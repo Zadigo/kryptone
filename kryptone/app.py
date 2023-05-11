@@ -9,12 +9,12 @@ import requests
 from lxml import etree
 from nltk.tokenize import NLTKWordTokenizer
 from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver import ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from sklearn.feature_extraction.text import CountVectorizer
-from utils import read_json_document, write_json_document
+from utils import read_json_document, write_json_document, RANDOM_USER_AGENT
 
 from kryptone.kryptone import cache, logger
 
@@ -193,12 +193,24 @@ class BaseCrawler(SEOMixin, EmailMixin):
             'C:/Users/pendenquej\Downloads/chromedriver_win32/chromedriver.exe'
         )
         self._start_url_object = urlparse(self.start_url)
+
+        # options = ChromeOptions()
+        # options.add_argument(f"--proxy-server={}")
+
         self.driver = Chrome(executable_path=path)
         self.urls_to_visit.add(self.start_url)
 
     @property
     def get_html_page_content(self):
         return self.driver.page_source
+
+    def build_headers(self, options):
+        headers = {
+            'User-Agent': RANDOM_USER_AGENT(),
+            'Accept-Language': 'en-US,en;q=0.9'
+        }
+        items = [f"--header={key}={value})" for key, value in headers.items()]
+        options.add_argument(' '.join(items))
     
     def run_validators(self, url):
         """Validates an url before it is
