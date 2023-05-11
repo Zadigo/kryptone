@@ -13,12 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from sklearn.feature_extraction.text import CountVectorizer
-
-
-def write_to_document(filename):
-    with open(filename, encoding='utf-8') as f:
-        pass
-
+from kryptone.utils import read_json_document
 
 class TextMixin:
     tokenizer_class = NLTKWordTokenizer
@@ -245,6 +240,14 @@ class BaseCrawler(SEOMixin, EmailMixin):
     def run_actions(self, current_url, **kwargs):
         """Run additional actions of the currently
         visited web page"""
+
+    def resume(self, **kwargs):
+        """From a previous list of urls to visit and
+        visited urls, resume web scrapping"""
+        data = read_json_document('cache.json')
+        self.urls_to_visit = data['urls_to_visit']
+        self.visited_urls = data['visited_urls']
+        self.start(**kwargs)
 
     def start(self, start_urls=[], wait_time=25):
         """Entrypoint to start the web scrapper"""
