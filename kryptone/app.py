@@ -1,10 +1,10 @@
-import json
 import os
 import re
 import time
 from collections import Counter, defaultdict
 from urllib.parse import urlparse
 
+import requests
 from lxml import etree
 from nltk.tokenize import NLTKWordTokenizer
 from selenium.webdriver import Chrome
@@ -13,7 +13,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from sklearn.feature_extraction.text import CountVectorizer
-from kryptone.utils import read_json_document
+from utils import read_json_document, write_json_document
+
+from kryptone.kryptone import cache, logger
+
 
 class TextMixin:
     tokenizer_class = NLTKWordTokenizer
@@ -180,6 +183,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
     start_url = None
     urls_to_visit = set()
     visited_urls = set()
+    url_validators = []
 
     def __init__(self):
         path = os.environ.get(
@@ -188,12 +192,25 @@ class BaseCrawler(SEOMixin, EmailMixin):
         )
         self._start_url_object = urlparse(self.start_url)
         self.driver = Chrome(executable_path=path)
-        self.history = defaultdict(dict)
         self.urls_to_visit.add(self.start_url)
 
     @property
     def get_html_page_content(self):
         return self.driver.page_source
+    
+    def run_validators(self, url):
+        results = []
+        if self.url_validators:
+            for validator in self.url_validators:
+                if not callable(validator):
+                    continue
+
+                result = validator(url, driver=self.driver)
+                if result is None:
+                    result = False
+                results.append(result)
+            return all(results)
+        return True
     
     def scroll_to(self, percentage=80):
         percentage = percentage / 100
@@ -233,9 +250,9 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
 
             self.urls_to_visit.add(link)
-        print('Found', len(elements))
-        print(len(self.urls_to_visit), 'urls left to visit')
-        # self.history[self.driver.current_url] = current_page_urls
+
+        logger.instance.info(f"Found {len(elements)} urls")
+        logger.instance.info(f"{len(self.urls_to_visit)} urls left to visit")
 
     def run_actions(self, current_url, **kwargs):
         """Run additional actions of the currently
@@ -248,6 +265,14 @@ class BaseCrawler(SEOMixin, EmailMixin):
         self.urls_to_visit = data['urls_to_visit']
         self.visited_urls = data['visited_urls']
         self.start(**kwargs)
+
+    def start_from_xml(self, url):
+        if not url.endswith('.xml'):
+            raise ValueError()
+        
+        response = requests.get(url)
+        parser = etree.XMLParser(encoding='utf-8')
+        xml = etree.fromstring(response.content, parser)
 
     def start(self, start_urls=[], wait_time=25):
         """Entrypoint to start the web scrapper"""
@@ -273,11 +298,20 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             self.get_page_urls()
             self.run_actions(current_url)
+
+            urls_data = {
+                'urls_to_visit': list(self.urls_to_visit),
+                'visited_urls': list(self.visited_urls)
+            }
+            cache.set_value('urls_data', urls_data)
+
+            write_json_document('cache.json', urls_data)
             time.sleep(wait_time)
 
 
+
 class Test(BaseCrawler):
-    start_url = 'https://www.lille-immo.fr/'
+    start_url = 'https://www.cvs-avocats.com/fr/'
 
     def run_actions(self, current_url, **kwargs):
         emails = self.find_emails_from_text(self.get_page_text)
