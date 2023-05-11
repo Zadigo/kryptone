@@ -1,3 +1,4 @@
+from multiprocessing import Process
 import os
 import re
 import time
@@ -184,6 +185,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
     urls_to_visit = set()
     visited_urls = set()
     url_validators = []
+    url_filters = []
 
     def __init__(self):
         path = os.environ.get(
@@ -199,6 +201,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
         return self.driver.page_source
     
     def run_validators(self, url):
+        """Validates an url before it is
+        included in the list of urls to visit"""
         results = []
         if self.url_validators:
             for validator in self.url_validators:
@@ -209,8 +213,28 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 if result is None:
                     result = False
                 results.append(result)
-            return all(results)
+            test_result = all(results)
+
+            if test_result:
+                message = f"Validation successful for {url}"
+            else:
+                message = f"Validation failed for {url}"
+            logger.instance.info(message)
         return True
+    
+    def run_filters(self, exclude=True):
+        """Filters out or in urls
+        included in the list of urls to visit.
+        The default action is to exclude all urls that
+        meet specified conditions"""
+        urls_to_filter = []
+        for instance in self.url_filters:
+            if not urls_to_filter:
+                urls_to_filter = list(filter(instance, self.urls_to_visit))
+            else:
+                urls_to_filter = list(filter(instance, urls_to_filter))
+        logger.instance.info(f"Filter runned on {len(self.urls_to_visit)} - {len(urls_to_filter)} urls remaining")
+        return urls_to_filter
     
     def scroll_to(self, percentage=80):
         percentage = percentage / 100
@@ -230,6 +254,12 @@ class BaseCrawler(SEOMixin, EmailMixin):
         for element in elements:
             link = element.get_attribute('href')
             link_object = urlparse(link)
+
+            if link in self.urls_to_visit:
+                continue
+
+            if link in self.visited_urls:
+                continue
             
             if link_object.netloc != self._start_url_object.netloc:
                 continue
@@ -252,7 +282,6 @@ class BaseCrawler(SEOMixin, EmailMixin):
             self.urls_to_visit.add(link)
 
         logger.instance.info(f"Found {len(elements)} urls")
-        logger.instance.info(f"{len(self.urls_to_visit)} urls left to visit")
 
     def run_actions(self, current_url, **kwargs):
         """Run additional actions of the currently
@@ -276,11 +305,13 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
     def start(self, start_urls=[], wait_time=25):
         """Entrypoint to start the web scrapper"""
+        logger.instance.info('Starting Kryptone...')
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
+            logger.instance.info(f"{len(self.urls_to_visit)} urls left to visit")
 
             current_url_object = urlparse(current_url)
             # If we are not the same domain as the start
@@ -306,18 +337,26 @@ class BaseCrawler(SEOMixin, EmailMixin):
             cache.set_value('urls_data', urls_data)
 
             write_json_document('cache.json', urls_data)
+
+            logger.instance.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
 
 
-
 class Test(BaseCrawler):
-    start_url = 'https://www.cvs-avocats.com/fr/'
+    start_url = 'http://gency313.fr/'
 
     def run_actions(self, current_url, **kwargs):
         emails = self.find_emails_from_text(self.get_page_text)
-        print(emails)
+        # print(emails)
 
 
 if __name__ == '__main__':
     t = Test()
-    t.start()
+    t.start(wait_time=10)
+    
+    try:
+        process = Process(target=t.start, kwargs={'wait_time': 10})
+        process.start()
+        process.join()
+    except:
+        process.close()
