@@ -69,7 +69,7 @@ class TextMixin:
         vectorizer = CountVectorizer(
             stop_words=self.get_stop_words(),
             max_features=50,
-            # preprocessor=text_preprocessor,
+            preprocessor=text_preprocessor,
             # max_df=0.85
         )
         matrix = vectorizer.fit_transform(self.page_documents)
@@ -165,7 +165,7 @@ class SEOMixin(TextMixin):
 
     def global_audit(self, language='fr'):
         _, vocabulary = self.vectorize_pages(self.get_page_text)
-        return vocabulary
+        return self.normalize_integers(vocabulary)
     
     def audit_page(self, current_url, language='fr'):
         """Audit the current page by analyzing different
@@ -381,7 +381,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
 
-    def start(self, start_urls=[], wait_time=25, language='fr'):
+    def start(self, start_urls=[], wait_time=25, language='en'):
         """Entrypoint to start the web scrapper"""
         logger.instance.info('Starting Kryptone...')
         if start_urls:
@@ -436,8 +436,8 @@ def do_not_visit_blog(url):
 
 
 class Test(BaseCrawler):
-    start_url = 'https://corporama.fr/'
-    # start_url = 'https://example.com'
+    # start_url = 'https://corporama.fr/'
+    start_url = 'https://example.com'
     url_filters = [do_not_visit_blog]
 
 
