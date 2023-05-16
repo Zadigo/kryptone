@@ -61,6 +61,16 @@ class TextMixin:
             # words = re.split('\s+', text)
             # stemmed_words = [porter_stemmer.stem(word=word) for word in words]
             # return ' '.join(stemmed_words)
+
+            # text = text.lower()
+            # text = re.sub("\\W", " ", text)  # remove special chars
+            # text = re.sub("\\s+(in|the|all|for|and|on)\\s+",
+            #             " _connector_ ", text)  # normalize certain words
+
+            # # stem words
+            # words = re.split("\\s+", text)
+            # stemmed_words = [porter_stemmer.stem(word=word) for word in words]
+            # return ' '.join(stemmed_words)
             return text
 
         text = self.clean_html_text(raw_text)
