@@ -1,9 +1,9 @@
 import logging
 import pathlib
 from collections import defaultdict
+import pathlib
 
 PROJECT_PATH = pathlib.Path('.').absolute()
-
 
 class Logger:
     instance = None
