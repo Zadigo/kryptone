@@ -1,4 +1,3 @@
-import re
 from collections import defaultdict
 from functools import lru_cache
 
@@ -7,7 +6,7 @@ from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
 from sklearn.feature_extraction.text import CountVectorizer
 
-from kryptone.kryptone import PROJECT_PATH
+from kryptone import PROJECT_PATH
 
 
 class TextMixin:
