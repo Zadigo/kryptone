@@ -1,25 +1,26 @@
-from multiprocessing import Process
 import os
 import re
 import time
 from collections import Counter, defaultdict
+from functools import lru_cache, cached_property
+from multiprocessing import Process
 from urllib.parse import urlparse
 
 import requests
 from lxml import etree
-from nltk.tokenize import NLTKWordTokenizer
-from selenium.webdriver import Chrome
-from selenium.webdriver import ChromeOptions
+from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
+from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from sklearn.feature_extraction.text import CountVectorizer
-from utils import read_json_document, write_json_document, RANDOM_USER_AGENT
+from utils import RANDOM_USER_AGENT, read_json_document, write_json_document
 
-from kryptone.kryptone import cache, logger
+from kryptone.kryptone import PROJECT_PATH, cache, logger
 
 
 class TextMixin:
+    page_documents = []
     tokenizer_class = NLTKWordTokenizer
 
     @staticmethod
@@ -27,51 +28,80 @@ class TextMixin:
         """Get the length of the
         incoming text"""
         return len(text)
+
+    @lru_cache(maxsize=100)
+    def get_stop_words(self, language='fr'):
+        filename = 'stop_words_french' if language == 'fr' else 'stop_words_english'
+        file_path = PROJECT_PATH / f'kryptone/data/{filename}.txt'
+        with open(file_path, mode='r', encoding='utf-8') as f:
+            stop_words = ''.join(f.readlines())
+
+            tokenizer = LineTokenizer()
+            stop_words = tokenizer.tokenize(stop_words)
+        return stop_words
+    
+    def clean_html_text(self, raw_text):
+        tokenizer = LineTokenizer()
+        tokens = tokenizer.tokenize(raw_text)
+        text = ' '.join(tokens)
+        return text
+    
+    def vectorize_pages(self, raw_text):
+        """Return the most common words from the website
+        by continuously building the page_documents and
+        analyzing their content"""
+        text = self.clean_html_text(raw_text)
+        self.page_documents.append(text)
+
+        vectorizer = CountVectorizer(
+            stop_words=self.get_stop_words(),
+            max_df=1.0
+        )
+        matrix = vectorizer.fit_transform(self.page_documents)
+        return matrix, vectorizer.vocabulary_
+
+    def vectorize_page(self, raw_text, language='fr'):
+        text = self.clean_html_text(raw_text)
+        vectorizer = CountVectorizer(
+            stop_words=self.get_stop_words(language=language),
+            max_df=1.0
+        )
+        matrix = vectorizer.fit_transform([text])
+        return matrix, vectorizer.vocabulary_
     
     def tokenize(self, text):
         """Create word tokens from a text"""
         instance = self.tokenizer_class()
         return instance.tokenize(text)
 
-    def get_vectorizer(self, language='en'):
-        """Vectorize a document"""
-        filename = 'stop_words_french' if language == 'fr' else 'stop_words_english'
-        # text = storage.get_file_content(filename)
-
-        # tokenizer = LineTokenizer()
-        # french_stop_words = tokenizer.tokenize(text)
-
-        # return CountVectorizer(
-        #     stop_words=french_stop_words,
-        #     max_df=1.0
-        # )
-
 
 class SEOMixin(TextMixin):
+    page_audits = defaultdict(dict)
     error_pages = set()
 
     @property
     def get_page_images(self):
-        return self.driver.find_element(By.TAG_NAME, 'img')
+        return self.driver.find_elements(By.TAG_NAME, 'img')
 
     @property
     def get_page_title(self):
-        element = self.driver.find_element(By.TAG_NAME, 'title')
         try:
-            return element.text
+            script = "return document.querySelector('title').innerText"
+            text = self.driver.execute_script(script)
         except:
             return ''
+        else:
+            return text
     
     @property
     def get_page_description(self):
-        element = self.driver.find_element(
-            By.CSS_SELECTOR,
-            "meta[name='description']"
-        )
         try:
-            return element.text
+            script = """return document.querySelector('meta[name="description"]').attributes.content.textContent"""
+            text = self.driver.execute_script(script)
         except:
             return ''
+        else:
+            return text
         
     @property
     def get_page_keywords(self):
@@ -86,30 +116,36 @@ class SEOMixin(TextMixin):
         
     @property
     def has_head_title(self):
-        element = self.driver.find_element(By.TAG_NAME, 'h1')
-        return True if element else False
+        try:
+            element = self.driver.find_element(By.TAG_NAME, 'h1')
+        except:
+            return False
+        else:
+            return True if element else False
     
     @property
     def title_is_valid(self):
-        return self.get_page_title <= 60
+        return len(self.get_page_title) <= 60
     
     @property
     def description_is_valid(self):
-        return self.get_page_title <= 150
+        return len(self.get_page_title) <= 150
     
     @property
     def get_page_text(self):
-        return self.driver.find_element(By.XPATH, '//body').text
-        
-    def most_common_words(self):
-        counter = Counter(self.tokenize(self.get_page_text))
-        most_common = counter.most_common(10)
-        return most_common
+        return self.driver.find_element(By.TAG_NAME, 'body').text
     
     def get_page_status_code(self):
         pass
+
+    def global_audit(self, language='fr'):
+        _, vocabulary = self.vectorize_pages(self.get_page_text)
+        return vocabulary
     
-    def build_complete_page_audit(self, current_url):
+    def audit_page(self, current_url, language='fr'):
+        """Audit the current page by analyzing different
+        key metrics from the title, the description etc."""
+        _, vocabulary = self.vectorize_page(self.get_page_text, language=language)
         audit = {
             'title': self.get_page_title,
             'title_length': self.get_text_length(self.get_page_title),
@@ -119,11 +155,12 @@ class SEOMixin(TextMixin):
             'description_is_valid': self.description_is_valid,
             'url': current_url,
             'page_content_length': len(self.get_page_text),
-            'word_count_analysis': dict(self.most_common_words()),
+            'word_count_analysis': vocabulary,
             'status_code': None
         }
+        self.page_audits[current_url] = audit
         return audit
-
+    
 
 class EmailMixin(TextMixin):
     emails_container = set()
@@ -245,7 +282,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 urls_to_filter = list(filter(instance, self.urls_to_visit))
             else:
                 urls_to_filter = list(filter(instance, urls_to_filter))
-        logger.instance.info(f"Filter runned on {len(self.urls_to_visit)} - {len(urls_to_filter)} urls remaining")
+        logger.instance.info(f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining")
         return urls_to_filter
     
     def scroll_to(self, percentage=80):
@@ -293,6 +330,9 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             self.urls_to_visit.add(link)
 
+        # TODO: Filter pages that we do not want to visit
+        self.urls_to_visit = set(self.run_filters())
+
         logger.instance.info(f"Found {len(elements)} urls")
 
     def run_actions(self, current_url, **kwargs):
@@ -315,7 +355,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
 
-    def start(self, start_urls=[], wait_time=25):
+    def start(self, start_urls=[], wait_time=25, language='fr'):
         """Entrypoint to start the web scrapper"""
         logger.instance.info('Starting Kryptone...')
         if start_urls:
@@ -350,16 +390,29 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             write_json_document('cache.json', urls_data)
 
+            # Audit the website
+            self.audit_page(current_url, language=language)
+            vocabulary = self.global_audit(language=language)
+            write_json_document('audit.json', self.page_audits)
+            write_json_document('global_audit.json', vocabulary)
+
+            cache.set_value('page_audits', self.page_audits)
+            cache.set_value('global_audit', vocabulary)
+
             logger.instance.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
 
 
-class Test(BaseCrawler):
-    start_url = 'http://gency313.fr/'
+def do_not_visit_blog(url):
+    if '/blog/' in url:
+        return False
+    return True
 
-    def run_actions(self, current_url, **kwargs):
-        emails = self.find_emails_from_text(self.get_page_text)
-        # print(emails)
+
+class Test(BaseCrawler):
+    start_url = 'https://corporama.fr/'
+    # start_url = 'https://example.com'
+    url_filters = [do_not_visit_blog]
 
 
 if __name__ == '__main__':
@@ -372,3 +425,6 @@ if __name__ == '__main__':
         process.join()
     except:
         process.close()
+    # text = """La suite d’API Stripe permet aux entreprises en ligne d’accepter des paiements, de transférer des fonds et de se développer rapidement à l’échelle mondiale."""
+    # m = TextMixin()
+    # print(m.vectorize(text, language='fr'))
