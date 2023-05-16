@@ -150,6 +150,16 @@ class SEOMixin(TextMixin):
     def get_page_text(self):
         return self.driver.find_element(By.TAG_NAME, 'body').text
     
+    @staticmethod
+    def normalize_integers(items):
+        # The vectorizer returns int32 integers
+        # which crashes the JSON output. Convert
+        # these integers to normal ones.
+        new_item = {}
+        for key, value in items.items():
+            new_item[key] = int(value)
+        return new_item
+    
     def get_page_status_code(self):
         pass
 
@@ -161,6 +171,7 @@ class SEOMixin(TextMixin):
         """Audit the current page by analyzing different
         key metrics from the title, the description etc."""
         _, vocabulary = self.vectorize_page(self.get_page_text, language=language)
+        vocabulary = self.normalize_integers(vocabulary)
         audit = {
             'title': self.get_page_title,
             'title_length': self.get_text_length(self.get_page_title),
@@ -408,7 +419,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
             # Audit the website
             self.audit_page(current_url, language=language)
             vocabulary = self.global_audit(language=language)
-            write_json_document('audit.json', dict(self.page_audits))
+            write_json_document('audit.json', self.page_audits)
             write_json_document('global_audit.json', vocabulary)
 
             cache.set_value('page_audits', self.page_audits)
