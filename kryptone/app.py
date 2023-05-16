@@ -440,6 +440,3 @@ if __name__ == '__main__':
         process.join()
     except:
         process.close()
-    # text = """La suite d’API Stripe permet aux entreprises en ligne d’accepter des paiements, de transférer des fonds et de se développer rapidement à l’échelle mondiale."""
-    # m = TextMixin()
-    # print(m.vectorize(text, language='fr'))
