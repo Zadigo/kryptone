@@ -2,12 +2,13 @@ import os
 import re
 import time
 from collections import Counter, defaultdict
-from functools import lru_cache, cached_property
+from functools import cached_property, lru_cache
 from multiprocessing import Process
 from urllib.parse import urlparse
 
 import requests
 from lxml import etree
+from nltk.stem import PorterStemmer
 from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by import By
@@ -50,12 +51,26 @@ class TextMixin:
         """Return the most common words from the website
         by continuously building the page_documents and
         analyzing their content"""
+        def text_preprocessor(text):
+            porter_stemmer = PorterStemmer()
+
+            # Remove special carachters
+            text = re.sub("\\W", " ", text)
+
+            # Use stem words
+            # words = re.split('\s+', text)
+            # stemmed_words = [porter_stemmer.stem(word=word) for word in words]
+            # return ' '.join(stemmed_words)
+            return text
+
         text = self.clean_html_text(raw_text)
         self.page_documents.append(text)
 
         vectorizer = CountVectorizer(
             stop_words=self.get_stop_words(),
-            max_df=1.0
+            max_features=50,
+            # preprocessor=text_preprocessor,
+            # max_df=0.85
         )
         matrix = vectorizer.fit_transform(self.page_documents)
         return matrix, vectorizer.vocabulary_
@@ -64,7 +79,7 @@ class TextMixin:
         text = self.clean_html_text(raw_text)
         vectorizer = CountVectorizer(
             stop_words=self.get_stop_words(language=language),
-            max_df=1.0
+            max_features=20
         )
         matrix = vectorizer.fit_transform([text])
         return matrix, vectorizer.vocabulary_
@@ -393,7 +408,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
             # Audit the website
             self.audit_page(current_url, language=language)
             vocabulary = self.global_audit(language=language)
-            write_json_document('audit.json', self.page_audits)
+            write_json_document('audit.json', dict(self.page_audits))
             write_json_document('global_audit.json', vocabulary)
 
             cache.set_value('page_audits', self.page_audits)
