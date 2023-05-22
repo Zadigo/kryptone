@@ -5,13 +5,15 @@ from urllib.parse import urlparse
 
 import requests
 from lxml import etree
+from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from utils import RANDOM_USER_AGENT, read_json_document, write_json_document
 
 from kryptone import cache, logger
 from kryptone.mixins import EmailMixin, SEOMixin
+from kryptone.utils import (RANDOM_USER_AGENT, read_json_document,
+                            write_json_document)
 
 
 class BaseCrawler(SEOMixin, EmailMixin):
@@ -20,8 +22,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    # webdriver = Chrome
-    webdriver = Edge
+    webdriver = Chrome
+    # webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
