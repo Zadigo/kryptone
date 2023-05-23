@@ -5,13 +5,15 @@ from urllib.parse import urlparse
 
 import requests
 from lxml import etree
+from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from utils import RANDOM_USER_AGENT, read_json_document, write_json_document
 
-from kryptone import cache, logger
+from kryptone import cache, logger, settings
 from kryptone.mixins import EmailMixin, SEOMixin
+from kryptone.utils.file_readers import read_json_document, write_json_document
+from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
 class BaseCrawler(SEOMixin, EmailMixin):
@@ -26,14 +28,18 @@ class BaseCrawler(SEOMixin, EmailMixin):
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
         if path is None:
-            logger.instance.error('Could not find web driver')
+            logger.error('Could not find web driver')
         else:
             self._start_url_object = urlparse(self.start_url)
 
-            # options = ChromeOptions()
+            options = EdgeOptions()
+            options.add_argument('--remote-allow-origins=*')
             # options.add_argument(f"--proxy-server={}")
 
-            self.driver = self.webdriver(executable_path=path)
+            self.driver = self.webdriver(
+                executable_path=path,
+                options=options
+            )
             self.urls_to_visit.add(self.start_url)
 
     @property
@@ -67,7 +73,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 message = f"Validation successful for {url}"
             else:
                 message = f"Validation failed for {url}"
-            logger.instance.info(message)
+            logger.info(message)
         return True
 
     def run_filters(self, exclude=True):
@@ -81,8 +87,9 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 urls_to_filter = list(filter(instance, self.urls_to_visit))
             else:
                 urls_to_filter = list(filter(instance, urls_to_filter))
-        logger.instance.info(
-            f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining")
+        logger.info(
+            f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining"
+        )
         return urls_to_filter
 
     def scroll_to(self, percentage=80):
@@ -134,7 +141,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         # TODO: Filter pages that we do not want to visit
         self.urls_to_visit = set(self.run_filters())
 
-        logger.instance.info(f"Found {len(elements)} urls")
+        logger.info(f"Found {len(elements)} urls")
 
     def run_actions(self, current_url, **kwargs):
         """Run additional actions of the currently
@@ -158,14 +165,15 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
     def start(self, start_urls=[], wait_time=25, language='en'):
         """Entrypoint to start the web scrapper"""
-        logger.instance.info('Starting Kryptone...')
+        logger.info('Started crawling...')
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
-            logger.instance.info(
-                f"{len(self.urls_to_visit)} urls left to visit")
+            logger.info(
+                f"{len(self.urls_to_visit)} urls left to visit"
+            )
 
             current_url_object = urlparse(current_url)
             # If we are not the same domain as the start
@@ -201,7 +209,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
             cache.set_value('page_audits', self.page_audits)
             cache.set_value('global_audit', vocabulary)
 
-            logger.instance.info(f"Waiting {wait_time} seconds...")
+            logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
 
 
@@ -218,13 +226,13 @@ class Test(BaseCrawler):
 
 
 if __name__ == '__main__':
-    # t = Test()
-    # t.start(wait_time=10)
+    t = Test()
+    t.start(wait_time=10)
 
-    # try:
-    #     process = Process(target=t.start, kwargs={'wait_time': 10})
-    #     process.start()
-    #     process.join()
-    # except:
-    #     process.close()
-    pass
+    try:
+        process = Process(target=t.start, kwargs={'wait_time': 10})
+        process.start()
+        process.join()
+    except:
+        process.close()
+    # pass

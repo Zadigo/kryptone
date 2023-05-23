@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from functools import lru_cache
 
