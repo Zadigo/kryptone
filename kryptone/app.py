@@ -82,16 +82,21 @@ class BaseCrawler(SEOMixin, EmailMixin):
         included in the list of urls to visit.
         The default action is to exclude all urls that
         meet specified conditions"""
-        urls_to_filter = []
-        for instance in self.url_filters:
-            if not urls_to_filter:
-                urls_to_filter = list(filter(instance, self.urls_to_visit))
-            else:
-                urls_to_filter = list(filter(instance, urls_to_filter))
-        logger.info(
-            f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining"
-        )
-        return urls_to_filter
+        # Ensure that we return the original
+        # urls to visit if there are no filters
+        # or this might return nothing 
+        if self.url_filters:
+            urls_to_filter = []
+            for instance in self.url_filters:
+                if not urls_to_filter:
+                    urls_to_filter = list(filter(instance, self.urls_to_visit))
+                else:
+                    urls_to_filter = list(filter(instance, urls_to_filter))
+            logger.info(
+                f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining"
+            )
+            return urls_to_filter
+        return self.urls_to_visit
 
     def scroll_to(self, percentage=80):
         percentage = percentage / 100
@@ -117,6 +122,11 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 continue
 
             if link in self.visited_urls:
+                continue
+
+            # Links such as http://exampe.com/path# 
+            # are useless and repetitive
+            if link.endswith('#'):
                 continue
 
             if link_object.netloc != self._start_url_object.netloc:
@@ -214,26 +224,17 @@ class BaseCrawler(SEOMixin, EmailMixin):
             time.sleep(wait_time)
 
 
-def do_not_visit_blog(url):
-    if '/blog/' in url:
-        return False
-    return True
-
-
 class Test(BaseCrawler):
-    # start_url = 'https://corporama.fr/'
-    start_url = 'https://example.com'
-    url_filters = [do_not_visit_blog]
+    start_url = 'http://bistrotduboucherversailles.com/'
 
 
 if __name__ == '__main__':
     t = Test()
-    t.start(wait_time=10)
+    # t.start()
 
     try:
-        process = Process(target=t.start, kwargs={'wait_time': 10})
+        process = Process(target=t.start, kwargs={'wait_time': 15})
         process.start()
         process.join()
     except:
         process.close()
-    # pass
