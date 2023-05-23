@@ -32,7 +32,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
         else:
             self._start_url_object = urlparse(self.start_url)
 
-            options = EdgeOptions()
+            # options = EdgeOptions()
+            options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             # options.add_argument(f"--proxy-server={}")
 
