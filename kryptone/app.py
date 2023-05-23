@@ -22,8 +22,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    # webdriver = Chrome
-    webdriver = Edge
+    webdriver = Chrome
+    # webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
