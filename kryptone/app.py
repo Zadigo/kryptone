@@ -12,7 +12,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import cache, logger, settings
 from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone.utils.file_readers import read_json_document, write_json_document, write_csv_document
+from kryptone.utils.file_readers import (read_json_document,
+                                         write_csv_document,
+                                         write_json_document)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
