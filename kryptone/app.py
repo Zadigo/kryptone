@@ -12,7 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import cache, logger, settings
 from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone.utils.file_readers import read_json_document, write_json_document
+from kryptone.utils.file_readers import read_json_document, write_json_document, write_csv_document
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
@@ -46,6 +46,10 @@ class BaseCrawler(SEOMixin, EmailMixin):
     @property
     def get_html_page_content(self):
         return self.driver.page_source
+    
+    @property
+    def get_page_link_elements(self):
+        return self.driver.find_elements(By.TAG_NAME, 'a')
 
     def build_headers(self, options):
         headers = {
@@ -84,7 +88,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         meet specified conditions"""
         # Ensure that we return the original
         # urls to visit if there are no filters
-        # or this might return nothing 
+        # or this might return nothing
         if self.url_filters:
             urls_to_filter = []
             for instance in self.url_filters:
@@ -112,8 +116,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
             "window.scrollTo(0, document.body.scrollHeight);")
 
     def get_page_urls(self, same_domain=True):
-        # current_page_urls = set()
-        elements = self.driver.find_elements(By.TAG_NAME, 'a')
+        elements = self.get_page_link_elements
         for element in elements:
             link = element.get_attribute('href')
             link_object = urlparse(link)
@@ -124,7 +127,10 @@ class BaseCrawler(SEOMixin, EmailMixin):
             if link in self.visited_urls:
                 continue
 
-            # Links such as http://exampe.com/path# 
+            if link is None or link == '':
+                continue
+
+            # Links such as http://exampe.com/path#
             # are useless and repetitive
             if link.endswith('#'):
                 continue
@@ -212,29 +218,39 @@ class BaseCrawler(SEOMixin, EmailMixin):
             write_json_document('cache.json', urls_data)
 
             # Audit the website
-            self.audit_page(current_url, language=language)
-            vocabulary = self.global_audit(language=language)
-            write_json_document('audit.json', self.page_audits)
-            write_json_document('global_audit.json', vocabulary)
+            # self.audit_page(current_url, language=language)
+            # vocabulary = self.global_audit(language=language)
+            # write_json_document('audit.json', self.page_audits)
+            # write_json_document('global_audit.json', vocabulary)
 
             cache.set_value('page_audits', self.page_audits)
-            cache.set_value('global_audit', vocabulary)
+            # cache.set_value('global_audit', vocabulary)
 
+            self.emails(self.get_page_text, elements=self.get_page_link_elements)
+            write_csv_document('emails.csv', self.emails_container)
+ 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
 
 
+def url_filter(url):
+    if '/actualites/' in url:
+        return False
+    return True
+
+
 class Test(BaseCrawler):
-    start_url = 'http://bistrotduboucherversailles.com/'
+    start_url = 'https://www.groupeleduff.com/'
+    url_filters = [url_filter]
 
 
 if __name__ == '__main__':
     t = Test()
-    # t.start()
+    t.start(wait_time=10)
 
-    try:
-        process = Process(target=t.start, kwargs={'wait_time': 15})
-        process.start()
-        process.join()
-    except:
-        process.close()
+    # try:
+    #     process = Process(target=t.start, kwargs={'wait_time': 15})
+    #     process.start()
+    #     process.join()
+    # except:
+    #     process.close()
