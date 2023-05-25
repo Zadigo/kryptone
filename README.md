@@ -18,6 +18,27 @@ scrapper = MyWebscrapper()
 scrapper.start()
 ```
 
+### Filtering urls
+
+Urls can be filtered by passing in a filter function in `url_filters`. This function should always return a boolean.
+
+The url filtering functions a run consecutively 
+
+For instance , let's say we want to avoid any url that contains `/shirts/`:
+
+```python
+
+def avoid_shirts(url):
+    if '/shirts/' in url:
+        return False
+    return True
+
+
+class MyScrapper(BaseCrawler):
+    start_url = 'http://example.com'
+    url_filters = [avoid_shirts]
+```
+
 ## Parameters
 
 ### Wait time
