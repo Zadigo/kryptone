@@ -9,6 +9,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from kryptone import PROJECT_PATH
 
+EMAIL_REGEX = r'\S+\@\S+'
+
 
 class TextMixin:
     page_documents = []
@@ -207,7 +209,7 @@ class EmailMixin(TextMixin):
 
     @staticmethod
     def parse_url(element):
-        value = element.get_attibute('href')
+        value = element.get_attribute('href')
         if value is not None and '@' in value:
             return value
         return None
@@ -215,19 +217,19 @@ class EmailMixin(TextMixin):
     def parse_protected_email(self, email):
         pass
 
-    def emails(self):
+    def emails(self, text, elements=None):
         """Returns a set of valid email
         addresses on the current page"""
         def validate_values(value):
             if value is None:
                 return False
 
-            result = re.match(r'^(?:mailto\:)?(.*\@.*)$', value)
+            result = re.match(EMAIL_REGEX, value)
             if result:
                 return True
 
-        emails_from_text = self.find_emails_from_links('')
-        emails_from_links = self.find_emails_from_text('')
+        emails_from_text = self.find_emails_from_links(elements)
+        emails_from_links = self.find_emails_from_text(text)
         unvalidated_emails = emails_from_text.union(emails_from_links)
 
         valid_items = list(filter(validate_values, unvalidated_emails))
