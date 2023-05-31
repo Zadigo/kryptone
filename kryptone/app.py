@@ -241,10 +241,17 @@ class Kiabi(BaseCrawler):
     start_url = 'https://www.kiabi.com/femme_200005'
     products = []
 
-    def _products(self):
+    def _products(self, unique=False):
+        unique_products = set()
         result = []
         for item in self.products:
-            result.append(item.get_items())
+            items = item.get_items()
+
+            if item.name in unique_products:
+                continue
+
+            result.append(items)
+            unique_products.add(item.name)
         return result
 
     def _get_products(self):
@@ -254,6 +261,7 @@ class Kiabi(BaseCrawler):
 
         results = self.driver.execute_script("""
         const a = document.querySelectorAll('div[class^="productCard_productCardContainer"]')
+
         return Array.from(a).map((productCard) => {
             var product = {
                 url: null,
@@ -269,24 +277,22 @@ class Kiabi(BaseCrawler):
             }
             product.url = productCard.querySelector('a').href
 
-            Array.from(spanElements).forEach((spanElement) => {
-                var classList = Array.from(spanElement.classList)
-                if (classList.some(str => str.includes('productPrice_priceOverride'))) {
-                    product.old_price = spanElement.innerText
-                }
+            var firstPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:first-of-type')
+            var lastPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:last-of-type')
 
-                if (classList.some(str => str.includes('productPrice_pricePromo'))) {
-                    product.new_price = spanElement.innerText
-                }
-            })
+            if (firstPrice) {
+                product.old_price = firstPrice.innerText
+            }
+
+            if (lastPrice) {
+                product.new_price = lastPrice.innerText
+            }
 
             return product
         })
         """)
         for result in results:
             product = Product(**result)
-            if product in self.products:
-                continue
             self.products.append(product)
 
     def run_actions(self, current_url, **kwargs):
@@ -303,7 +309,7 @@ class Kiabi(BaseCrawler):
             base = base + 2000
             time.sleep(10)
             self._get_products()
-            write_json_document('kiabi.json', self._products())
+            write_json_document('kiabi.json', self._products(unique=True))
 
 
 if __name__ == '__main__':
