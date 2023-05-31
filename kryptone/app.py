@@ -48,7 +48,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
     @property
     def get_html_page_content(self):
         return self.driver.page_source
-    
+
     @property
     def get_page_link_elements(self):
         return self.driver.find_elements(By.TAG_NAME, 'a')
@@ -182,7 +182,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
 
-    def start(self, start_urls=[], wait_time=25, language='en'):
+    def start(self, start_urls=[], wait_time=25, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
         logger.info('Started crawling...')
         if start_urls:
@@ -208,7 +208,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             self.visited_urls.add(current_url)
 
-            self.get_page_urls()
+            if crawl:
+                self.get_page_urls()
             self.run_actions(current_url)
 
             urls_data = {
@@ -228,27 +229,86 @@ class BaseCrawler(SEOMixin, EmailMixin):
             cache.set_value('page_audits', self.page_audits)
             # cache.set_value('global_audit', vocabulary)
 
-            self.emails(self.get_page_text, elements=self.get_page_link_elements)
+            self.emails(self.get_page_text,
+                        elements=self.get_page_link_elements)
             write_csv_document('emails.csv', self.emails_container)
- 
+
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
 
 
-def url_filter(url):
-    if '/actualites/' in url:
-        return False
-    return True
+class Kiabi(BaseCrawler):
+    start_url = 'https://www.kiabi.com/femme_200005'
+    products = []
 
+    def _products(self):
+        result = []
+        for item in self.products:
+            result.append(item.get_items())
+        return result
 
-class Test(BaseCrawler):
-    start_url = 'https://www.groupeleduff.com/'
-    url_filters = [url_filter]
+    def _get_products(self):
+        """Polls the page for new products 
+        continuously"""
+        from kryptone.db.models import Product
+
+        results = self.driver.execute_script("""
+        const a = document.querySelectorAll('div[class^="productCard_productCardContainer"]')
+        return Array.from(a).map((productCard) => {
+            var product = {
+                url: null,
+                name: null,
+                old_price: null,
+                new_price: null
+            }
+            var h2 = productCard.querySelector('h2')
+            var spanElements = productCard.getElementsByTagName('span')
+
+            if (h2) {
+                product.name = h2.innerText
+            }
+            product.url = productCard.querySelector('a').href
+
+            Array.from(spanElements).forEach((spanElement) => {
+                var classList = Array.from(spanElement.classList)
+                if (classList.some(str => str.includes('productPrice_priceOverride'))) {
+                    product.old_price = spanElement.innerText
+                }
+
+                if (classList.some(str => str.includes('productPrice_pricePromo'))) {
+                    product.new_price = spanElement.innerText
+                }
+            })
+
+            return product
+        })
+        """)
+        for result in results:
+            product = Product(**result)
+            if product in self.products:
+                continue
+            self.products.append(product)
+
+    def run_actions(self, current_url, **kwargs):
+        # button[0].scrollIntoView()
+        self.driver.execute_script("""
+        const xpath = '//div[@class="productList_buttonContainer__WURDD"]/button'
+        const button = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
+        button.click()
+        """)
+
+        base = 8000
+        for _ in range(1000):
+            self.driver.execute_script(f'window.scroll(0, {base})')
+            base = base + 2000
+            time.sleep(10)
+            self._get_products()
+            write_json_document('kiabi.json', self._products())
 
 
 if __name__ == '__main__':
-    t = Test()
-    t.start(wait_time=10)
+    t = Kiabi()
+    t.start(wait_time=10, crawl=False)
 
     # try:
     #     process = Process(target=t.start, kwargs={'wait_time': 15})
