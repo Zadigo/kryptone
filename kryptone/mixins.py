@@ -13,6 +13,9 @@ EMAIL_REGEX = r'\S+\@\S+'
 
 
 class TextMixin:
+    """A mixin for analyzing 
+    working with text"""
+
     page_documents = []
     tokenizer_class = NLTKWordTokenizer
 
@@ -93,6 +96,9 @@ class TextMixin:
 
 
 class SEOMixin(TextMixin):
+    """A mixin for auditing a 
+    web page"""
+
     page_audits = defaultdict(dict)
     error_pages = set()
 
@@ -192,6 +198,9 @@ class SEOMixin(TextMixin):
 
 
 class EmailMixin(TextMixin):
+    """A mixin for extracting emails
+    from a given page"""
+    
     emails_container = set()
 
     @staticmethod

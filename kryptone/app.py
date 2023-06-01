@@ -237,88 +237,95 @@ class BaseCrawler(SEOMixin, EmailMixin):
             time.sleep(wait_time)
 
 
-class Kiabi(BaseCrawler):
-    start_url = 'https://www.kiabi.com/femme_200005'
-    products = []
+# class Kiabi(BaseCrawler):
+#     start_url = 'https://www.kiabi.com/femme_200005'
+#     products = []
 
-    def _products(self, unique=False):
-        unique_products = set()
-        result = []
-        for item in self.products:
-            items = item.get_items()
+#     def _products(self, unique=False):
+#         """Returns a list of unique products
+#         from the page"""
+#         unique_products = set()
+#         result = []
+#         for item in self.products:
+#             items = item.get_items()
 
-            if item.name in unique_products:
-                continue
+#             if item.name in unique_products:
+#                 continue
 
-            result.append(items)
-            unique_products.add(item.name)
-        return result
+#             result.append(items)
+#             unique_products.add(item.name)
+#         return result
 
-    def _get_products(self):
-        """Polls the page for new products 
-        continuously"""
-        from kryptone.db.models import Product
+#     def _poll_products(self):
+#         """Polls the page for new products 
+#         continuously as we keep scrolling
+#         down the rest of the page"""
+#         from kryptone.db.models import Product
 
-        results = self.driver.execute_script("""
-        const a = document.querySelectorAll('div[class^="productCard_productCardContainer"]')
+#         results = self.driver.execute_script("""
+#         // Select the containers for the different products
+#         const a = document.querySelectorAll('div[class^="productCard_productCardContainer"]')
 
-        return Array.from(a).map((productCard) => {
-            var product = {
-                url: null,
-                name: null,
-                old_price: null,
-                new_price: null
-            }
-            var h2 = productCard.querySelector('h2')
-            var spanElements = productCard.getElementsByTagName('span')
+#         // Parse each products
+#         return Array.from(a).map((productCard) => {
+#             var product = {
+#                 url: null,
+#                 name: null,
+#                 old_price: null,
+#                 new_price: null
+#             }
+#             var h2 = productCard.querySelector('h2')
+#             var spanElements = productCard.getElementsByTagName('span')
 
-            if (h2) {
-                product.name = h2.innerText
-            }
-            product.url = productCard.querySelector('a').href
+#             if (h2) {
+#                 product.name = h2.innerText
+#             }
+#             product.url = productCard.querySelector('a').href
 
-            var firstPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:first-of-type')
-            var lastPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:last-of-type')
+#             // Sometimes we have two prices: discounted, original
+#             var firstPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:first-of-type')
+#             var lastPrice = productCard.querySelector('div[data-testid="productListCardInformations"] span[data-testid="productList_span_cardPrice"] span:last-of-type')
 
-            if (firstPrice) {
-                product.old_price = firstPrice.innerText
-            }
+#             if (firstPrice) {
+#                 product.old_price = firstPrice.innerText
+#             }
 
-            if (lastPrice) {
-                product.new_price = lastPrice.innerText
-            }
+#             if (lastPrice) {
+#                 product.new_price = lastPrice.innerText
+#             }
 
-            return product
-        })
-        """)
-        for result in results:
-            product = Product(**result)
-            self.products.append(product)
+#             return product
+#         })
+#         """)
+#         for result in results:
+#             product = Product(**result)
+#             self.products.append(product)
 
-    def run_actions(self, current_url, **kwargs):
-        # button[0].scrollIntoView()
-        self.driver.execute_script("""
-        const xpath = '//div[@class="productList_buttonContainer__WURDD"]/button'
-        const button = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
-        button.click()
-        """)
+#     def run_actions(self, current_url, **kwargs):
+#         # button[0].scrollIntoView()
+#         self.driver.execute_script("""
+#         // Clicks on the button to load more products
+#         const xpath = '//div[@class="productList_buttonContainer__WURDD"]/button'
+#         const button = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
+#         button.click()
+#         """)
 
-        base = 8000
-        for _ in range(1000):
-            self.driver.execute_script(f'window.scroll(0, {base})')
-            base = base + 2000
-            time.sleep(10)
-            self._get_products()
-            write_json_document('kiabi.json', self._products(unique=True))
+#         base = 8000
+#         for _ in range(1000):
+#             self.driver.execute_script(f'window.scroll(0, {base})')
+#             base = base + 2000
+#             time.sleep(10)
+#             self._poll_products()
+#             write_json_document('kiabi.json', self._products(unique=True))
 
 
-if __name__ == '__main__':
-    t = Kiabi()
-    t.start(wait_time=10, crawl=False)
+# if __name__ == '__main__':
+#     t = Kiabi()
+#     t.start(wait_time=10, crawl=False)
 
-    # try:
-    #     process = Process(target=t.start, kwargs={'wait_time': 15})
-    #     process.start()
-    #     process.join()
-    # except:
-    #     process.close()
+#     # try:
+#     #     process = Process(target=t.start, kwargs={'wait_time': 15})
+#     #     process.start()
+#     #     process.join()
+#     # except:
+#     #     process.close()

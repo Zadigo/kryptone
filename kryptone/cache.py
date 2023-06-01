@@ -3,7 +3,9 @@ from collections import defaultdict
 
 class Cache:
     """A simple cache storage
-    for the web scrapper"""
+    for storing data during the
+    execution of the web scrapper"""
+
     configuration = None
     container = defaultdict(list)
 
