@@ -1,6 +1,6 @@
 # Kryptone
 
-A web scapper for marketers wrapped around Selenium
+A web scapper dedicated to marketers wrapped around Selenium
 
 ## How it works
 
