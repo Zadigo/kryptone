@@ -1,14 +1,21 @@
 import pathlib
 
+# Absolute path to the Kryptone project
+KRYPTONE_PATH = pathlib.Path('.').parent.absolute()
+
+
+# Absolute path to the local project
 PROJECT_PATH = pathlib.Path('.').parent.absolute()
 
 
+# The webdriver browser to use
 WEBDRIVER = {
     'driver': 'selenium.webdriver.Edge',
     'executable_path': 'WEBDRIVER_EXECUTABLE_PATH',
 }
 
 
+# The name of the cache file
 CACHE_FILE_NAME = 'cache.json'
 
 
