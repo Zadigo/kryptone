@@ -1,4 +1,5 @@
 class MasterRegistry:
-    pass
+    def populate(self):
+        pass
 
 registry = MasterRegistry()
