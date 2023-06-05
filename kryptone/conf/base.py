@@ -1,11 +1,13 @@
 import pathlib
 
 # Absolute path to the Kryptone project
-KRYPTONE_PATH = pathlib.Path('.').parent.absolute()
+# os.path.dirname(os.path.dirname(__file__))
+# GLOBAL_KRYPTONE_PATH = pathlib.Path('.').parent.absolute()
+GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 
 
 # Absolute path to the local project
-PROJECT_PATH = pathlib.Path('.').parent.absolute()
+PROJECT_PATH = None
 
 
 # The webdriver browser to use
@@ -21,5 +23,5 @@ CACHE_FILE_NAME = 'cache.json'
 
 CACHE = {
     'default': 'kryptone.cache.Cache',
-    'location': PROJECT_PATH / CACHE_FILE_NAME,
+    'location': None
 }

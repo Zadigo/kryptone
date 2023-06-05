@@ -19,13 +19,15 @@ def collect_commands():
     without loading any of them
     """
     from kryptone import settings
-    commands_path = list(
-        os.walk(os.path.join(
-            settings.GLOBAL_ZINEB_PATH,
-            'management',
-            'commands')
-        )
+    path = os.path.join(
+        settings.GLOBAL_KRYPTONE_PATH,
+        'management',
+        'commands'
     )
+    if not os.path.exists(path):
+        raise FileExistsError(f'Path for commmands is not valid: {path}')
+    
+    commands_path = list(os.walk(path))
     files = commands_path[0][-1]
     complete_paths = map(lambda filename: os.path.join(
         commands_path[0][0], filename), files)
@@ -43,10 +45,10 @@ def load_command_class(name: str) -> Callable:
         module_name = basename(path)
         name, _ = module_name.split('.')
         try:
-            module = import_module(f'zineb.management.commands.{name}')
+            module = import_module(f'kryptone.management.commands.{name}')
         except:
             raise ImportError(
-                f"Could not import module at {path} from the Zineb commands directory.")
+                f"Could not import module at {path} from the Kryptone commands directory.")
         return module.Command()
 
 
@@ -65,7 +67,7 @@ class Utility:
             true_name, _ = module_name.split('.')
             try:
                 module_obj = import_module(
-                    f'zineb.management.commands.{true_name}')
+                    f'kryptone.management.commands.{true_name}')
             except Exception as e:
                 raise ImportError(
                     (f"Could not import module at {path}. {e.args[0]}"))
@@ -73,7 +75,7 @@ class Utility:
 
     def _parse_incoming_commands(self, args: list):
         if len(args) <= 1:
-            raise ValueError(('You called manage.py or python -m zineb '
+            raise ValueError(('You called manage.py or python -m Krytone '
                               'without specifying any commands to run.'))
         name = args[0]
         remaining_tokens = args[1:]
