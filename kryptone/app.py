@@ -37,6 +37,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
             # options = EdgeOptions()
             options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
+            options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")
 
             self.driver = self.webdriver(
