@@ -1,0 +1,10 @@
+"""
+1. Implement a start url
+2. Run "manage.py"
+"""
+
+from kryptone.app import BaseCrawler
+
+
+class MyFirstCrawler(BaseCrawler):
+    start_url = None
