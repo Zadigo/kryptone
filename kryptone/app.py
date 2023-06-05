@@ -174,13 +174,14 @@ class BaseCrawler(SEOMixin, EmailMixin):
         self.visited_urls = data['visited_urls']
         self.start(**kwargs)
 
-    def start_from_xml(self, url):
+    def start_from_xml(self, url, **kwargs):
         if not url.endswith('.xml'):
             raise ValueError()
 
         response = requests.get(url)
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
+        self.start(start_urls=[], **kwargs)
 
     def start(self, start_urls=[], wait_time=25, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
@@ -208,6 +209,9 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             self.visited_urls.add(current_url)
 
+            # We can either crawl all the website
+            # or just crawl a specific page on
+            # the website
             if crawl:
                 self.get_page_urls()
             self.run_actions(current_url)
@@ -220,7 +224,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             write_json_document('cache.json', urls_data)
 
-            # Audit the website
+            # Audit the website TODO: Improve the way in
+            # in which the text is extracted from the page
             # self.audit_page(current_url, language=language)
             # vocabulary = self.global_audit(language=language)
             # write_json_document('audit.json', self.page_audits)
@@ -229,8 +234,10 @@ class BaseCrawler(SEOMixin, EmailMixin):
             cache.set_value('page_audits', self.page_audits)
             # cache.set_value('global_audit', vocabulary)
 
-            self.emails(self.get_page_text,
-                        elements=self.get_page_link_elements)
+            self.emails(
+                self.get_page_text,
+                elements=self.get_page_link_elements
+            )
             write_csv_document('emails.csv', self.emails_container)
 
             logger.info(f"Waiting {wait_time} seconds...")
