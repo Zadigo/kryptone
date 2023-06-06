@@ -7,7 +7,9 @@ from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
 from sklearn.feature_extraction.text import CountVectorizer
 
-from kryptone import PROJECT_PATH
+from kryptone.conf import settings
+
+# from kryptone import PROJECT_PATH
 
 EMAIL_REGEX = r'\S+\@\S+'
 
@@ -28,7 +30,8 @@ class TextMixin:
     @lru_cache(maxsize=100)
     def get_stop_words(self, language='fr'):
         filename = 'stop_words_french' if language == 'fr' else 'stop_words_english'
-        file_path = PROJECT_PATH / f'kryptone/data/{filename}.txt'
+        file_path = settings.GLOBAL_KRYPTONE_PATH / \
+            f'kryptone/data/{filename}.txt'
         with open(file_path, mode='r', encoding='utf-8') as f:
             stop_words = ''.join(f.readlines())
 
@@ -200,7 +203,7 @@ class SEOMixin(TextMixin):
 class EmailMixin(TextMixin):
     """A mixin for extracting emails
     from a given page"""
-    
+
     emails_container = set()
 
     @staticmethod

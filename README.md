@@ -1,12 +1,12 @@
 # Kryptone
 
-A web scapper dedicated to marketers wrapped around Selenium
+A web scapper dedicated to marketers and wrapped around the Selenium library
 
 ## How it works
 
-The scrapper starts from an initial page and gathers all the urls on said page. Each url is added in the `urls_to_visit` container. Then the web scrapper repeats the process until the first container is emptied.
+The scrapper starts from an initial page and gathers all the urls. Each url is added in the `urls_to_visit` container. It then repeats the process until the first container is emptied.
 
-When the scrapper visits a page, the url is added to the ``visited_urls` container.
+When a page is successfully visited, the url is added to the `visited_urls` container.
 
 ## How to use
 
@@ -20,9 +20,7 @@ scrapper.start()
 
 ### Filtering urls
 
-Urls can be filtered by passing in a filter function in `url_filters`. This function should always return a boolean.
-
-The url filtering functions a run consecutively 
+Urls can be filtered by passing in a filter function in `url_filters`. These functions should always return a boolean and they are also run consecutively in the order in which they were implemented.
 
 For instance , let's say we want to avoid any url that contains `/shirts/`:
 

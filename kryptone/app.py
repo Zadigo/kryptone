@@ -10,12 +10,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from kryptone import cache, logger, settings
+from kryptone import logger
+from kryptone.cache import Cache
+from kryptone.conf import settings
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+
+cache = Cache()
 
 
 class BaseCrawler(SEOMixin, EmailMixin):
@@ -24,8 +28,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    webdriver = Chrome
-    # webdriver = Edge
+    # webdriver = Chrome
+    webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
@@ -36,8 +40,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 raise ValueError('Start url must be a string')
             self._start_url_object = urlparse(self.start_url)
 
-            # options = EdgeOptions()
-            options = ChromeOptions()
+            options = EdgeOptions()
+            # options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")

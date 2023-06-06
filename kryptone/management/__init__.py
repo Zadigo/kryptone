@@ -18,7 +18,7 @@ def collect_commands():
     located in the `management/commands` directory
     without loading any of them
     """
-    from kryptone import settings
+    from kryptone.conf import settings
     path = os.path.join(
         settings.GLOBAL_KRYPTONE_PATH,
         'management',
@@ -26,7 +26,7 @@ def collect_commands():
     )
     if not os.path.exists(path):
         raise FileExistsError(f'Path for commmands is not valid: {path}')
-    
+
     commands_path = list(os.walk(path))
     files = commands_path[0][-1]
     complete_paths = map(lambda filename: os.path.join(

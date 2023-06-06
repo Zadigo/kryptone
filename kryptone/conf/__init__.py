@@ -2,7 +2,11 @@ import inspect
 
 from kryptone.utils.module_loaders import import_module
 
+
 class Settings:
+    """Global settings for a
+    a Kryptone project"""
+
     MODULE = None
 
     def __init__(self):
@@ -26,3 +30,6 @@ class Settings:
 
     def get(self, name):
         return self.__getitem__(name)
+
+
+settings = Settings()
