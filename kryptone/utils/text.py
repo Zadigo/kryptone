@@ -14,6 +14,12 @@ def parse_price(text):
     ... parse_price('4€4')
     ... 4.4
     """
+    if isinstance(text, (int, float)):
+        return text
+    
+    if text is None:
+        return None
+    
     format_one = PRICE_EURO.match(text)
     format_two = PRICE.search(text)
 

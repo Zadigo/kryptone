@@ -1,5 +1,8 @@
-def drop_null(items):
+def drop_null(items, remove_empty_strings=True):
     for item in items:
+        if remove_empty_strings and item == '':
+            continue
+        
         if item is not None:
             yield item
 

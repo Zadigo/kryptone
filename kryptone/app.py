@@ -22,14 +22,52 @@ from kryptone.utils.randomizers import RANDOM_USER_AGENT
 cache = Cache()
 
 
-class BaseCrawler(SEOMixin, EmailMixin):
+class ActionsMixin:
+    @property
+    def scrolled_to_bottom(self):
+        """Checks that we have scrolled to the bottom of the page"""
+        script = """return (window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight"""
+        return self.driver.execute_script(script)
+    
+    def scroll_page(self, pixels=2000):
+        """Continuously scroll the current page
+        in order to load a set of products"""
+        new_pixels = pixels
+        is_scrollable = True
+        while is_scrollable:
+            self.scroll_window(pixels=new_pixels)
+            is_scrollable = True if not self.scrolled_to_bottom else False
+            time.sleep(3)
+            # Increment the number of pixels to
+            # accomplish scrolling the whole page
+            new_pixels = new_pixels + pixels
+
+    
+    def scroll_to(self, percentage=80):
+        """Scroll to a specific section of the page"""
+        percentage = percentage / 100
+        script = f"""
+        const height = document.body.scrollHeight
+        const pixels = Math.round(height * {percentage});
+        window.scrollTo(0, pixels);
+        """
+        self.driver.execute_script(script)
+
+    def scroll_window(self, pixels=2000):
+        """Scroll the whole window"""
+        # script = "window.scrollTo(0, document.body.scrollHeight)"
+        script = f"window.scrollTo(0, {pixels})"
+        self.driver.execute_script(script)
+
+
+class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     start_url = None
     urls_to_visit = set()
     visited_urls = set()
     url_validators = []
     url_filters = []
-    # webdriver = Chrome
-    webdriver = Edge
+    webdriver = Chrome
+    # webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
@@ -40,8 +78,8 @@ class BaseCrawler(SEOMixin, EmailMixin):
                 raise ValueError('Start url must be a string')
             self._start_url_object = urlparse(self.start_url)
 
-            options = EdgeOptions()
-            # options = ChromeOptions()
+            # options = EdgeOptions()
+            options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")
@@ -59,6 +97,11 @@ class BaseCrawler(SEOMixin, EmailMixin):
     @property
     def get_page_link_elements(self):
         return self.driver.find_elements(By.TAG_NAME, 'a')
+    
+    @property
+    def completion_percentage(self):
+        result = len(self.visited_urls) / len(self.urls_to_visit)
+        return round(result, 0)
 
     def build_headers(self, options):
         headers = {
@@ -110,19 +153,6 @@ class BaseCrawler(SEOMixin, EmailMixin):
             )
             return urls_to_filter
         return self.urls_to_visit
-
-    def scroll_to(self, percentage=80):
-        percentage = percentage / 100
-        script = f"""
-        const height = document.body.scrollHeight;
-        const pixels = Math.round(height * {percentage});
-        window.scrollTo(0, pixels);
-        """
-        self.driver.execute_script(script)
-
-    def scroll_window(self):
-        self.driver.execute_script(
-            "window.scrollTo(0, document.body.scrollHeight);")
 
     def get_page_urls(self, same_domain=True):
         elements = self.get_page_link_elements
@@ -190,7 +220,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
         xml = etree.fromstring(response.content, parser)
         self.start(start_urls=[], **kwargs)
 
-    def start(self, start_urls=[], wait_time=25, language='en', crawl=True):
+    def start(self, start_urls=[], wait_time=25, run_audit=False, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
         logger.info('Started crawling...')
         if start_urls:
@@ -214,7 +244,7 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             self.driver.get(current_url)
 
-            wait = WebDriverWait(self.driver, 5)
+            wait = WebDriverWait(self.driver, 8)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
 
             self.visited_urls.add(current_url)
@@ -234,15 +264,17 @@ class BaseCrawler(SEOMixin, EmailMixin):
 
             write_json_document('cache.json', urls_data)
 
-            # Audit the website TODO: Improve the way in
-            # in which the text is extracted from the page
-            # self.audit_page(current_url, language=language)
-            # vocabulary = self.global_audit(language=language)
-            # write_json_document('audit.json', self.page_audits)
-            # write_json_document('global_audit.json', vocabulary)
+            if run_audit:
+                # Audit the website TODO: Improve the way in
+                # in which the text is extracted from the page
+                self.audit_page(current_url, language=language)
+                vocabulary = self.global_audit(language=language)
+                write_json_document('audit.json', self.page_audits)
+                write_json_document('global_audit.json', vocabulary)
 
-            cache.set_value('page_audits', self.page_audits)
-            # cache.set_value('global_audit', vocabulary)
+                cache.set_value('page_audit', self.page_audits)
+                # cache.set_value('global_audit', vocabulary)
+                logger.info('Audit completed...')
 
             self.emails(
                 self.get_page_text,
