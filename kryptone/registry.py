@@ -2,6 +2,10 @@ import os
 from importlib import import_module
 from pathlib import Path
 
+from kryptone.signals import Signal
+
+registry_populated = Signal()
+
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
 
@@ -32,6 +36,8 @@ class MasterRegistry:
         self.absolute_path = Path(project_module.__path__[0])
         self.project_name = self.absolute_path.name
         setattr(settings, 'PROJECT_PATH', self.absolute_path)
+
+        registry_populated.send(self, registry=registry)
 
     def get_spider(self, name):
         pass

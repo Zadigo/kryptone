@@ -7,8 +7,6 @@ from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
 
-# from kryptone import PROJECT_PATH
-
 EMAIL_REGEX = r'\S+\@\S+'
 
 
