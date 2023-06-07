@@ -1,15 +1,9 @@
 import logging
 
-# from kryptone.cache import Cache
-# from kryptone.conf.settings import Settings
 
 __all__ = [
     'utils'
 ]
-
-# settings = Settings()
-
-# PROJECT_PATH = pathlib.Path('.').absolute()
 
 
 class Logger:
@@ -52,8 +46,6 @@ class Logger:
 
 
 logger = Logger()
-
-# cache = Cache()
 
 
 def setup():
