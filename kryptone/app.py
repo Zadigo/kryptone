@@ -26,7 +26,12 @@ class ActionsMixin:
     @property
     def scrolled_to_bottom(self):
         """Checks that we have scrolled to the bottom of the page"""
-        script = """return (window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight"""
+        script = """
+        // The scroll element does not go that far down after
+        // a moment so adjust the scrollHeight number by reducing
+        // it by  a 100
+        return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)
+        """
         return self.driver.execute_script(script)
     
     def scroll_page(self, pixels=2000):
