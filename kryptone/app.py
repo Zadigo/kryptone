@@ -4,6 +4,7 @@ from multiprocessing import Process
 from urllib.parse import urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from lxml import etree
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.common.by import By
@@ -46,7 +47,6 @@ class ActionsMixin:
             # Increment the number of pixels to
             # accomplish scrolling the whole page
             new_pixels = new_pixels + pixels
-
     
     def scroll_to(self, percentage=80):
         """Scroll to a specific section of the page"""
@@ -97,14 +97,20 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
     @property
     def get_html_page_content(self):
+        """Returns HTML elements of the
+        current page"""
         return self.driver.page_source
 
     @property
     def get_page_link_elements(self):
+        """Returns all the selenium `<a></a>` anchor tags
+        of the current page"""
         return self.driver.find_elements(By.TAG_NAME, 'a')
     
     @property
     def completion_percentage(self):
+        """Indicates the level of completion
+        for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
 
@@ -142,10 +148,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         """Filters out or in urls
         included in the list of urls to visit.
         The default action is to exclude all urls that
-        meet specified conditions"""
-        # Ensure that we return the original
-        # urls to visit if there are no filters
-        # or this might return nothing
+        meet sepcific conditions"""
         if self.url_filters:
             urls_to_filter = []
             for instance in self.url_filters:
@@ -153,72 +156,93 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                     urls_to_filter = list(filter(instance, self.urls_to_visit))
                 else:
                     urls_to_filter = list(filter(instance, urls_to_filter))
-            logger.info(
-                f"Filter runned on {len(self.urls_to_visit)} urls / {len(urls_to_filter)} urls remaining"
-            )
+            
+            message = f"Url filter completed."
+            logger.info(message)
             return urls_to_filter
+        # Ensure that we return the original
+        # urls to visit if there are no filters
+        # or this might return nothing
         return self.urls_to_visit
 
     def get_page_urls(self, same_domain=True):
+        """Returns all the urls present on the
+        actual given page"""
         elements = self.get_page_link_elements
         for element in elements:
             link = element.get_attribute('href')
+
+            # Turn the url into a Python object
+            # to make more usable for us
             link_object = urlparse(link)
 
+            # 1. We do not want to add an item
+            # to the list if it already exists,
+            # if its invalid or None
             if link in self.urls_to_visit:
                 continue
 
             if link in self.visited_urls:
                 continue
-
+            
             if link is None or link == '':
                 continue
 
             # Links such as http://exampe.com/path#
-            # are useless and repetitive
+            # are useless and can create 
+            # useless repetition
             if link.endswith('#'):
                 continue
-
+            
+            # If the link is similar to the originally
+            # visited url, skip it - This is a security measure
             if link_object.netloc != self._start_url_object.netloc:
                 continue
 
-            # If the url contains a fragment, it's the same
-            # as visiting the root element of that page
-            # e.g. example.com/#google == example.com/
+            # If the url contains a fragment, it is the same
+            # as visiting the root page for instance:
+            # example.com/#google is the same as example.com/
             if link_object.fragment:
                 continue
 
-            # If we already visited the home page then
-            # skip all urls that include this home page
+            # If we have already visited the home page then
+            # skip all urls that include the '/' path - This
+            # is another security measure
             if link_object.path == '/' and self._start_url_object.path == '/':
                 continue
 
-            # Reconstruct a partial url e.g. /google -> https://example.com/google
+            # Reconstruct a partial urls for example
+            # /google becomes https://example.com/google
             if link_object.path != '/' and link.startswith('/'):
                 link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
 
             self.urls_to_visit.add(link)
 
-        # TODO: Filter pages that we do not want to visit
+        # Finally, run all the filters to exclude
+        # urls that the user does not want to visit
         self.urls_to_visit = set(self.run_filters())
 
         logger.info(f"Found {len(elements)} urls")
 
     def run_actions(self, current_url, **kwargs):
-        """Run additional actions of the currently
-        visited web page"""
+        """Run additional custom actions on the current
+        page. This function will be called each time
+        a page is visited."""
 
     def resume(self, **kwargs):
-        """From a previous list of urls to visit and
-        visited urls, resume web scrapping"""
+        """From a previous list of urls to visit 
+        and visited urls, resume the previous
+        scraping session"""
         data = read_json_document('cache.json')
-        self.urls_to_visit = data['urls_to_visit']
-        self.visited_urls = data['visited_urls']
+        self.urls_to_visit = set(data['urls_to_visit'])
+        self.visited_urls = set(data['visited_urls'])
         self.start(**kwargs)
 
     def start_from_xml(self, url, **kwargs):
+        """Start a new crawling session starting
+        from the sitemap of a given website"""
         if not url.endswith('.xml'):
-            raise ValueError()
+            raise ValueError('Url should point to a sitemap')
 
         response = requests.get(url)
         parser = etree.XMLParser(encoding='utf-8')
@@ -228,35 +252,37 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     def start(self, start_urls=[], wait_time=25, run_audit=False, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
         logger.info('Started crawling...')
+
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
-            logger.info(
-                f"{len(self.urls_to_visit)} urls left to visit"
-            )
+            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
 
+            # In the case where the user has provided a
+            # set of urls directly in the function,
+            # start_url would be None
             if self.start_url is None:
                 self.start_url = current_url
 
             current_url_object = urlparse(current_url)
-            # If we are not the same domain as the start
-            # url, stop, since we are not interested in
-            # exploring the whole internet
+            # If we are not on the same domain as the 
+            # starting url: *stop*. we are not interested 
+            # in exploring the whole internet
             if current_url_object.netloc != self._start_url_object.netloc:
                 continue
 
             self.driver.get(current_url)
-
+            # Always wait for the body section of
+            # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
 
             self.visited_urls.add(current_url)
 
             # We can either crawl all the website
-            # or just crawl a specific page on
-            # the website
+            # or just specific page
             if crawl:
                 self.get_page_urls()
             self.run_actions(current_url)
