@@ -35,7 +35,6 @@ class TextMixin:
         return list(itertools.chain(*tokenized_stop_words))
 
     def _remove_punctuation(self, text):
-        text = text.lower().strip()
         # We should not replace the "@" in the document since
         # this could affect email extraction
         punctuation = string.punctuation.replace('@', '')
@@ -53,7 +52,11 @@ class TextMixin:
     def _remove_rare_words(self, documents):
         pass
 
+    def fit(self, text):
+        self.page_documents.append(text.lower().stript)
+
     def fit_transform(self, text):
+        text = self.fit(text)
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
 
