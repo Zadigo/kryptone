@@ -287,7 +287,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
     def start(self, start_urls=[], wait_time=25, run_audit=False, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
-        logger.info('Started crawling...')
+        logger.info('Started crawling...')        
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
