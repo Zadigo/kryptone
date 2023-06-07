@@ -37,7 +37,9 @@ class ActionsMixin:
     
     def scroll_page(self, pixels=2000):
         """Continuously scroll the current page
-        in order to load a set of products"""
+        in order to load a set of products. This function
+        will scroll the window as long as the position
+        has not reached the bottom of the page"""
         new_pixels = pixels
         is_scrollable = True
         while is_scrollable:
@@ -63,6 +65,22 @@ class ActionsMixin:
         # script = "window.scrollTo(0, document.body.scrollHeight)"
         script = f"window.scrollTo(0, {pixels})"
         self.driver.execute_script(script)
+
+    def click_consent_button(self, element_id=None, element_class=None):
+        """Click the consent to cookies button which often
+        tends to appear on websites"""
+        element = None
+        if element_id is not None:
+            element = self.driver.find_element(By.ID, element_id)
+        
+        if element_class is not None:
+            element = self.driver.find_element(By.ID, element_id)
+
+        if element is not None:
+            try:
+                element.click()
+            except:
+                logger.info('Consent button not found')
 
 
 class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
@@ -95,6 +113,13 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             )
             self.urls_to_visit.add(self.start_url)
 
+    # def __del__(self):
+    #     # When the program terminates,
+    #     # always back up the urls that
+    #     # were visited or unvisited
+    #     self._backup_urls()
+    #     logger.info('Crawl finished')
+
     @property
     def get_html_page_content(self):
         """Returns HTML elements of the
@@ -113,6 +138,17 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
+    
+    def _backup_urls(self):
+        """Backs up the urls both in the cache,
+        and in the cache file"""
+        urls_data = {
+            'urls_to_visit': list(self.urls_to_visit),
+            'visited_urls': list(self.visited_urls)
+        }
+        cache.set_value('urls_data', urls_data)
+
+        write_json_document('cache.json', urls_data)
 
     def build_headers(self, options):
         headers = {
@@ -287,13 +323,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 self.get_page_urls()
             self.run_actions(current_url)
 
-            urls_data = {
-                'urls_to_visit': list(self.urls_to_visit),
-                'visited_urls': list(self.visited_urls)
-            }
-            cache.set_value('urls_data', urls_data)
-
-            write_json_document('cache.json', urls_data)
+            self._backup_urls()
 
             if run_audit:
                 # Audit the website TODO: Improve the way in
