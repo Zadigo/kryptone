@@ -2,10 +2,8 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 
-from nltk.stem import PorterStemmer
 from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
-from sklearn.feature_extraction.text import CountVectorizer
 
 from kryptone.conf import settings
 
@@ -49,6 +47,7 @@ class TextMixin:
         """Return the most common words from the website
         by continuously building the page_documents and
         analyzing their content"""
+        from nltk.stem import PorterStemmer
         def text_preprocessor(text):
             porter_stemmer = PorterStemmer()
 
@@ -74,6 +73,9 @@ class TextMixin:
         text = self.clean_html_text(raw_text)
         self.page_documents.append(text)
 
+        # TODO: Speed up page loading by only import CountVectorizer
+        # when needed
+        from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer(
             stop_words=self.get_stop_words(),
             max_features=50,
@@ -84,6 +86,9 @@ class TextMixin:
         return matrix, vectorizer.vocabulary_
 
     def vectorize_page(self, raw_text, language='fr'):
+        # TODO: Speed up page loading by only import CountVectorizer
+        # when needed
+        from sklearn.feature_extraction.text import CountVectorizer
         text = self.clean_html_text(raw_text)
         vectorizer = CountVectorizer(
             stop_words=self.get_stop_words(language=language),
