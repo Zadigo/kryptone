@@ -1,0 +1,82 @@
+const resultCards = document.querySelector('div[role="feed"]').querySelectorAll('div:not([class])')
+// Remove the useless DIVs that do not have no height
+// and can cause some breaking issues
+const cleanResultCards = resultCards.map((item) => {
+    return item.offsetHeight > 0
+})
+
+return cleanResultCards.map((item) => {
+    let link = item.querySelector('a')
+    let url = link['href']
+    let enterprise = link.ariaLabel
+    let score
+    let address
+
+    try {
+        score = item.querySelector('span[role="img"]').ariaLabel
+    } catch (e) {
+        score = item.querySelector('span[class="MW4etd"]').innerText
+    }
+
+    try {
+        // Just try to grab all the information at once even though we
+        // useless items for the scrap
+        const infoBlocks = item.querySelector('div[class*="fontBodyMedium"]').querySelectorAll('div[class="W4Efsd"]')
+        address = infoBlocks[1].innerText
+    } catch (e) {
+        console.log(e)
+    }
+
+    // This is the section where we get all
+    // the comments
+    setTimeout(() => {
+        link.click()
+    }, 8000)
+
+    // Move to the comment section
+    setTimeout(() => {
+        let commentSection = document.querySelectorAll('*[role="tablist"] button')[1]
+        commentSection.click()
+
+        let allComments = document.querySelector('*[role="main"] div[tabindex="-1"] div[class$="m6QErb "]')
+        let comments = allComments.querySelector('div')
+
+        comments = comments.map((comment) => {
+            let period = null
+            let text = null
+
+            // Sometimes there is a read more button
+            // that we have to click
+            try {
+                comment.querySelector('button[aria-label="Voir plus"]').click()
+            } catch (e) {
+                // pass
+            }
+
+            try {
+                period = comment.querySelector('.DU9Pgb').innerText
+            } catch (e) {
+                // pass
+            }
+
+            try {
+                text = comment.querySelector('.MyEned').innerText.trim()
+            } catch (e) {
+                // pass
+            }
+
+            return {
+                text: text,
+                period: period
+            }
+        })
+    }, 2000)
+
+    return {
+        url: url,
+        enterprise: enterprise,
+        score: score,
+        address: address,
+        comments: comments
+    }
+})

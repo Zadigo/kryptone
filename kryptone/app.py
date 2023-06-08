@@ -98,7 +98,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             logger.error('Could not find web driver')
         else:
             if not isinstance(self.start_url, str):
-                raise ValueError('Start url must be a string')
+                raise ValueError(f'Start url must be a string. Got: {self.start_url}')
             self._start_url_object = urlparse(self.start_url)
 
             # options = EdgeOptions()
@@ -337,11 +337,12 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 # cache.set_value('global_audit', vocabulary)
                 logger.info('Audit completed...')
 
-            self.emails(
-                self.get_page_text,
-                elements=self.get_page_link_elements
-            )
-            write_csv_document('emails.csv', self.emails_container)
+            # TODO: Mixins have changed
+            # self.emails(
+            #     self.get_page_text,
+            #     elements=self.get_page_link_elements
+            # )
+            # write_csv_document('emails.csv', self.emails_container)
 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)

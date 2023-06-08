@@ -21,7 +21,7 @@ class TextMixin:
     fitted_page_documents = []
     tokenizer_class = NLTKWordTokenizer
 
-    @lru_cache(max_size=5)
+    @lru_cache(maxsize=5)
     def _stop_words(self, language='en'):
         if language == 'en':
             path = settings.GLOBAL_KRYPTONE_PATH / 'stop_words_english.txt'
