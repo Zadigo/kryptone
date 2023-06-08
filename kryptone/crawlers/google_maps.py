@@ -1,5 +1,6 @@
 import dataclasses
 import random
+import re
 import time
 
 from jennyfer.models import GoogleBusiness
@@ -19,7 +20,7 @@ class GoogleBusiness:
     url: str = None
     address: str = None
     rating: str = None
-    number_of_comments: int = None
+    number_of_reviews: int = None
     comments: str = None
 
     @property
@@ -127,6 +128,16 @@ class GoogleMaps(BaseCrawler):
             except:
                 continue
 
+            # try:
+            #     data = business.find_element(By.CSS_SELECTOR, 'span[role="img"]')
+            # except:
+            #     rating = None
+            #     reviews = None
+            # else:
+            #     has_match = re.match(r'\d+\.?\d+', data).group(0)
+            #     rating = has_match.group(1) if has_match else None
+            #     reviews = data.split('(')[-1].replace(')', '')
+
             # Opens the side panel
             link.click()
             time.sleep(2)
@@ -231,6 +242,9 @@ class GoogleMaps(BaseCrawler):
 
             business_information.name = name
             business_information.url = url
+            business_information.address = clean_information
+            business_information.rating = rating
+            business_information.number_of_reviews = reviews
             business_information.comments = list(drop_null((comments)))
             businesses.append(business_information)
             time.sleep(2)
