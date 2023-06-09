@@ -1,4 +1,5 @@
 import re
+from kryptone.utils.iterators import drop_null
 
 PRICE = re.compile(r'(\d+\,?\d+)')
 
@@ -31,3 +32,13 @@ def parse_price(text):
         price = text
     price = price.replace(',', '.')
     return float(price)
+
+
+def clean_text(text):
+    if not isinstance(text, str):
+        return text
+    items = text.split('\n')
+    text = ' '.join(items)
+
+    items = drop_null(text.split(' '))
+    return ' '.join(items)
