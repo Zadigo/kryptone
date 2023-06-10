@@ -30,7 +30,7 @@ class GoogleBusiness:
             'url': self.url,
             'address': self.address,
             'rating': self.rating,
-            'number_of_comments': self.number_of_comments,
+            'number_of_reviews': self.number_of_reviews,
             'comments': self.comments
         }
 

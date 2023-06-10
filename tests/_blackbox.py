@@ -8,6 +8,9 @@ from kryptone.utils.text import parse_price
 class Etam(BaseCrawler):
     start_url = 'https://www.etam.com/culottes-et-bas-tangas/'
 
+    def post_visit_actions(self, **kwargs):
+        self.click_consent_button(element_id='acceptAllCookies')
+
     # def get_products(self):
     #     product_grid = self.driver.find_element(
     #         By.CSS_SELECTOR,
@@ -34,7 +37,7 @@ class Etam(BaseCrawler):
     #             ).text
     #         except:
     #             name = None
-            
+
     #         try:
     #             price = element.find_element(
     #                 By.CSS_SELECTOR,
@@ -56,7 +59,8 @@ class Etam(BaseCrawler):
     #     write_json_document('test_etam.json', products)
 
 
-
 if __name__ == '__main__':
     testing = Etam()
-    testing.start(crawl=False, wait_time=2)
+    # testing.start(crawl=False, wait_time=2)
+    # testing.start(crawl=True, run_audit=True, wait_time=2)
+    testing.resume()

@@ -34,7 +34,7 @@ class ActionsMixin:
         return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)
         """
         return self.driver.execute_script(script)
-    
+
     def scroll_page(self, pixels=2000):
         """Continuously scroll the current page
         in order to load a set of products. This function
@@ -49,7 +49,7 @@ class ActionsMixin:
             # Increment the number of pixels to
             # accomplish scrolling the whole page
             new_pixels = new_pixels + pixels
-    
+
     def scroll_to(self, percentage=80):
         """Scroll to a specific section of the page"""
         percentage = percentage / 100
@@ -72,7 +72,7 @@ class ActionsMixin:
         element = None
         if element_id is not None:
             element = self.driver.find_element(By.ID, element_id)
-        
+
         if element_class is not None:
             element = self.driver.find_element(By.ID, element_id)
 
@@ -89,8 +89,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    webdriver = Chrome
-    # webdriver = Edge
+    # webdriver = Chrome
+    webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
@@ -98,11 +98,12 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             logger.error('Could not find web driver')
         else:
             if not isinstance(self.start_url, str):
-                raise ValueError(f'Start url must be a string. Got: {self.start_url}')
+                raise ValueError(
+                    f'Start url must be a string. Got: {self.start_url}')
             self._start_url_object = urlparse(self.start_url)
 
-            # options = EdgeOptions()
-            options = ChromeOptions()
+            options = EdgeOptions()
+            # options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")
@@ -131,14 +132,14 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         """Returns all the selenium `<a></a>` anchor tags
         of the current page"""
         return self.driver.find_elements(By.TAG_NAME, 'a')
-    
+
     @property
     def completion_percentage(self):
         """Indicates the level of completion
         for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
-    
+
     def _backup_urls(self):
         """Backs up the urls both in the cache,
         and in the cache file"""
@@ -192,7 +193,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                     urls_to_filter = list(filter(instance, self.urls_to_visit))
                 else:
                     urls_to_filter = list(filter(instance, urls_to_filter))
-            
+
             message = f"Url filter completed."
             logger.info(message)
             return urls_to_filter
@@ -220,16 +221,16 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
             if link in self.visited_urls:
                 continue
-            
+
             if link is None or link == '':
                 continue
 
             # Links such as http://exampe.com/path#
-            # are useless and can create 
+            # are useless and can create
             # useless repetition
             if link.endswith('#'):
                 continue
-            
+
             # If the link is similar to the originally
             # visited url, skip it - This is a security measure
             if link_object.netloc != self._start_url_object.netloc:
@@ -260,10 +261,16 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
         logger.info(f"Found {len(elements)} urls")
 
+    def post_visit_actions(self, **kwargs):
+        """Actions to run on the page just after
+        the crawler has visited a page e.g. clicking
+        on cookie button banner"""
+        pass
+
     def run_actions(self, current_url, **kwargs):
-        """Run additional custom actions on the current
-        page. This function will be called each time
-        a page is visited."""
+        """Additional custom actions to execute on the page
+        once all the default steps are completed"""
+        pass
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
@@ -274,7 +281,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         self.visited_urls = set(data['visited_urls'])
         self.start(**kwargs)
 
-    def start_from_xml(self, url, **kwargs):
+    def start_from_sitemap_xml(self, url, **kwargs):
         """Start a new crawling session starting
         from the sitemap of a given website"""
         if not url.endswith('.xml'):
@@ -285,9 +292,21 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         xml = etree.fromstring(response.content, parser)
         self.start(start_urls=[], **kwargs)
 
+    def start_from_html_sitemap(self, url, **kwargs):
+        """Start crawling from the sitemap page section
+        of a given website"""
+        if not 'sitemap' in url:
+            raise ValueError('Url should be the sitemap page')
+        body = self.driver.find_element(By.TAG_NAME, 'body')
+        link_elements = body.find_elements(By.TAG_NAME, 'a')
+        urls = []
+        for element in link_elements:
+            urls.append(element.get_attribute('href'))
+        self.start(start_urls=urls, **kwargs)
+
     def start(self, start_urls=[], wait_time=25, run_audit=False, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
-        logger.info('Started crawling...')        
+        logger.info('Started crawling...')
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -303,8 +322,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 self.start_url = current_url
 
             current_url_object = urlparse(current_url)
-            # If we are not on the same domain as the 
-            # starting url: *stop*. we are not interested 
+            # If we are not on the same domain as the
+            # starting url: *stop*. we are not interested
             # in exploring the whole internet
             if current_url_object.netloc != self._start_url_object.netloc:
                 continue
@@ -314,6 +333,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            self.post_visit_actions(current_url=current_url)
 
             self.visited_urls.add(current_url)
 
@@ -321,7 +341,6 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             # or just specific page
             if crawl:
                 self.get_page_urls()
-            self.run_actions(current_url)
 
             self._backup_urls()
 
@@ -329,20 +348,25 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 # Audit the website TODO: Improve the way in
                 # in which the text is extracted from the page
                 self.audit_page(current_url, language=language)
-                vocabulary = self.global_audit(language=language)
                 write_json_document('audit.json', self.page_audits)
+
+                vocabulary = self.global_audit(language=language)
                 write_json_document('global_audit.json', vocabulary)
 
                 cache.set_value('page_audit', self.page_audits)
-                # cache.set_value('global_audit', vocabulary)
-                logger.info('Audit completed...')
+                cache.set_value('global_audit', vocabulary)
 
-            # TODO: Mixins have changed
-            # self.emails(
-            #     self.get_page_text,
-            #     elements=self.get_page_link_elements
-            # )
-            # write_csv_document('emails.csv', self.emails_container)
+                logger.info('Audit complete...')
+
+            self.emails(
+                self.get_transformed_raw_page_text,
+                elements=self.get_page_link_elements
+            )
+            write_csv_document('emails.csv', self.emails_container)
+
+            # Run custom user actions once 
+            # everything is completed
+            self.run_actions(current_url)
 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)

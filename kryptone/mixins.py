@@ -1,7 +1,7 @@
 import itertools
 import re
 import string
-from collections import defaultdict
+from collections import Counter, defaultdict
 from functools import lru_cache
 
 from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
+from kryptone.utils.iterators import drop_null, drop_while
 
 EMAIL_REGEX = r'\S+\@\S+'
 
@@ -24,15 +25,30 @@ class TextMixin:
     @lru_cache(maxsize=5)
     def _stop_words(self, language='en'):
         if language == 'en':
-            path = settings.GLOBAL_KRYPTONE_PATH / 'stop_words_english.txt'
+            path = settings.GLOBAL_KRYPTONE_PATH / 'data/stop_words_english.txt'
         else:
-            path = settings.GLOBAL_KRYPTONE_PATH / 'stop_words_french.txt'
+            path = settings.GLOBAL_KRYPTONE_PATH / 'data/stop_words_french.txt'
         data = read_document(path)
 
         from sklearn.feature_extraction.text import TfidfVectorizer
         tokenizer = TfidfVectorizer().build_tokenizer()
         tokenized_stop_words = [tokenizer(word) for word in data.split('\n')]
         return list(itertools.chain(*tokenized_stop_words))
+
+    @staticmethod
+    def get_text_length(text):
+        """Get the length of the
+        incoming text"""
+        return len(text)
+
+    @property
+    def _fitted_text_tokens(self):
+        result = ' '.join(self.fitted_page_documents)
+        return result.split(' ')
+
+    @staticmethod
+    def _tokenize(text):
+        return list(drop_null(text.split(' ')))
 
     def _remove_punctuation(self, text):
         # We should not replace the "@" in the document since
@@ -41,128 +57,79 @@ class TextMixin:
         return text.translate(str.maketrans('', '', punctuation))
 
     def _remove_stop_words(self, text, language='en'):
-        tokens = text.split(' ')
+        """Removes all stop words from a given document"""
+        tokens = self._tokenize(text)
         stop_words = self._stop_words(language=language)
-        words = [token for token in tokens if token not in stop_words]
-        return ' '.join(words)
-    
-    def _remove_most_common_words(self, documents):
-        pass
+        result = drop_while(lambda x: x in stop_words, tokens)
+        return ' '.join(result)
 
-    def _remove_rare_words(self, documents):
-        pass
+    def _common_words(self, text):
+        tokens = self._tokenize(text)
+        counter = Counter(tokens)
+        return counter.most_common()[1:5]
+
+    def _rare_words(self, text):
+        tokens = self._tokenize(text)
+        counter = Counter(tokens)
+        return counter.most_common()[:-5:-1]
 
     def fit(self, text):
-        self.page_documents.append(text.lower().stript)
+        """Normalize the document by removing newlines,
+        useless spaces, punctuations and removing null
+        values"""
+        if text is None:
+            return None
 
-    def fit_transform(self, text):
+        normalized_text = str(text).lower().strip()
+        if '\n' in normalized_text:
+            normalized_text = normalized_text.replace('\n', '')
+
+        text_without_null = ' '.join(drop_null(normalized_text.split(' ')))
+        final_text = self._remove_punctuation(text_without_null)
+        self.page_documents.append(final_text)
+        return final_text
+
+    def fit_transform(self, text=None, language='en'):
+        """Fit a document and then transform it into
+        a usable element for text analysis"""
         text = self.fit(text)
+        if text is not None:
+            self.page_documents.append(text)
+
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
 
-        stemmer = SnowballStemmer('english')
+        if language == 'en':
+            stemmer = SnowballStemmer('english')
+        elif language == 'fr':
+            stemmer = SnowballStemmer('french')
+        else:
+            stemmer = SnowballStemmer('english')
 
         for document in self.page_documents:
-            result1 = self._remove_punctuation(document)
-            result2 = self._remove_stop_words(result1)
-
-
-            # Use stemmer to get the stems for each
-            # word in the document
+            result1 = self._remove_stop_words(document)
 
             # 1. Remove special carachters
-            result3 = re.sub('\W', ' ', result2)
+            result2 = re.sub('\W', ' ', result1)
 
-            # 2. Use the stem of each words
+            # 2. Remove rare and common words
+            rare_words = self._rare_words(result2)
+            common_words = self._common_words(result2)
+            words_to_remove = rare_words + common_words
+            words_to_remove = list(map(lambda x: x[0], words_to_remove))
+            simplified_text = drop_while(
+                lambda x: x in words_to_remove,
+                self._tokenize(result2)
+            )
+            result3 = ' '.join(simplified_text)
+
+            # 3. Use stemmer to get the stems
             words = re.split('\s+', result3)
             stemmed_words = [stemmer.stem(word=word) for word in words]
-            result4 = ' '.join(stemmed_words)
+            result3 = ' '.join(stemmed_words)
 
-            self.fitted_page_documents.append(result4)
-
-
-    # @staticmethod
-    # def get_text_length(text):
-    #     """Get the length of the
-    #     incoming text"""
-    #     return len(text)
-
-    # @lru_cache(maxsize=100)
-    # def get_stop_words(self, language='fr'):
-    #     filename = 'stop_words_french' if language == 'fr' else 'stop_words_english'
-    #     file_path = settings.GLOBAL_KRYPTONE_PATH / \
-    #         f'kryptone/data/{filename}.txt'
-    #     with open(file_path, mode='r', encoding='utf-8') as f:
-    #         stop_words = ''.join(f.readlines())
-
-    #         tokenizer = LineTokenizer()
-    #         stop_words = tokenizer.tokenize(stop_words)
-    #     return stop_words
-
-    # def clean_html_text(self, raw_text):
-    #     tokenizer = LineTokenizer()
-    #     tokens = tokenizer.tokenize(raw_text)
-    #     text = ' '.join(tokens)
-    #     return text
-
-    # def vectorize_pages(self, raw_text):
-    #     """Return the most common words from the website
-    #     by continuously building the page_documents and
-    #     analyzing their content"""
-    #     from nltk.stem import PorterStemmer
-    #     def text_preprocessor(text):
-    #         porter_stemmer = PorterStemmer()
-
-    #         # Remove special carachters
-    #         text = re.sub("\\W", " ", text)
-
-    #         # Use stem words
-    #         # words = re.split('\s+', text)
-    #         # stemmed_words = [porter_stemmer.stem(word=word) for word in words]
-    #         # return ' '.join(stemmed_words)
-
-    #         # text = text.lower()
-    #         # text = re.sub("\\W", " ", text)  # remove special chars
-    #         # text = re.sub("\\s+(in|the|all|for|and|on)\\s+",
-    #         #             " _connector_ ", text)  # normalize certain words
-
-    #         # # stem words
-    #         # words = re.split("\\s+", text)
-    #         # stemmed_words = [porter_stemmer.stem(word=word) for word in words]
-    #         # return ' '.join(stemmed_words)
-    #         return text
-
-    #     text = self.clean_html_text(raw_text)
-    #     self.page_documents.append(text)
-
-    #     # TODO: Speed up page loading by only import CountVectorizer
-    #     # when needed
-    #     from sklearn.feature_extraction.text import CountVectorizer
-    #     vectorizer = CountVectorizer(
-    #         stop_words=self.get_stop_words(),
-    #         max_features=50,
-    #         preprocessor=text_preprocessor,
-    #         # max_df=0.85
-    #     )
-    #     matrix = vectorizer.fit_transform(self.page_documents)
-    #     return matrix, vectorizer.vocabulary_
-
-    # def vectorize_page(self, raw_text, language='fr'):
-    #     # TODO: Speed up page loading by only import CountVectorizer
-    #     # when needed
-    #     from sklearn.feature_extraction.text import CountVectorizer
-    #     text = self.clean_html_text(raw_text)
-    #     vectorizer = CountVectorizer(
-    #         stop_words=self.get_stop_words(language=language),
-    #         max_features=20
-    #     )
-    #     matrix = vectorizer.fit_transform([text])
-    #     return matrix, vectorizer.vocabulary_
-
-    # def tokenize(self, text):
-    #     """Create word tokens from a text"""
-    #     instance = self.tokenizer_class()
-    #     return instance.tokenize(text)
+            self.fitted_page_documents.append(result3)
+        return self.fitted_page_documents
 
 
 class SEOMixin(TextMixin):
@@ -189,7 +156,9 @@ class SEOMixin(TextMixin):
     @property
     def get_page_description(self):
         try:
-            script = """return document.querySelector('meta[name="description"]').attributes.content.textContent"""
+            script = """
+            return document.querySelector('meta[name="description"]').attributes.content.textContent
+            """
             text = self.driver.execute_script(script)
         except:
             return ''
@@ -225,8 +194,16 @@ class SEOMixin(TextMixin):
         return len(self.get_page_title) <= 150
 
     @property
+    def get_transformed_raw_page_text(self):
+        text = self.driver.find_element(By.TAG_NAME, 'body').text
+        return self.fit(text)
+
+    @property
     def get_page_text(self):
-        return self.driver.find_element(By.TAG_NAME, 'body').text
+        """Returns a fitted and transformed
+        version of the document's text"""
+        text = self.driver.find_element(By.TAG_NAME, 'body').text
+        return self.fit_transform(text)
 
     @staticmethod
     def normalize_integers(items):
@@ -241,16 +218,29 @@ class SEOMixin(TextMixin):
     def get_page_status_code(self):
         pass
 
+    def vectorize_documents(self):
+        from sklearn.feature_extraction.text import CountVectorizer
+        vectorizer = CountVectorizer()
+        matrix = vectorizer.fit_transform(self.fitted_page_documents)
+        return matrix, vectorizer
+    
+    def vectorize_page(self, text):
+        from sklearn.feature_extraction.text import CountVectorizer
+        vectorizer = CountVectorizer()
+        matrix = vectorizer.fit_transform(self.fit_transform(text))
+        return matrix, vectorizer
+    
     def global_audit(self, language='fr'):
-        _, vocabulary = self.vectorize_pages(self.get_page_text)
-        return self.normalize_integers(vocabulary)
-
+        """Returns a global audit of the website"""
+        # TODO:
+        _, vectorizer = self.vectorize_documents()
+        return self.normalize_integers(vectorizer.vocabulary_)
+    
     def audit_page(self, current_url, language='fr'):
         """Audit the current page by analyzing different
         key metrics from the title, the description etc."""
-        _, vocabulary = self.vectorize_page(
-            self.get_page_text, language=language)
-        vocabulary = self.normalize_integers(vocabulary)
+        matrix, vectorizer = self.vectorize_page(self.get_page_text)
+        vocabulary = self.normalize_integers(vectorizer.vocabulary_)
         audit = {
             'title': self.get_page_title,
             'title_length': self.get_text_length(self.get_page_title),
@@ -316,7 +306,8 @@ class EmailMixin(TextMixin):
 
     def find_emails_from_text(self, text):
         """Return emails embedded in plain text"""
-        emails_from_text = map(self.identify_email, self.tokenize(text))
+        fitted_text = self.fit(text)
+        emails_from_text = map(self.identify_email, self._tokenize(fitted_text))
         return set(emails_from_text)
 
     def find_emails_from_links(self, elements):
