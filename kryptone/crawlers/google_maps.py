@@ -65,7 +65,7 @@ class GoogleMaps(BaseCrawler):
             )
             time.sleep(3)
         except:
-            pass
+            logger.info('No consent screen')
 
         results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
         results_is_scrollable = True
@@ -128,7 +128,7 @@ class GoogleMaps(BaseCrawler):
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
             except:
-                pass
+                logger.info('Business information not found')
             else:
                 rows.append([name, url])
         write_csv_document('int_save.csv', rows)
@@ -137,6 +137,7 @@ class GoogleMaps(BaseCrawler):
         # order to get the pieces of information for the business
         items_copy = items.copy()
         comments_saved_position = None
+        counter = 1
         while items_copy:
             business_information = GoogleBusiness()
 
@@ -234,7 +235,7 @@ class GoogleMaps(BaseCrawler):
                 time.sleep(1)
 
             retrieve_comments_script = """
-            const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium']")
+            const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
             
             return Array.from(commentsWrapper).map((commentWrapper) => {
                 const textSection = commentWrapper.querySelector("*[class='MyEned']")
@@ -253,8 +254,15 @@ class GoogleMaps(BaseCrawler):
                     // pass
                 }
 
+                try {
+                    rating = commentWrapper.querySelector('span[role="img"]').ariaLabel
+                } catch (e) {
+                    rating = null
+                }
+
                 return {
                     text: textSection.innerText,
+                    rating: rating,
                     period: period
                 }
             })
@@ -264,6 +272,7 @@ class GoogleMaps(BaseCrawler):
                 comments = self.driver.execute_script(retrieve_comments_script)
             except:
                 comments = ''
+                logger.error(f'Comments not found for {name}')
             else:
                 comments = list(drop_null((comments)))
                 for comment in comments:
@@ -277,6 +286,8 @@ class GoogleMaps(BaseCrawler):
                     clean_comments.append(clean_dict)
 
             def clean_information_list(items):
+                # Remove useless data from the array
+                # of values that we have received
                 exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
                             'vendredi', 'samedi', 'dimanche']
                 result1 = []
@@ -310,7 +321,9 @@ class GoogleMaps(BaseCrawler):
             business_information.comments = clean_comments
             businesses.append(business_information)
             self.final_result = businesses
-            logger.info(f'Completed {x} of {len(businesses)}')
+
+            logger.info(f'Completed {counter} of {len(items)} business cards')
+            counter = counter + 1
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json, businesses))

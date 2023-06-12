@@ -80,3 +80,41 @@ return cleanResultCards.map((item) => {
         comments: comments
     }
 })
+
+
+let seen = []
+
+const parseItem = function (item) {
+    let dataReviewId = item.dataset['reviewId']
+    if (seen.includes(dataReviewId)) {
+        // pass
+    } else {
+        try {
+            item.querySelector('button[aria-label="Voir plus"]').click()
+        } catch (e) {
+            console.log(e)
+        }
+    
+        try {
+            text = item.querySelector('.MyEned').innerText
+        } catch (e) {
+            text = ''
+        }
+    
+        try {
+            rating = item.querySelector('span[role="img"]').ariaLabel
+        } catch (e) {
+            console.log(e)
+        }
+        
+        period = item.querySelector('.rsqaWe').innerText
+        seen.push(dataReviewId)
+        return {
+            period: period,
+            rating: rating,
+            text: text
+        }
+    }
+
+}
+Array.from(document.querySelectorAll('div[data-review-id^="Ch"]')).map(parseItem)
