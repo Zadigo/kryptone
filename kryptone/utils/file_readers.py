@@ -30,4 +30,4 @@ def write_csv_document(filename, data):
         if not isinstance(data, list):
             data = [data]
             
-        writer.writerow(data)
+        writer.writerows(data)

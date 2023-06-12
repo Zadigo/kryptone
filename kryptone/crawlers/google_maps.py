@@ -9,9 +9,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone.app import BaseCrawler
-from kryptone.utils.file_readers import write_json_document
+from kryptone.utils.file_readers import write_json_document, write_csv_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
+from kryptone import logger
 
 
 @dataclasses.dataclass
@@ -33,11 +34,18 @@ class GoogleBusiness:
             'number_of_reviews': self.number_of_reviews,
             'comments': self.comments
         }
+    
+    def as_csv(self):
+        rows = []
+        for comment in self.comments:
+            row = [self.name, self.url, self.address, self.rating, self.number_of_reviews, comment['period'], comment['text']]
+            rows.append(row)
+        return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
 
 
 class GoogleMaps(BaseCrawler):
     # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
-    start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re/@47.0380946,-1.5755537,6z/data=!3m1!4b1?entry=ttu'
+    start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
     final_result = []
 
     def run_actions(self, current_url, **kwargs):
@@ -110,6 +118,21 @@ class GoogleMaps(BaseCrawler):
         # and can result in errors. Try-Except these.
         # items = feed.find_elements(By.CSS_SELECTOR, 'div:not([class])')
         items = feed.find_elements(By.CSS_SELECTOR, 'div[role="article"]')
+        
+        # Intermediate save - Saves the first initital results
+        # that were found in he feed
+        rows = []
+        for item in items:
+            try:
+                link = item.find_element(By.TAG_NAME, 'a')
+                name = link.get_attribute('aria-label')
+                url = link.get_attribute('href')
+            except:
+                pass
+            else:
+                rows.append([name, url])
+        write_csv_document('int_save.csv', rows)
+
         # For each item, we need to click on the card in
         # order to get the pieces of information for the business
         items_copy = items.copy()
@@ -133,15 +156,14 @@ class GoogleMaps(BaseCrawler):
             else:
                 rating, number_of_reviews = rating.split(' ')
 
-            # try:
-            #     data = business.find_element(By.CSS_SELECTOR, 'span[role="img"]')
-            # except:
-            #     rating = None
-            #     reviews = None
-            # else:
-            #     has_match = re.match(r'\d+\.?\d+', data).group(0)
-            #     rating = has_match.group(1) if has_match else None
-            #     reviews = data.split('(')[-1].replace(')', '')
+            # Some names might contain characters such as \' which
+            # can break the javascript script since there are also
+            # single quotes. We need to escape those.
+            javascript_business_name = ''
+            if "'" in name:
+                javascript_business_name = name.replace("'", "\\'")
+            else:
+                javascript_business_name = name
 
             # Opens the side panel
             link.click()
@@ -154,7 +176,7 @@ class GoogleMaps(BaseCrawler):
             const infoSection = document.querySelector('div[class="m6QErb "][aria-label^="{business_name}"][role="region"]')
             const allDivs = infoSection.querySelectorAll('div')
             return Array.from(allDivs).map(x => x.innerText)
-            """.format(business_name=name)
+            """.format(business_name=javascript_business_name)
             information = self.driver.execute_script(business_information_script)
             clean_information = set(list(drop_null(information)))
 
@@ -190,7 +212,7 @@ class GoogleMaps(BaseCrawler):
                 return [ currentPosition, elementHeight ]
             """
             comments_scroll_script = comments_scroll_script.format(
-                business_name=name
+                business_name=javascript_business_name
             )
             while comments_is_scrollable:
                 result = self.driver.execute_script(comments_scroll_script)
@@ -212,9 +234,6 @@ class GoogleMaps(BaseCrawler):
                 time.sleep(1)
 
             retrieve_comments_script = """
-            // const xpath = "//div[starts-with(@data-review-id, 'Ch')][contains(@class, 'fontBodyMedium')]//*[@class='MyEned']"
-            // const text = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
-
             const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium']")
             
             return Array.from(commentsWrapper).map((commentWrapper) => {
@@ -223,9 +242,9 @@ class GoogleMaps(BaseCrawler):
                 // Sometimes there is a read more button
                 // that we have to click
                 try {
-                    textSection.querySelector('button[aria-label="Voir plus"]').click()
+                    commentWrapper.querySelector('button[aria-label="Voir plus"]').click()
                 } catch (e) {
-                    console.log(e)
+                    console.log('Read more click', e)
                 }
                 
                 try {
@@ -240,13 +259,13 @@ class GoogleMaps(BaseCrawler):
                 }
             })
             """
+            clean_comments = []
             try:
                 comments = self.driver.execute_script(retrieve_comments_script)
             except:
                 comments = ''
             else:
                 comments = list(drop_null((comments)))
-                clean_comments = []
                 for comment in comments:
                     if not isinstance(comment, dict):
                         continue
@@ -291,20 +310,22 @@ class GoogleMaps(BaseCrawler):
             business_information.comments = clean_comments
             businesses.append(business_information)
             self.final_result = businesses
+            logger.info(f'Completed {x} of {len(businesses)}')
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json, businesses))
-        write_json_document('test_maps.json', data)
+        write_json_document('boulangerie.json', data)
 
 
 if __name__ == '__main__':
     try:
         instance = GoogleMaps()
-        instance.start(crawl=False, debug_mode=True, wait_time=1)
+        instance.start(crawl=False, wait_time=1)
     except KeyboardInterrupt:
         data = list(map(lambda x: x.as_json, instance.final_result))
         write_json_document('test_maps.json', data)
     except Exception:
         data = list(map(lambda x: x.as_json, instance.final_result))
         write_json_document('test_maps.json', data)
+        raise
 
