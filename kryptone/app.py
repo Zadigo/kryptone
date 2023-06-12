@@ -24,6 +24,10 @@ cache = Cache()
 
 
 class ActionsMixin:
+     # Default speed at which the robot
+    # should scroll a given page
+    default_scroll_step = 80
+
     @property
     def scrolled_to_bottom(self):
         """Checks that we have scrolled to the bottom of the page"""
@@ -81,6 +85,34 @@ class ActionsMixin:
                 element.click()
             except:
                 logger.info('Consent button not found')
+
+
+    def _test_scroll_page(self, xpath=None, css_selector=None):
+        if css_selector:
+            selector = """const mainWrapper = document.querySelector('{condition}')"""
+            selector = selector.format(condition=css_selector)
+        else:
+            selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
+            selector = selector.format(condition=xpath)
+
+        body = """
+        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+
+        const elementHeight = elementToScroll.scrollHeight
+        let currentPosition = elementToScroll.scrollTop
+
+        // Indicates the scrolling speed
+        const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+        currentPosition += scrollStep
+        elementToScroll.scroll(0, currentPosition)
+
+        return [ currentPosition, elementHeight ]
+        """.format(scroll_step=self.default_scroll_step)
+
+        script = css_selector + '\n' + body
+        return script
+
 
 
 class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):

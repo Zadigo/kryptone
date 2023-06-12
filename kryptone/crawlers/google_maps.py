@@ -205,7 +205,7 @@ class GoogleMaps(BaseCrawler):
                 let currentPosition = elementToScroll.scrollTop
 
                 // Indicates the scrolling speed
-                const scrollStep = Math.ceil(elementHeight / 10)
+                const scrollStep = Math.ceil(elementHeight / {scroll_step})
 
                 currentPosition += scrollStep
                 elementToScroll.scroll(0, currentPosition)
@@ -213,7 +213,8 @@ class GoogleMaps(BaseCrawler):
                 return [ currentPosition, elementHeight ]
             """
             comments_scroll_script = comments_scroll_script.format(
-                business_name=javascript_business_name
+                business_name=javascript_business_name,
+                scroll_step=self.default_scroll_step
             )
             while comments_is_scrollable:
                 result = self.driver.execute_script(comments_scroll_script)
