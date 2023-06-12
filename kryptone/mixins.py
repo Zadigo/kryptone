@@ -49,6 +49,12 @@ class TextMixin:
     @staticmethod
     def _tokenize(text):
         return list(drop_null(text.split(' ')))
+    
+    @staticmethod
+    def clean_text(text):
+        result = str(text).encode('utf-8').decode('utf-8')
+        result = result.replace('\n', '')
+        return result
 
     def _remove_punctuation(self, text):
         # We should not replace the "@" in the document since

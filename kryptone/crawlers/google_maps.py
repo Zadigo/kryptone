@@ -36,7 +36,9 @@ class GoogleBusiness:
 
 
 class GoogleMaps(BaseCrawler):
-    start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
+    # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
+    start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re/@47.0380946,-1.5755537,6z/data=!3m1!4b1?entry=ttu'
+    final_result = []
 
     def run_actions(self, current_url, **kwargs):
         try:
@@ -84,9 +86,9 @@ class GoogleMaps(BaseCrawler):
 
             current_position, element_height = result
 
-            # NOTE: For testing purposes
-            if current_position > 500:
-                break
+            if self.debug_mode:
+                if current_position > 500:
+                    break
 
             if current_position >= element_height:
                 results_is_scrollable = False
@@ -125,8 +127,11 @@ class GoogleMaps(BaseCrawler):
                 link = business.find_element(By.TAG_NAME, 'a')
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
+                rating = business.find_element(By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
             except:
                 continue
+            else:
+                rating, number_of_reviews = rating.split(' ')
 
             # try:
             #     data = business.find_element(By.CSS_SELECTOR, 'span[role="img"]')
@@ -194,9 +199,9 @@ class GoogleMaps(BaseCrawler):
                 if current_position >= element_height:
                     comments_is_scrollable = False
 
-                # NOTE: For testing purposes
-                if current_position >= 1500:
-                    break
+                if self.debug_mode:
+                    if current_position >= 1500:
+                        break
 
                 # There seems to be a case where the current position
                 # does not get updated and stays the same which
@@ -218,9 +223,9 @@ class GoogleMaps(BaseCrawler):
                 // Sometimes there is a read more button
                 // that we have to click
                 try {
-                    commentWrapper.querySelector('button[aria-label="Voir plus"]').click()
+                    textSection.querySelector('button[aria-label="Voir plus"]').click()
                 } catch (e) {
-                    // pass
+                    console.log(e)
                 }
                 
                 try {
@@ -239,14 +244,27 @@ class GoogleMaps(BaseCrawler):
                 comments = self.driver.execute_script(retrieve_comments_script)
             except:
                 comments = ''
+            else:
+                comments = list(drop_null((comments)))
+                clean_comments = []
+                for comment in comments:
+                    if not isinstance(comment, dict):
+                        continue
+                    
+                    clean_dict = {}
+                    for key, value in comment.items():
+                        clean_text = self.clean_text(value) 
+                        clean_dict[key] = clean_text
+                    clean_comments.append(clean_dict)
 
             business_information.name = name
             business_information.url = url
-            business_information.address = clean_information
+            business_information.address = list(clean_information)
             business_information.rating = rating
-            business_information.number_of_reviews = reviews
-            business_information.comments = list(drop_null((comments)))
+            business_information.number_of_reviews = number_of_reviews
+            business_information.comments = clean_comments
             businesses.append(business_information)
+            self.final_result = businesses
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json, businesses))
@@ -254,5 +272,13 @@ class GoogleMaps(BaseCrawler):
 
 
 if __name__ == '__main__':
-    instance = GoogleMaps()
-    instance.start(crawl=False, wait_time=1)
+    try:
+        instance = GoogleMaps()
+        instance.start(crawl=False, debug_mode=True, wait_time=1)
+    except KeyboardInterrupt:
+        data = list(map(lambda x: x.as_json, instance.final_result))
+        write_json_document('test_maps.json', data)
+    except Exception:
+        data = list(map(lambda x: x.as_json, instance.final_result))
+        write_json_document('test_maps.json', data)
+

@@ -89,8 +89,9 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    # webdriver = Chrome
-    webdriver = Edge
+    webdriver = Chrome
+    debug_mode = False
+    # webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
@@ -102,8 +103,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                     f'Start url must be a string. Got: {self.start_url}')
             self._start_url_object = urlparse(self.start_url)
 
-            options = EdgeOptions()
-            # options = ChromeOptions()
+            # options = EdgeOptions()
+            options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")
@@ -304,9 +305,14 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], wait_time=25, run_audit=False, language='en', crawl=True):
+    def start(self, start_urls=[], debug_mode=False, wait_time=25, run_audit=False, language='en', crawl=True):
         """Entrypoint to start the web scrapper"""
-        logger.info('Started crawling...')
+        self.debug_mode = debug_mode
+
+        if self.debug_mode:
+            logger.info('Starting Kryptone in debug mode...')
+        else:
+            logger.info('Starting Kryptone...')
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))

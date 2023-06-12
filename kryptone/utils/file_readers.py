@@ -16,7 +16,7 @@ def read_json_document(filename):
 def write_json_document(filename, data):
     """Writes data to a JSON file"""
     with open(filename, mode='w+', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 
 def write_csv_document(filename, data):
