@@ -257,9 +257,35 @@ class GoogleMaps(BaseCrawler):
                         clean_dict[key] = clean_text
                     clean_comments.append(clean_dict)
 
+            def clean_information_list(items):
+                exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
+                            'vendredi', 'samedi', 'dimanche']
+                result1 = []
+                for text in items:
+                    if text in exclude:
+                        continue
+                    result1.append(text)
+
+                result2 = []
+                for text in result1:
+                    logic = [
+                        text.startswith('lundi'),
+                        text.startswith('Ouvert'),
+                        text.startswith('Envoyer vers'),
+                        text.startswith('Suggérer'),
+                        text.startswith('Revendiquer cet')
+                    ]
+                    if any(logic):
+                        continue
+                    result2.append(text)
+                return result2
+
+
             business_information.name = name
             business_information.url = url
-            business_information.address = list(clean_information)
+            business_information.address = clean_information_list(
+                list(clean_information)
+            )
             business_information.rating = rating
             business_information.number_of_reviews = number_of_reviews
             business_information.comments = clean_comments
