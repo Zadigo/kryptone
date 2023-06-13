@@ -8,11 +8,17 @@ GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 PROJECT_PATH = None
 
 
+SPIDERS = ['Kiabi']
+
+
 # The webdriver browser to use
-# WEBDRIVER = {
-#     'driver': 'selenium.webdriver.Edge',
-#     'executable_path': 'WEBDRIVER_EXECUTABLE_PATH',
-# }
+WEBDRIVER = {
+    'driver': 'selenium.webdriver.Edge',
+    'executable_path': None,
+}
+
+
+MEDIA_FOLDER = 'media'
 
 
 # The name of the cache file

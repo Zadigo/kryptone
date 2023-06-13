@@ -30,6 +30,22 @@
                 "group": "Kryptone",
                 "order": 2
             }
+        },
+        {
+            "name": "Kryptone: Local Project",
+            "type": "python",
+            "request": "launch",
+            "program": "../kiabi/manage.py",
+            "args": [
+                "start"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "presentation": {
+                "hidden": false,
+                "group": "Kryptone",
+                "order": 2
+            }
         }
     ]
 }

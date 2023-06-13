@@ -45,7 +45,8 @@ class GoogleBusiness:
 
 class GoogleMaps(BaseCrawler):
     # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
-    start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
+    # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
+    start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
     final_result = []
 
     def run_actions(self, current_url, **kwargs):
@@ -235,10 +236,17 @@ class GoogleMaps(BaseCrawler):
                 comments_saved_position = current_position
                 time.sleep(1)
 
+            # Before retrieving all the comments
+            # raise a small pause here
+            time.sleep(2)
+
             retrieve_comments_script = """
             const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
             
             return Array.from(commentsWrapper).map((commentWrapper) => {
+                let text = ''
+                let period = null
+                let rating = null
                 const textSection = commentWrapper.querySelector("*[class='MyEned']")
 
                 // Sometimes there is a read more button
@@ -258,11 +266,17 @@ class GoogleMaps(BaseCrawler):
                 try {
                     rating = commentWrapper.querySelector('span[role="img"]').ariaLabel
                 } catch (e) {
-                    rating = null
+                    // pass
+                }
+
+                try {
+                    text = textSection.innerText
+                } catch (e) {
+                    // pass
                 }
 
                 return {
-                    text: textSection.innerText,
+                    text: text,
                     rating: rating,
                     period: period
                 }
@@ -271,9 +285,9 @@ class GoogleMaps(BaseCrawler):
             clean_comments = []
             try:
                 comments = self.driver.execute_script(retrieve_comments_script)
-            except:
+            except Exception as e:
                 comments = ''
-                logger.error(f'Comments not found for {name}')
+                logger.error(f'Comments not found for {name}: {e.args}')
             else:
                 comments = list(drop_null((comments)))
                 for comment in comments:
@@ -285,6 +299,7 @@ class GoogleMaps(BaseCrawler):
                         clean_text = self.clean_text(value) 
                         clean_dict[key] = clean_text
                     clean_comments.append(clean_dict)
+                logger.info(f'Found {len(clean_comments)} reviews')
 
             def clean_information_list(items):
                 # Remove useless data from the array
@@ -337,9 +352,11 @@ if __name__ == '__main__':
         instance.start(crawl=False, wait_time=1)
     except KeyboardInterrupt:
         data = list(map(lambda x: x.as_json, instance.final_result))
-        write_json_document('test_maps.json', data)
+        write_json_document('dump.json', data)
+        logger.critical(f"Dumping data to 'dump.json'")
     except Exception:
         data = list(map(lambda x: x.as_json, instance.final_result))
-        write_json_document('test_maps.json', data)
+        write_json_document('dump.json', data)
+        logger.critical(f"Dumping data to 'dump.json'")
         raise
 

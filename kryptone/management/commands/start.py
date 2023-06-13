@@ -24,8 +24,8 @@ class Command(ProjectCommand):
             raise ValueError(('The spiders for the current project '
                               'were not properly configured'))
 
-        config = registry.get_spider(namespace.name)
-        config.run()
-        # if namespace.name is not None:
-        # else:
-        #     registry.run_all_spiders()
+        if namespace.name is not None:
+            config = registry.get_spider(namespace.name)
+            config.run()
+        else:
+            registry.run_all_spiders()

@@ -83,7 +83,6 @@ return cleanResultCards.map((item) => {
 
 
 let seen = []
-
 const parseItem = function (item) {
     let dataReviewId = item.dataset['reviewId']
     if (seen.includes(dataReviewId)) {
@@ -117,4 +116,7 @@ const parseItem = function (item) {
     }
 
 }
-Array.from(document.querySelectorAll('div[data-review-id^="Ch"]')).map(parseItem)
+const result = Array.from(document.querySelectorAll('div[data-review-id^="Ch"]')).map(parseItem)
+result.filter((item) => {
+    return item !== undefined
+})
