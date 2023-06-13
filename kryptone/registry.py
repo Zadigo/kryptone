@@ -69,7 +69,7 @@ class SpiderConfig:
             raise ValueError(
                 f'Could not start spider in project: {self.dotted_path}'
             )
-        self.spider_class.start()
+        self.spider_class().start()
 
 
 class MasterRegistry:
@@ -110,6 +110,8 @@ class MasterRegistry:
         if not media_path.exists():
             raise ValueError("MEDIA_FOLDER path does does not exist")
         setattr(settings, 'MEDIA_FOLDER', media_path)
+
+        self.is_ready = True
 
     def populate(self):
         dotted_path = os.environ.get(ENVIRONMENT_VARIABLE, None)
@@ -189,7 +191,7 @@ class MasterRegistry:
                 try:
                     config.run()
                 except Exception:
-                    logger.instance.critical((f"Could not start {config}. "
+                    logger.critical((f"Could not start {config}. "
                                               "Did you use the correct class name?"), stack_info=True)
                     raise
 
