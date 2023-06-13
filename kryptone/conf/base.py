@@ -8,7 +8,7 @@ GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 PROJECT_PATH = None
 
 
-SPIDERS = ['Kiabi']
+SPIDERS = []
 
 
 # The webdriver browser to use
