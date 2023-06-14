@@ -1,112 +1,50 @@
-const resultCards = document.querySelector('div[role="feed"]').querySelectorAll('div:not([class])')
-// Remove the useless DIVs that do not have no height
-// and can cause some breaking issues
-const cleanResultCards = resultCards.map((item) => {
-    return item.offsetHeight > 0
-})
-
-return cleanResultCards.map((item) => {
-    let link = item.querySelector('a')
-    let url = link['href']
-    let enterprise = link.ariaLabel
-    let score
-    let address
-
-    try {
-        score = item.querySelector('span[role="img"]').ariaLabel
-    } catch (e) {
-        score = item.querySelector('span[class="MW4etd"]').innerText
-    }
-
-    try {
-        // Just try to grab all the information at once even though we
-        // useless items for the scrap
-        const infoBlocks = item.querySelector('div[class*="fontBodyMedium"]').querySelectorAll('div[class="W4Efsd"]')
-        address = infoBlocks[1].innerText
-    } catch (e) {
-        console.log(e)
-    }
-
-    // This is the section where we get all
-    // the comments
-    setTimeout(() => {
-        link.click()
-    }, 8000)
-
-    // Move to the comment section
-    setTimeout(() => {
-        let commentSection = document.querySelectorAll('*[role="tablist"] button')[1]
-        commentSection.click()
-
-        let allComments = document.querySelector('*[role="main"] div[tabindex="-1"] div[class$="m6QErb "]')
-        let comments = allComments.querySelector('div')
-
-        comments = comments.map((comment) => {
-            let period = null
-            let text = null
-
-            // Sometimes there is a read more button
-            // that we have to click
-            try {
-                comment.querySelector('button[aria-label="Voir plus"]').click()
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                period = comment.querySelector('.DU9Pgb').innerText
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                text = comment.querySelector('.MyEned').innerText.trim()
-            } catch (e) {
-                // pass
-            }
-
-            return {
-                text: text,
-                period: period
-            }
-        })
-    }, 2000)
-
-    return {
-        url: url,
-        enterprise: enterprise,
-        score: score,
-        address: address,
-        comments: comments
-    }
-})
-
-
 let seen = []
-const parseItem = function (item) {
+const parseGoogleMapsComments = function (item) {
+    // Javascript code used to parse the comments on
+    // on a Google Maps business page
     let dataReviewId = item.dataset['reviewId']
     if (seen.includes(dataReviewId)) {
         // pass
     } else {
         try {
-            item.querySelector('button[aria-label="Voir plus"]').click()
+            let moreButton = null
+
+            moreButton = (
+                // Try by getting the button using the specific review ID
+                item.querySelector(`button[data-review-id="${dataReviewId}"][aria-controls="${dataReviewId}"][aria-expanded="false"]`) ||
+                // Try the "Voir plus" button"
+                item.querySelector('button[aria-label="Voir plus"]') ||
+                // Try the "See more" button"
+                item.querySelector('button[aria-label="See more"]') ||
+                // On last resort try "aria-expanded"
+                item.querySelector('button[aria-expanded="false"]')
+            )
+            moreButton.click()
         } catch (e) {
-            console.log(e)
+            console.info('No additional content for', dataReviewId)
         }
-    
+
+        try {
+            // Or, item.querySelector('.DU9Pgb').innerText
+            period = item.querySelector('.rsqaWe').innerText
+        } catch (e) {
+            // pass
+        }
+         
+        // TODO: To get the full comment, we need to delay
+        // the text extraction by a couple milliseconds
         try {
             text = item.querySelector('.MyEned').innerText
         } catch (e) {
             text = ''
         }
-    
+
         try {
             rating = item.querySelector('span[role="img"]').ariaLabel
         } catch (e) {
-            console.log(e)
+            // pass
         }
-        
-        period = item.querySelector('.rsqaWe').innerText
+
         seen.push(dataReviewId)
         return {
             period: period,
@@ -114,9 +52,20 @@ const parseItem = function (item) {
             text: text
         }
     }
-
 }
-const result = Array.from(document.querySelectorAll('div[data-review-id^="Ch"]')).map(parseItem)
-result.filter((item) => {
-    return item !== undefined
-})
+Array.from(document.querySelectorAll('div[data-review-id^="Ch"]'))
+    .map(parseGoogleMapsComments)
+    .filter((item) => { return item !== undefined })
+
+
+
+const scrollDocument = function () {
+    // Scrolls the whole page of a website
+    const documentHeight = document.documentElement.offsetHeight
+    const currentPosition = document.documentElement.scrollTop
+
+    const scrollStep = Math.ceil(documentHeight / 30)
+    currentPosition += scrollStep
+    document.documentElement.scroll(0, currentPosition)
+    return [documentHeight, currentPosition]
+}
