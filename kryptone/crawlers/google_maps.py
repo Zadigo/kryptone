@@ -13,7 +13,7 @@ from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
-
+from urllib.parse import quote_plus, urljoin
 
 @dataclasses.dataclass
 class GoogleBusiness:
@@ -43,11 +43,22 @@ class GoogleBusiness:
         return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
 
 
+def generate_search_url(search):
+    """Generates a Google Maps search url"""
+    url = "https://www.google.com/maps/search/"
+    name = search.lower().strip()
+    return urljoin(url, quote_plus(name))
+
+
 class GoogleMaps(BaseCrawler):
+    final_result = []
     # # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
     # # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
-    start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
-    final_result = []
+    # start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
+    start_url = generate_search_url('la mie câline')
+
+    def search_url(self, business_name):
+        pass
 
     def run_actions(self, current_url, **kwargs):
         try:
@@ -179,8 +190,17 @@ class GoogleMaps(BaseCrawler):
             const allDivs = infoSection.querySelectorAll('div')
             return Array.from(allDivs).map(x => x.innerText)
             """.format(business_name=javascript_business_name)
-            information = self.driver.execute_script(business_information_script)
-            clean_information = set(list(drop_null(information)))
+            try:
+                # Some business names do not seem to be valid e.g.
+                # aria-label="la mie CÂLINE - Atelier "Pains & Restauration"" which
+                # breaks the script. We'll just keep going if we cannot get
+                # no business information
+                information = self.driver.execute_script(business_information_script)
+            except Exception as e:
+                logger.critical(f'Could not parse business information: {e.args}')
+                continue
+            else:
+                clean_information = set(list(drop_null(information)))
 
             # 2.1. Get the side panel
             # side_panel = self.driver.find_elements(
@@ -316,6 +336,12 @@ class GoogleMaps(BaseCrawler):
                 for text in result1:
                     logic = [
                         text.startswith('lundi'),
+                        text.startswith('mardi'),
+                        text.startswith('mercredi'),
+                        text.startswith('jeudi'),
+                        text.startswith('vendredi'),
+                        text.startswith('samedi'),
+                        text.startswith('dimanche'),
                         text.startswith('Ouvert'),
                         text.startswith('Envoyer vers'),
                         text.startswith('Suggérer'),
@@ -359,4 +385,3 @@ if __name__ == '__main__':
         write_json_document('dump.json', data)
         logger.critical(f"Dumping data to 'dump.json'")
         raise
-
