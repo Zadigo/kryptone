@@ -2,6 +2,7 @@ import dataclasses
 import random
 import re
 import time
+from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -13,7 +14,7 @@ from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
-from urllib.parse import quote_plus, urljoin
+
 
 @dataclasses.dataclass
 class GoogleBusiness:
@@ -38,7 +39,8 @@ class GoogleBusiness:
     def as_csv(self):
         rows = []
         for comment in self.comments:
-            row = [self.name, self.url, self.address, self.rating, self.number_of_reviews, comment['period'], comment['text']]
+            row = [self.name, self.url, self.address, self.rating, 
+                   self.number_of_reviews, comment['period'], comment['text']]
             rows.append(row)
         return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
 
