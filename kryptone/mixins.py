@@ -52,9 +52,9 @@ class TextMixin:
     
     @staticmethod
     def clean_text(text):
-        result = str(text).encode('utf-8').decode('utf-8')
-        result = result.replace('\n', '')
-        return result
+        result = text.replace('\n', ' ')
+        result = str(result).encode('utf-8').decode('utf-8')
+        return result.strip()
 
     def _remove_punctuation(self, text):
         # We should not replace the "@" in the document since
