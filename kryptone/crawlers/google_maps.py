@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
 from kryptone.app import BaseCrawler
+from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
@@ -43,8 +44,8 @@ class GoogleBusiness:
 
 
 class GoogleMaps(BaseCrawler):
-    # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
-    # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
+    # # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
+    # # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
     start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
     final_result = []
 
@@ -342,7 +343,7 @@ class GoogleMaps(BaseCrawler):
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json, businesses))
-        write_json_document('boulangerie.json', data)
+        write_json_document(self.get_filename(extension='json'), data)
 
 
 if __name__ == '__main__':

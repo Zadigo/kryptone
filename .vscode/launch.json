@@ -37,7 +37,7 @@
             "request": "launch",
             "program": "../kiabi/manage.py",
             "args": [
-                "start"
+                "start",
             ],
             "console": "integratedTerminal",
             "justMyCode": true,

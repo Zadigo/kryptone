@@ -1,6 +1,6 @@
 import subprocess
-from kryptone import settings
+from kryptone.conf import settings
 
-app_path = settings.PROJECT_PATH / 'kryptone/app.py'
-arguments = ['python', app_path]
+app_path = 'tests/testproject/manage.py'
+arguments = ['python', app_path, 'start', '-d True', '-c False']
 subprocess.call(arguments, stdin=subprocess.PIPE, stdout=subprocess.PIPE)

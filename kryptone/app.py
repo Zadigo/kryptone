@@ -1,5 +1,7 @@
+import string
 import os
 import time
+import random
 from multiprocessing import Process
 from urllib.parse import urlparse
 
@@ -172,6 +174,13 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
+    
+    def get_filename(self, length=5, extension=None):
+        characters = string.ascii_lowercase + string.digits
+        name = ''.join(random.choice(characters) for _ in range(length))
+        if extension is not None:
+            return f'{name}.{extension}'
+        return name
 
     def _backup_urls(self):
         """Backs up the urls both in the cache,

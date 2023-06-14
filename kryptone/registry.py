@@ -61,7 +61,7 @@ class SpiderConfig:
         if self.spider_class is not None and self.name is not None:
             self.is_ready = True
 
-    def run(self):
+    def run(self, **kwargs):
         """Runs the spider by calling the spider class
         which in return calls "start" method on the
         spider via the __init__ method"""
@@ -69,7 +69,7 @@ class SpiderConfig:
             raise ValueError(
                 f'Could not start spider in project: {self.dotted_path}'
             )
-        self.spider_class().start()
+        self.spider_class().start(**kwargs)
 
 
 class MasterRegistry:
@@ -180,7 +180,7 @@ class MasterRegistry:
 
         self.pre_configure_project(dotted_path, settings)
 
-    def run_all_spiders(self):
+    def run_all_spiders(self, **kwargs):
         if not self.has_spiders:
             logger.info(("There are no registered spiders in your project. If you created spiders, "
                            "register them within the SPIDERS variable of your "
@@ -189,7 +189,7 @@ class MasterRegistry:
             for config in self.get_spiders():
                 pre_init_spider.send(self, spider=config)
                 try:
-                    config.run()
+                    config.run(**kwargs)
                 except Exception:
                     logger.critical((f"Could not start {config}. "
                                               "Did you use the correct class name?"), stack_info=True)
