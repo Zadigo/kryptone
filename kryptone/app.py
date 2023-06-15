@@ -417,3 +417,61 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
+
+
+class SinglePageAutomater(BaseCrawler):
+    """Automates user defined actions on a
+    single page"""
+
+    def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
+        """Entrypoint to start the web scrapper"""
+        self.debug_mode = debug_mode
+
+        if self.debug_mode:
+            logger.info('Starting Kryptone in debug mode...')
+        else:
+            logger.info('Starting Kryptone...')
+
+        if start_urls:
+            self.urls_to_visit.update(set(start_urls))
+
+        while self.urls_to_visit:
+            current_url = self.urls_to_visit.pop()
+            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
+
+            # In the case where the user has provided a
+            # set of urls directly in the function,
+            # start_url would be None
+            if self.start_url is None:
+                self.start_url = current_url
+
+            current_url_object = urlparse(current_url)
+            # If we are not on the same domain as the
+            # starting url: *stop*. we are not interested
+            # in exploring the whole internet
+            if current_url_object.netloc != self._start_url_object.netloc:
+                continue
+
+            self.driver.get(current_url)
+            # Always wait for the body section of
+            # the page to be located  or visible
+            wait = WebDriverWait(self.driver, 8)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            self.post_visit_actions(current_url=current_url)
+
+            self.visited_urls.add(current_url)
+
+            self._backup_urls()
+
+            self.emails(
+                self.get_transformed_raw_page_text,
+                elements=self.get_page_link_elements
+            )
+            write_csv_document('emails.csv', self.emails_container)
+
+            # Run custom user actions once
+            # everything is completed
+            self.run_actions(current_url)
+
+            logger.info(f"Waiting {wait_time} seconds...")
+            time.sleep(wait_time)

@@ -62,7 +62,7 @@ Array.from(document.querySelectorAll('div[data-review-id^="Ch"]'))
 const scrollDocument = function () {
     // Scrolls the whole page of a website
     const documentHeight = document.documentElement.offsetHeight
-    const currentPosition = document.documentElement.scrollTop
+    let currentPosition = document.documentElement.scrollTop
 
     const scrollStep = Math.ceil(documentHeight / 30)
     currentPosition += scrollStep

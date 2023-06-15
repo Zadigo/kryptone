@@ -57,7 +57,11 @@ class GoogleMaps(BaseCrawler):
     # # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
     # # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
     # start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
-    start_url = generate_search_url('la mie câline')
+    start_url = 'https://www.google.com/maps/search/eric+kayser/@45.0316798,-2.4724553,5z?entry=ttu'
+
+    # start_url = generate_search_url('la mie câline')
+    # start_url = generate_search_url('pomme de pain')
+    # start_url = generate_search_url('eric kayser')
 
     def search_url(self, business_name):
         pass
@@ -199,7 +203,8 @@ class GoogleMaps(BaseCrawler):
                 # no business information
                 information = self.driver.execute_script(business_information_script)
             except Exception as e:
-                logger.critical(f'Could not parse business information: {e.args}')
+                counter = counter + 1
+                logger.critical(f'Could not parse business information: {url}')
                 continue
             else:
                 clean_information = set(list(drop_null(information)))
@@ -265,34 +270,53 @@ class GoogleMaps(BaseCrawler):
             retrieve_comments_script = """
             const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
             
-            return Array.from(commentsWrapper).map((commentWrapper) => {
+            return Array.from(commentsWrapper).map((item) => {
+                let dataReviewId = item.dataset['reviewId']
+
                 let text = ''
                 let period = null
                 let rating = null
-                const textSection = commentWrapper.querySelector("*[class='MyEned']")
+                const textSection = item.querySelector("*[class='MyEned']")
 
-                // Sometimes there is a read more button
-                // that we have to click
                 try {
-                    commentWrapper.querySelector('button[aria-label="Voir plus"]').click()
+                    // Sometimes there is a read more button
+                    // that we have to click
+                    
+                    moreButton = (
+                        // Try the "Voir plus" button"
+                        item.querySelector('button[aria-label="Voir plus"]') ||
+                        // Try the "See more" button"
+                        item.querySelector('button[aria-label="See more"]') ||
+                        // On last resort try "aria-expanded"
+                        item.querySelector('button[aria-expanded="false"]')
+                    )
+                    moreButton.click()
                 } catch (e) {
-                    console.log('Read more click', e)
+                    console.log('No additional data for', dataReviewId)
                 }
                 
                 try {
-                    period = commentWrapper.querySelector('.DU9Pgb').innerText
+                    // Or, item.querySelector('.rsqaWe').innerText
+                    period = item.querySelector('.DU9Pgb').innerText
                 } catch (e) {
                     // pass
                 }
 
                 try {
-                    rating = commentWrapper.querySelector('span[role="img"]').ariaLabel
+                    rating = item.querySelector('span[role="img"]').ariaLabel
                 } catch (e) {
                     // pass
                 }
 
                 try {
                     text = textSection.innerText
+                } catch (e) {
+                    // pass
+                }
+
+                try {
+                    reviewerName = item.querySelector('class*="d4r55"').innerText
+                    reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
                 } catch (e) {
                     // pass
                 }
@@ -337,6 +361,8 @@ class GoogleMaps(BaseCrawler):
                 result2 = []
                 for text in result1:
                     logic = [
+                        'Commander' in text,
+                        'ubereats.com' in text,
                         text.startswith('lundi'),
                         text.startswith('mardi'),
                         text.startswith('mercredi'),
