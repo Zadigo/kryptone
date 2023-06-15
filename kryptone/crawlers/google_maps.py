@@ -63,9 +63,6 @@ class GoogleMaps(BaseCrawler):
     # start_url = generate_search_url('pomme de pain')
     # start_url = generate_search_url('eric kayser')
 
-    def search_url(self, business_name):
-        pass
-
     def run_actions(self, current_url, **kwargs):
         try:
             # Google has a special consent form
