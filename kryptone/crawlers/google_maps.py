@@ -397,7 +397,9 @@ class GoogleMaps(BaseCrawler):
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json, businesses))
-        write_json_document(self.get_filename(extension='json'), data)
+        filename = self.get_filename(extension='json')
+        write_json_document(filename, data)
+        logger.info(f'File created: {filename}')
 
 
 if __name__ == '__main__':
