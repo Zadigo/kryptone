@@ -1,9 +1,9 @@
 import unittest
 
 import requests
+from bs4 import BeautifulSoup
 
 from kryptone.mixins import EmailMixin, TextMixin
-from bs4 import BeautifulSoup
 
 with open('tests/pages/bershka.html', encoding='utf-8') as f:
     soup = BeautifulSoup(f, 'html.parser')
@@ -61,6 +61,7 @@ class TestTextMixin(unittest.TestCase):
 #         text = 'this is a text with an email: test@gmail.com'
 #         emails = self.instance.find_emails_from_text(text)
 #         self.assertListEqual(list(emails), ['test@gmail.com'])
+
 
 if __name__ == '__main__':
     unittest.main()

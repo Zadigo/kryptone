@@ -60,7 +60,7 @@ class Etam(BaseCrawler):
 
 
 if __name__ == '__main__':
-    testing = Etam()
-    # testing.start(crawl=False, wait_time=2)
+    instance = Etam()
+    instance.start(wait_time=4)
     # testing.start(crawl=True, run_audit=True, wait_time=2)
-    testing.resume()
+    # instance.resume()

@@ -123,9 +123,9 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     visited_urls = set()
     url_validators = []
     url_filters = []
-    webdriver = Chrome
+    # webdriver = Chrome
     debug_mode = False
-    # webdriver = Edge
+    webdriver = Edge
 
     def __init__(self):
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
@@ -137,8 +137,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                     f'Start url must be a string. Got: {self.start_url}')
             self._start_url_object = urlparse(self.start_url)
 
-            # options = EdgeOptions()
-            options = ChromeOptions()
+            options = EdgeOptions()
+            # options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
             options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
             # options.add_argument(f"--proxy-server={}")
@@ -183,8 +183,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         return name
 
     def _backup_urls(self):
-        """Backs up the urls both in the cache,
-        and in the cache file"""
+        """Backs up the urls both in the memory
+        cache, and in the cache file"""
         urls_data = {
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
@@ -201,33 +201,32 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         items = [f"--header={key}={value})" for key, value in headers.items()]
         options.add_argument(' '.join(items))
 
-    def run_validators(self, url):
-        """Validates an url before it is
-        included in the list of urls to visit"""
-        results = []
-        if self.url_validators:
-            for validator in self.url_validators:
-                if not callable(validator):
-                    continue
+    # def run_validators(self, url):
+    #     """Validates an url before it is
+    #     included in the list of urls to visit"""
+    #     results = []
+    #     if self.url_validators:
+    #         for validator in self.url_validators:
+    #             if not callable(validator):
+    #                 continue
 
-                result = validator(url, driver=self.driver)
-                if result is None:
-                    result = False
-                results.append(result)
-            test_result = all(results)
+    #             result = validator(url, driver=self.driver)
+    #             if result is None:
+    #                 result = False
+    #             results.append(result)
+    #         test_result = all(results)
 
-            if test_result:
-                message = f"Validation successful for {url}"
-            else:
-                message = f"Validation failed for {url}"
-            logger.info(message)
-        return True
+    #         if test_result:
+    #             message = f"Validation successful for {url}"
+    #         else:
+    #             message = f"Validation failed for {url}"
+    #         logger.info(message)
+    #     return True
 
     def run_filters(self, exclude=True):
-        """Filters out or in urls
-        included in the list of urls to visit.
-        The default action is to exclude all urls that
-        meet sepcific conditions"""
+        """Filters out or in urls included in the list 
+        of urls to visit. The default action is to 
+        exclude all urls that meet sepcific conditions"""
         if self.url_filters:
             urls_to_filter = []
             for instance in self.url_filters:
@@ -346,7 +345,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=25, run_audit=False, language='en', crawl=True):
+    def start(self, start_urls=[], debug_mode=False, wait_time=25, run_audit=False, language='en'):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
 
@@ -386,8 +385,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
             # We can either crawl all the website
             # or just specific page
-            if crawl:
-                self.get_page_urls()
+            self.get_page_urls()
 
             self._backup_urls()
 
