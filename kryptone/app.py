@@ -208,28 +208,6 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         items = [f"--header={key}={value})" for key, value in headers.items()]
         options.add_argument(' '.join(items))
 
-    # def run_validators(self, url):
-    #     """Validates an url before it is
-    #     included in the list of urls to visit"""
-    #     results = []
-    #     if self.url_validators:
-    #         for validator in self.url_validators:
-    #             if not callable(validator):
-    #                 continue
-
-    #             result = validator(url, driver=self.driver)
-    #             if result is None:
-    #                 result = False
-    #             results.append(result)
-    #         test_result = all(results)
-
-    #         if test_result:
-    #             message = f"Validation successful for {url}"
-    #         else:
-    #             message = f"Validation failed for {url}"
-    #         logger.info(message)
-    #     return True
-
     def run_filters(self, exclude=True):
         """Filters out or in urls included in the list 
         of urls to visit. The default action is to 
@@ -460,6 +438,7 @@ class SinglePageAutomater(BaseCrawler):
                 self.start_url = current_url
                 self._start_url_object = urlparse(self.start_url)
 
+            logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
             # Always wait for the body section of
             # the page to be located  or visible
