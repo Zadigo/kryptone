@@ -8,9 +8,9 @@ RUN source ~/.bashrc && source ~/.bash_profile
 
 RUN echo $PYTHONPATH
 
-COPY . home/app
+COPY . home/kryptone
 
-WORKDIR home/app
+WORKDIR /home/kryptone
 
 EXPOSE 5589
 
