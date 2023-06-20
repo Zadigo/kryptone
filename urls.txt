@@ -1,0 +1,82 @@
+BOULANGERIE ANGE 460 Bd Denis Papin 11000
+BOULANGERIE ANGE Domaine de Lacoste 11100
+BOULANGERIE ANGE 10 Rue du 11 Novembre 17138
+BOULANGERIE ANGE 70 Av. Louis Bouchet 17200
+BOULANGERIE ANGE Rue du Brillouet 17300
+BOULANGERIE ANGE 1 Rue Gustave Courbet 19100
+BOULANGERIE ANGE 21 Av. Louis Suder 24430
+BOULANGERIE ANGE 145 Rte de Paris 31140
+BOULANGERIE ANGE 140 Av. de Fronton 31200
+BOULANGERIE ANGE 3 Rte de Bessières 31240
+BOULANGERIE ANGE 2 Av. de Toulouse 31650
+BOULANGERIE ANGE 32 Chem. de la Salvetat 31770
+BOULANGERIE ANGE 216 Rte de Toulouse 33130
+BOULANGERIE ANGE 87 Rue de la Morandière 33185
+BOULANGERIE ANGE 370 Av. du Parc des Expositions 33260
+BOULANGERIE ANGE 7 Av. de Verdun 33260
+BOULANGERIE ANGE 2 Rue Duguay Trouin 33300
+BOULANGERIE ANGE 309 Av. du Médoc 33320
+BOULANGERIE ANGE Moulin de la Cassadote ZAC de la Cassadote 33380
+BOULANGERIE ANGE 1 Av. de la Libération 33440
+BOULANGERIE ANGE 180-182 Rte de Saint-Émilion 33500
+BOULANGERIE ANGE 18 Av. de l Aquitaine 33560
+BOULANGERIE ANGE 1 bis Av. Gustave Eiffel 33600
+BOULANGERIE ANGE 16 Rue des Châtaigniers 33700
+BOULANGERIE ANGE 1 Rue Isaac Newton 33700
+BOULANGERIE ANGE 672 Rue du Pas du Loup 34070
+BOULANGERIE ANGE 2 Allée Charles Robert Darwin Quartier Eureka 34170
+BOULANGERIE ANGE 355 Bd de Sainte-Claire 34400
+BOULANGERIE ANGE 3 Rue Marcel Carné 34970
+BOULANGERIE ANGE 220 Rue de Lorient 35000
+BOULANGERIE ANGE 318 Rue de Saint Malo 35000
+BOULANGERIE ANGE Impasse de la Peupleraie 35400
+BOULANGERIE ANGE ZA de Bray 35510
+BOULANGERIE ANGE 916 Av. du Midi 47000
+BOULANGERIE ANGE 16 Av. François Mitterrand 47200
+BOULANGERIE ANGE 9 Rue Bernard Palissy 63000
+BOULANGERIE ANGE Centre Commercial Riom Sud 63200
+BOULANGERIE ANGE 11 Rue des Entrepreneurs 64140
+BOULANGERIE ANGE 66 Rond Point de Bahinos CC BAB 3000 64600
+BOULANGERIE ANGE 2 Chem. de la Trav. 65420
+BOULANGERIE ANGE 100 Av. de Paris 82000
+
+La Mie de la Pain Parc Commercial du Moulin, Route de Tulle, D1089 19360
+La Mie de la Pain 1 Av. de l Euro 31150
+La Mie de la Pain 251 Rte de Bayonne 31300
+La Mie de la Pain Route de Toulouse - ZAC de Grenade Sud 31330
+La Mie de la Pain 25 Chem. du Buguet 31620
+La Mie de la Pain 2 Chem. de la Ménude 31770
+La Mie de la Pain 2 Av. Georges Guynemer 31770
+La Mie de la Pain 2 Chem. de la Vieille Côté 31840
+La Mie de la Pain 28 Av. de l Yser 32000
+La Mie de la Pain 285 Rue nationale 33240
+La Mie de la Pain 21 Av. Vulcain 33260
+La Mie de la Pain 51 Av. de Saint-Loubès 33440
+La Mie de la Pain 40 All. du Broc 40090
+La Mie de la Pain 1036 Av. Anatole de Monzie 46000
+La Mie de la Pain Rue Joseph Teulère 47240
+La Mie de la Pain 2 Imp. Jacques Daguerre 82000
+La Mie de la Pain 29 Rue de Selves 82000
+La Mie de la Pain 22 All. de l Empereur 82000
+La Mie de la Pain 1275 Rte du N 82000
+La Mie de la Pain 15 Chem. des Rouges 82300
+La Mie de la Pain 28 Av. de la Mouscane 82700
+
+Firmin 50 Rte de Narbonne 11800
+Firmin 1 Av. Jean Baptiste Fournial 19100
+Firmin Centre Commercial Casino 19100
+Firmin 6 Rue Talleyrand-Périgord 24000
+Firmin 180 Av. Maréchal Juin 24000
+Firmin 2 Rue Taillefer 24000
+Firmin Rte de Bordeaux 24100
+Firmin Résidence de la Poste 24430
+Firmin 26 Rte de Ribérac 24650
+Firmin 24660 Coulounieix-Chamiers 24660
+Firmin Moulin les mounards, la feuilleraie Dans le Grand Frais Trélissac Grand Frais Trélissac 24750
+Firmin 1BIS Av. de Muret 31300
+Firmin 55 Av. de Saint-Loubès 33440
+Firmin 335 Tayac-Nord 33460
+Firmin 2231 Av. du Qur Neuf 40390
+Firmin 2912 Av. de Bordeaux 40800
+Firmin 460 avenue du ftpf 46000
+Firmin 3580 Rte du N 82000
