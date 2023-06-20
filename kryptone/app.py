@@ -1,7 +1,7 @@
-import string
 import os
-import time
 import random
+import string
+import time
 from multiprocessing import Process
 from urllib.parse import urlparse
 
@@ -17,10 +17,13 @@ from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.mixins import EmailMixin, SEOMixin
+from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+
+post_init = Signal()
 
 cache = Cache()
 
@@ -116,7 +119,6 @@ class ActionsMixin:
         return script
 
 
-
 class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     start_url = None
     urls_to_visit = set()
@@ -148,6 +150,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 options=options
             )
             self.urls_to_visit.add(self.start_url)
+            
+            post_init.send(self)
 
     # def __del__(self):
     #     # When the program terminates,

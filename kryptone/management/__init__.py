@@ -97,7 +97,7 @@ class Utility:
         return command_instance
 
 
-def execute_command_inline(argv):
+def execute_command_inline(argv=None):
     """
     Execute a command using `python manage.py`
     """

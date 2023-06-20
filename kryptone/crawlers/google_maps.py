@@ -54,14 +54,9 @@ def generate_search_url(search):
 
 class GoogleMaps(BaseCrawler):
     final_result = []
-    # # start_url = 'https://www.google.com/maps/search/sophie+lebreuilly/@50.6472975,2.8742715,10z/data=!3m1!4b1?entry=ttu'
-    # # start_url = 'https://www.google.com/maps/search/la+paneti%C3%A8re+toulouse/@43.5667567,1.4240391,13z/data=!3m1!4b1?entry=ttu'
-    # start_url = 'https://www.google.com/maps/search/secrets+de+pains+toulouse/@43.5946823,1.3538516,12z/data=!3m1!4b1?entry=ttu'
-    start_url = 'https://www.google.com/maps/search/eric+kayser/@45.0316798,-2.4724553,5z?entry=ttu'
-
+    
+    start_url = "https://www.google.com/maps/search/Marie+Blach%C3%A8re/@44.2399522,1.6699718,8.75z?entry=ttu"
     # start_url = generate_search_url('la mie câline')
-    # start_url = generate_search_url('pomme de pain')
-    # start_url = generate_search_url('eric kayser')
 
     def run_actions(self, current_url, **kwargs):
         try:
@@ -397,6 +392,246 @@ class GoogleMaps(BaseCrawler):
         filename = self.get_filename(extension='json')
         write_json_document(filename, data)
         logger.info(f'File created: {filename}')
+
+
+# class GoogleMapsPlace(GoogleMaps):
+#     def run_actions(self, current_url, **kwargs):
+#         business_information = GoogleBusiness()
+
+#         try:
+#             name = self.driver
+#             url = self.driver.current_url
+#             rating = business.find_element(
+#                 By.CSS_SELECTOR,
+#                 'span[role="img"]'
+#             ).get_attribute('aria-label')
+#         except:
+#             pass
+#         else:
+#             rating, number_of_reviews = rating.split(' ')
+
+#         # Some names might contain characters such as \' which
+#         # can break the javascript script since there are also
+#         # single quotes. We need to escape those.
+#         javascript_business_name = ''
+#         if "'" in name:
+#             javascript_business_name = name.replace("'", "\\'")
+#         else:
+#             javascript_business_name = name
+
+#         # Opens the side panel
+#         link.click()
+#         time.sleep(2)
+
+#         # 1.1 Get additonal business information - This is
+#         # a brute force method that gets any business details
+#         # from the business information section
+#         business_information_script = """
+#         const infoSection = document.querySelector('div[class="m6QErb "][aria-label^="{business_name}"][role="region"]')
+#         const allDivs = infoSection.querySelectorAll('div')
+#         return Array.from(allDivs).map(x => x.innerText)
+#         """.format(business_name=javascript_business_name)
+#         try:
+#             # Some business names do not seem to be valid e.g.
+#             # aria-label="la mie CÂLINE - Atelier "Pains & Restauration"" which
+#             # breaks the script. We'll just keep going if we cannot get
+#             # no business information
+#             information = self.driver.execute_script(
+#                 business_information_script)
+#         except Exception as e:
+#             counter = counter + 1
+#             logger.critical(f'Could not parse business information: {url}')
+#             return False
+#         else:
+#             clean_information = set(list(drop_null(information)))
+
+#         # 2.1. Get the side panel
+#         # side_panel = self.driver.find_elements(
+#         #     By.CSS_SELECTOR,
+#         #     'div[role="main"]'
+#         # )[-1]
+#         # 2.2. Move to the comment section
+#         tab_list = self.driver.find_elements(
+#             By.CSS_SELECTOR,
+#             '*[role="tablist"] button'
+#         )
+#         tab_list[1].click()
+#         time.sleep(2)
+
+#         # Scroll the comment section by using
+#         # the exact same above process
+#         comments_is_scrollable = True
+#         comments_scroll_script = """
+#             const mainWrapper = document.querySelector('div[role="main"][aria-label="{business_name}"]')
+#             const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+
+#             const elementHeight = elementToScroll.scrollHeight
+#             let currentPosition = elementToScroll.scrollTop
+
+#             // Indicates the scrolling speed
+#             const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+#             currentPosition += scrollStep
+#             elementToScroll.scroll(0, currentPosition)
+
+#             return [ currentPosition, elementHeight ]
+#         """
+#         comments_scroll_script = comments_scroll_script.format(
+#             business_name=javascript_business_name,
+#             scroll_step=self.default_scroll_step
+#         )
+#         while comments_is_scrollable:
+#             result = self.driver.execute_script(comments_scroll_script)
+
+#             current_position, element_height = result
+#             if current_position >= element_height:
+#                 comments_is_scrollable = False
+
+#             if self.debug_mode:
+#                 if current_position >= 1500:
+#                     break
+
+#             # There seems to be a case where the current position
+#             # does not get updated and stays the same which
+#             # means that we have reached the bottom of the page
+#             if comments_saved_position is not None and current_position == comments_saved_position:
+#                 comments_is_scrollable = False
+#             comments_saved_position = current_position
+#             time.sleep(1)
+
+#         # Before retrieving all the comments
+#         # raise a small pause here
+#         time.sleep(2)
+
+#         retrieve_comments_script = """
+#         const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
+        
+#         return Array.from(commentsWrapper).map((item) => {
+#             let dataReviewId = item.dataset['reviewId']
+
+#             let text = ''
+#             let period = null
+#             let rating = null
+#             const textSection = item.querySelector("*[class='MyEned']")
+
+#             try {
+#                 // Sometimes there is a read more button
+#                 // that we have to click
+                
+#                 moreButton = (
+#                     // Try the "Voir plus" button"
+#                     item.querySelector('button[aria-label="Voir plus"]') ||
+#                     // Try the "See more" button"
+#                     item.querySelector('button[aria-label="See more"]') ||
+#                     // On last resort try "aria-expanded"
+#                     item.querySelector('button[aria-expanded="false"]')
+#                 )
+#                 moreButton.click()
+#             } catch (e) {
+#                 console.log('No additional data for', dataReviewId)
+#             }
+            
+#             try {
+#                 // Or, item.querySelector('.rsqaWe').innerText
+#                 period = item.querySelector('.DU9Pgb').innerText
+#             } catch (e) {
+#                 // pass
+#             }
+
+#             try {
+#                 rating = item.querySelector('span[role="img"]').ariaLabel
+#             } catch (e) {
+#                 // pass
+#             }
+
+#             try {
+#                 text = textSection.innerText
+#             } catch (e) {
+#                 // pass
+#             }
+
+#             try {
+#                 reviewerName = item.querySelector('class*="d4r55"').innerText
+#                 reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
+#             } catch (e) {
+#                 // pass
+#             }
+
+#             return {
+#                 text: text,
+#                 rating: rating,
+#                 period: period
+#             }
+#         })
+#         """
+#         clean_comments = []
+#         try:
+#             comments = self.driver.execute_script(retrieve_comments_script)
+#         except Exception as e:
+#             comments = ''
+#             logger.error(f'Comments not found for {name}: {e.args}')
+#         else:
+#             comments = list(drop_null((comments)))
+#             for comment in comments:
+#                 if not isinstance(comment, dict):
+#                     continue
+
+#                 clean_dict = {}
+#                 for key, value in comment.items():
+#                     clean_text = self.clean_text(value)
+#                     clean_dict[key] = clean_text
+#                 clean_comments.append(clean_dict)
+#             logger.info(f'Found {len(clean_comments)} reviews')
+
+#         def clean_information_list(items):
+#             # Remove useless data from the array
+#             # of values that we have received
+#             exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
+#                         'vendredi', 'samedi', 'dimanche']
+#             result1 = []
+#             for text in items:
+#                 if text in exclude:
+#                     continue
+#                 result1.append(text)
+
+#             result2 = []
+#             for text in result1:
+#                 logic = [
+#                     'Commander' in text,
+#                     'ubereats.com' in text,
+#                     text.startswith('lundi'),
+#                     text.startswith('mardi'),
+#                     text.startswith('mercredi'),
+#                     text.startswith('jeudi'),
+#                     text.startswith('vendredi'),
+#                     text.startswith('samedi'),
+#                     text.startswith('dimanche'),
+#                     text.startswith('Ouvert'),
+#                     text.startswith('Envoyer vers'),
+#                     text.startswith('Suggérer'),
+#                     text.startswith('Revendiquer cet')
+#                 ]
+#                 if any(logic):
+#                     continue
+#                 result2.append(text)
+#             return result2
+
+#         business_information.name = name
+#         business_information.url = url
+#         business_information.address = clean_information_list(
+#             list(clean_information)
+#         )
+#         business_information.rating = rating
+#         business_information.number_of_reviews = number_of_reviews
+#         business_information.comments = clean_comments
+#         self.final_result.append(business_information)
+
+#         time.sleep(2)
+
+#         # data = list(map(lambda x: x.as_json, businesses))
+#         # filename = self.get_filename(extension='json')
+#         # write_json_document(filename, data)
+#         # logger.info(f'File created: {filename}')
 
 
 if __name__ == '__main__':
