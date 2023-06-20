@@ -8,6 +8,8 @@ WORKDIR /home
 
 COPY . /kryptone
 
+RUN touch /etc/bash.bashrc
+
 # RUN echo "export PYTHONPATH=${PYTHONPATH}:/home/kryptone" >> /ubuntu/.bashrc
 RUN echo "export PYTHONPATH=${PYTHONPATH}:/home/kryptone" >> /etc/bash.bashrc
 
