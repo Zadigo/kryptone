@@ -1,17 +1,19 @@
 FROM ubuntu:latest
 
-RUN echo export PYTHONPATH="${PYTHONPATH}:/home/kryptone" >> ~/.bashrc
+RUN ls -la
 
-RUN echo export PYTHONPATH="${PYTHONPATH}:/home/kryptone" >> ~/.bash_profile
+# RUN echo export PYTHONPATH="${PYTHONPATH}:/home/kryptone" >> ~/.bashrc
 
-RUN source ~/.bashrc && source ~/.bash_profile
+# RUN echo export PYTHONPATH="${PYTHONPATH}:/home/kryptone" >> ~/.bash_profile
 
-RUN echo $PYTHONPATH
+# RUN source ~/.bashrc && source ~/.bash_profile
 
-COPY . home/kryptone
+# RUN echo $PYTHONPATH
 
-WORKDIR /home/kryptone
+# COPY . home/kryptone
 
-EXPOSE 5589
+# WORKDIR /home/kryptone
 
-ENTRYPOINT [ "python", "manage.py" ]
+# EXPOSE 5589
+
+# ENTRYPOINT [ "python", "manage.py" ]
