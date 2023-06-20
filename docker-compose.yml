@@ -6,7 +6,7 @@ networks:
 
 services:
   kryptone:
-    build: ..
+    build: .
     container_name: kryptone
     ports:
       - 5589:5589
