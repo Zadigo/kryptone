@@ -1,6 +1,7 @@
 import dataclasses
 import random
 import re
+import csv
 import time
 from urllib.parse import quote_plus, urljoin
 
@@ -15,6 +16,7 @@ from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
 from kryptone.utils.urls import URLFile
+import json
 
 
 @dataclasses.dataclass
@@ -53,7 +55,35 @@ def generate_search_url(search):
     return urljoin(url, quote_plus(name))
 
 
-class GoogleMaps(SinglePageAutomater):
+class GoogleMapsMixin:
+    def generate_csv_file(self, filename=None):
+        with open('ange.json', encoding='utf-8') as f:
+            data = json.load(f)
+
+            business_comments = []
+            for item in data:
+                comments = item['comments']
+                for comment in comments:
+                    container = [
+                        item['name'],
+                        item['address'],
+                        # item['rating'],
+                        item['number_of_reviews'],
+                        comment['period'],
+                        comment['rating'],
+                        comment['text']
+                    ]
+                    business_comments.append(container)
+            
+            with open('ange.csv', mode='w', encoding='utf-8', newline='\n') as f:
+                writer = csv.writer(f)
+                for row in business_comments:
+                    if not row:
+                        continue
+                    writer.writerow(row)
+
+
+class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
     final_result = []
 
     # start_url = "https://www.google.com/maps/search/Marie+Blach%C3%A8re/@44.2399522,1.6699718,8.75z?entry=ttu"
