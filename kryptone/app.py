@@ -384,7 +384,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             # in exploring the whole internet
             if current_url_object.netloc != self._start_url_object.netloc:
                 continue
-
+            
+            logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
             # Always wait for the body section of
             # the page to be located  or visible
