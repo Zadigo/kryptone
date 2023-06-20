@@ -1,4 +1,5 @@
 from urllib.parse import urljoin, urlparse
+from kryptone.utils.file_readers import read_document
 
 import requests
 
@@ -55,3 +56,16 @@ class URL:
         }
         response = requests.get(self.raw_url, headers=headers)
         return response.ok, response.status_code
+
+
+class URLFile:
+    urls = []
+    def __init__(self, processor=None):
+        data = read_document('urls.txt')
+        urls = data.split('\n')
+        if processor is not None:
+            for url in urls:
+                self.urls.append(processor(url))
+
+    def __iter__(self):
+        return iter(self.urls)

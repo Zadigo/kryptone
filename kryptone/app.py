@@ -130,16 +130,18 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
     debug_mode = False
 
     def __init__(self):
+        self._start_url_object = None
+
         path = os.environ.get('KRYPTONE_WEBDRIVER', None)
         if path is None:
             logger.error('Could not find web driver')
         else:
-            if not isinstance(self.start_url, str):
-                raise ValueError(
-                    f'Start url must be a string. Got: {self.start_url}'
-                )
-            self._start_url_object = urlparse(self.start_url)
-
+            #     if not isinstance(self.start_url, str):
+            #         raise ValueError(
+            #             f'Start url must be a string. Got: {self.start_url}'
+            #         )
+            #     self._start_url_object = urlparse(self.start_url)
+            
             # options = EdgeOptions()
             options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
@@ -366,11 +368,15 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             current_url = self.urls_to_visit.pop()
             logger.info(f"{len(self.urls_to_visit)} urls left to visit")
 
+            if current_url is None:
+                continue
+
             # In the case where the user has provided a
             # set of urls directly in the function,
             # start_url would be None
             if self.start_url is None:
                 self.start_url = current_url
+                self._start_url_object = urlparse(self.start_url)
 
             current_url_object = urlparse(current_url)
             # If we are not on the same domain as the
@@ -424,7 +430,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
 class SinglePageAutomater(BaseCrawler):
     """Automates user defined actions on a
-    single page"""
+    single page as oppposed to crawing the
+    whole website"""
 
     def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
         """Entrypoint to start the web scrapper"""
@@ -442,18 +449,15 @@ class SinglePageAutomater(BaseCrawler):
             current_url = self.urls_to_visit.pop()
             logger.info(f"{len(self.urls_to_visit)} urls left to visit")
 
+            if current_url is None:
+                continue
+
             # In the case where the user has provided a
             # set of urls directly in the function,
             # start_url would be None
             if self.start_url is None:
                 self.start_url = current_url
-
-            current_url_object = urlparse(current_url)
-            # If we are not on the same domain as the
-            # starting url: *stop*. we are not interested
-            # in exploring the whole internet
-            if current_url_object.netloc != self._start_url_object.netloc:
-                continue
+                self._start_url_object = urlparse(self.start_url)
 
             self.driver.get(current_url)
             # Always wait for the body section of

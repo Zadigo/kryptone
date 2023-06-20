@@ -9,11 +9,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
-from kryptone.app import BaseCrawler
+from kryptone.app import BaseCrawler, SinglePageAutomater
 from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
+from kryptone.utils.urls import URLFile
 
 
 @dataclasses.dataclass
@@ -52,13 +53,13 @@ def generate_search_url(search):
     return urljoin(url, quote_plus(name))
 
 
-class GoogleMaps(BaseCrawler):
+class GoogleMaps(SinglePageAutomater):
     final_result = []
 
-    start_url = "https://www.google.com/maps/search/Marie+Blach%C3%A8re/@44.2399522,1.6699718,8.75z?entry=ttu"
+    # start_url = "https://www.google.com/maps/search/Marie+Blach%C3%A8re/@44.2399522,1.6699718,8.75z?entry=ttu"
     # start_url = generate_search_url('la mie câline')
 
-    def run_actions(self, current_url, **kwargs):
+    def post_visit_actions(self, **kwargs):
         try:
             # Google has a special consent form
             self.driver.execute_script(
@@ -77,6 +78,7 @@ class GoogleMaps(BaseCrawler):
         except:
             logger.info('No consent screen')
 
+    def run_actions(self, current_url, **kwargs):
         results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
         results_is_scrollable = True
 
@@ -399,20 +401,18 @@ class GoogleMapsPlace(GoogleMaps):
         business_information = GoogleBusiness()
 
         try:
-            name = self.driver.find_element(
-                By.CSS_SELECTOR,
-                '.DUwDvf.fontHeadlineLarge'
-            ).text
+            name = self.driver.find_element(By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
             url = self.driver.current_url
             rating_section = self.driver.find_element(By.CSS_SELECTOR, '.F7nice')
-            rating = rating_section.find_element(
-                By.CSS_SELECTOR,
-                'span[class="ceNzKf"][role="img"]'
-            ).get_attribute('aria-label')
+            rating, number_of_reviews = rating_section.text.split('\n')
         except:
-            pass
+            name = None
+            url = self.driver.current_url
+            rating = None
+            number_of_reviews = None
         else:
-            rating, number_of_reviews = rating.split(' ')
+            number_of_reviews = number_of_reviews.replace('(', '')
+            number_of_reviews = number_of_reviews.replace(')', '')
 
         # Some names might contain characters such as \' which
         # can break the javascript script since there are also
@@ -423,8 +423,6 @@ class GoogleMapsPlace(GoogleMaps):
         else:
             javascript_business_name = name
 
-        # Opens the side panel
-        link.click()
         time.sleep(2)
 
         # 1.1 Get additonal business information - This is
@@ -443,7 +441,6 @@ class GoogleMapsPlace(GoogleMaps):
             information = self.driver.execute_script(
                 business_information_script)
         except Exception as e:
-            counter = counter + 1
             logger.critical(f'Could not parse business information: {url}')
             return False
         else:
@@ -484,6 +481,8 @@ class GoogleMapsPlace(GoogleMaps):
             business_name=javascript_business_name,
             scroll_step=self.default_scroll_step
         )
+
+        comments_saved_position = None
         while comments_is_scrollable:
             result = self.driver.execute_script(comments_scroll_script)
 
@@ -632,26 +631,28 @@ class GoogleMapsPlace(GoogleMaps):
 
         time.sleep(2)
 
-        # data = list(map(lambda x: x.as_json, businesses))
-        # filename = self.get_filename(extension='json')
-        # write_json_document(filename, data)
-        # logger.info(f'File created: {filename}')
+        data = list(map(lambda x: x.as_json, self.final_result))
+        write_json_document('ssr.json', data)
 
 
 if __name__ == '__main__':
-    try:
-        instance = GoogleMapsPlace()
-        # instance = GoogleMaps()
-        urls = [
-            'https://www.google.fr/maps/place/Bricomarch%C3%A9/@45.0623843,5.0824153,13z/data=!4m10!1m2!2m1!1sbricomarch%C3%A9!3m6!1s0x478ab2c99e97aba7:0xf9a321930a23c394!8m2!3d45.05827!4d5.107725!15sCgxicmljb21hcmNow6kiA4gBAZIBFGRvX2l0X3lvdXJzZWxmX3N0b3Jl4AEA!16s%2Fg%2F1w8w8xmm?entry=ttu'
-        ]
-        instance.start(start_urls=urls, crawl=False, wait_time=1)
-    except KeyboardInterrupt:
-        data = list(map(lambda x: x.as_json, instance.final_result))
-        write_json_document('dump.json', data)
-        logger.critical(f"Dumping data to 'dump.json'")
-    except Exception:
-        data = list(map(lambda x: x.as_json, instance.final_result))
-        write_json_document('dump.json', data)
-        logger.critical(f"Dumping data to 'dump.json'")
-        raise
+    # try:
+    #     instance = GoogleMapsPlace()
+    #     # instance = GoogleMaps()
+    #     urls = [
+    #         'https://www.google.fr/maps/place/Bricomarch%C3%A9/@45.0623843,5.0824153,13z/data=!4m10!1m2!2m1!1sbricomarch%C3%A9!3m6!1s0x478ab2c99e97aba7:0xf9a321930a23c394!8m2!3d45.05827!4d5.107725!15sCgxicmljb21hcmNow6kiA4gBAZIBFGRvX2l0X3lvdXJzZWxmX3N0b3Jl4AEA!16s%2Fg%2F1w8w8xmm?entry=ttu'
+    #     ]
+    #     instance.start(start_urls=urls, wait_time=1)
+    # except KeyboardInterrupt:
+    #     data = list(map(lambda x: x.as_json, instance.final_result))
+    #     write_json_document('dump.json', data)
+    #     logger.critical(f"Dumping data to 'dump.json'")
+    # except Exception:
+    #     data = list(map(lambda x: x.as_json, instance.final_result))
+    #     write_json_document('dump.json', data)
+    #     logger.critical(f"Dumping data to 'dump.json'")
+    #     raise
+
+    instance = GoogleMapsPlace()
+    url_file = URLFile(processor=generate_search_url)
+    instance.start(start_urls=list(url_file))
