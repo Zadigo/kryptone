@@ -136,7 +136,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         else:
             if not isinstance(self.start_url, str):
                 raise ValueError(
-                    f'Start url must be a string. Got: {self.start_url}')
+                    f'Start url must be a string. Got: {self.start_url}'
+                )
             self._start_url_object = urlparse(self.start_url)
 
             # options = EdgeOptions()
