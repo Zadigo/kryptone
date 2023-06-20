@@ -398,6 +398,7 @@ class GoogleMaps(SinglePageAutomater):
 
 class GoogleMapsPlace(GoogleMaps):
     def run_actions(self, current_url, **kwargs):
+        current_time = time.time()
         business_information = GoogleBusiness()
 
         try:
@@ -413,6 +414,12 @@ class GoogleMapsPlace(GoogleMaps):
         else:
             number_of_reviews = number_of_reviews.replace('(', '')
             number_of_reviews = number_of_reviews.replace(')', '')
+
+        # If we were not able to get a
+        # name, come from the principle
+        # that the page was not found
+        if name is None:
+            return False
 
         # Some names might contain characters such as \' which
         # can break the javascript script since there are also
@@ -446,11 +453,6 @@ class GoogleMapsPlace(GoogleMaps):
         else:
             clean_information = set(list(drop_null(information)))
 
-        # 2.1. Get the side panel
-        # side_panel = self.driver.find_elements(
-        #     By.CSS_SELECTOR,
-        #     'div[role="main"]'
-        # )[-1]
         # 2.2. Move to the comment section
         tab_list = self.driver.find_elements(
             By.CSS_SELECTOR,
@@ -612,6 +614,7 @@ class GoogleMapsPlace(GoogleMaps):
                     text.startswith('Ouvert'),
                     text.startswith('Envoyer vers'),
                     text.startswith('Suggérer'),
+                    text.startswith('Trouver'),
                     text.startswith('Revendiquer cet')
                 ]
                 if any(logic):
@@ -633,6 +636,7 @@ class GoogleMapsPlace(GoogleMaps):
 
         data = list(map(lambda x: x.as_json, self.final_result))
         write_json_document('ssr.json', data)
+        # completion_time = (time.time() - current_time) / 60
 
 
 if __name__ == '__main__':
