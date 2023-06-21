@@ -56,6 +56,10 @@ def generate_search_url(search):
 
 
 class GoogleMapsMixin:
+    @staticmethod
+    def transform_to_json(items):
+        return list(map(lambda x: x.as_json, items))
+    
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
             data = json.load(f)
@@ -67,7 +71,6 @@ class GoogleMapsMixin:
                     container = [
                         item['name'],
                         item['address'],
-                        # item['rating'],
                         item['number_of_reviews'],
                         comment['period'],
                         comment['rating'],
@@ -85,6 +88,9 @@ class GoogleMapsMixin:
 
 class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
     final_result = []
+
+    def create_dump(self):
+        write_json_document('dump.json', self.transform_to_json(self.final_result))
 
     def post_visit_actions(self, **kwargs):
         try:
