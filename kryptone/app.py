@@ -200,6 +200,19 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
 
         write_json_document('cache.json', urls_data)
 
+
+class BaseCrawler(CrawlerMixin):
+    start_url = None
+    url_validators = []
+    url_filters = []
+
+    def get_filename(self, length=5, extension=None):
+        characters = string.ascii_lowercase + string.digits
+        name = ''.join(random.choice(characters) for _ in range(length))
+        if extension is not None:
+            return f'{name}.{extension}'
+        return name
+
     def build_headers(self, options):
         headers = {
             'User-Agent': RANDOM_USER_AGENT(),
@@ -339,8 +352,6 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         else:
             logger.info('Starting Kryptone...')
 
-        if self.start_url is not None:
-            self.urls_to_visit.add(self.start_url)
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
 
