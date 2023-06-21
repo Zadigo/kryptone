@@ -73,10 +73,22 @@ class SpiderConfig:
                 f'Could not start spider in project: {self.dotted_path}'
             )
         spider_instance = self.spider_class()
-        spider_instance.start(
-            # start_urls=self.initial_start_urls,
-            **kwargs
-        )
+
+        try:
+            spider_instance.start(
+                # start_urls=self.initial_start_urls,
+                **kwargs
+            )
+        except KeyboardInterrupt:
+            spider_instance.create_dump()
+        except Exception as e:
+            spider_instance.create_dump()
+            raise ExceptionGroup(
+                'Multiple exceptions occurred',
+                [
+                    Exception(e)
+                ]
+            )
 
 
 class MasterRegistry:
