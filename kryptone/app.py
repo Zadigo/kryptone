@@ -119,15 +119,12 @@ class ActionsMixin:
         return script
 
 
-class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
-    start_url = None
+class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     urls_to_visit = set()
     visited_urls = set()
-    url_validators = []
-    url_filters = []
     webdriver = Chrome
-    # webdriver = Edge
     debug_mode = False
+    # webdriver = Edge
 
     def __init__(self):
         self._start_url_object = None
@@ -199,19 +196,6 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         cache.set_value('urls_data', urls_data)
 
         write_json_document('cache.json', urls_data)
-
-
-class BaseCrawler(CrawlerMixin):
-    start_url = None
-    url_validators = []
-    url_filters = []
-
-    def get_filename(self, length=5, extension=None):
-        characters = string.ascii_lowercase + string.digits
-        name = ''.join(random.choice(characters) for _ in range(length))
-        if extension is not None:
-            return f'{name}.{extension}'
-        return name
 
     def build_headers(self, options):
         headers = {
