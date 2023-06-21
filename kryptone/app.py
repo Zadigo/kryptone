@@ -339,6 +339,8 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         else:
             logger.info('Starting Kryptone...')
 
+        if self.start_url is not None:
+            self.urls_to_visit.add(self.start_url)
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
 
@@ -411,12 +413,6 @@ class SinglePageAutomater(BaseCrawler):
     """Automates user defined actions on a
     single page as oppposed to crawing the
     whole website"""
-    
-    start_urls = []
-
-    @property
-    def name(self):
-        return 'automation'
 
     def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
         """Entrypoint to start the web scrapper"""
