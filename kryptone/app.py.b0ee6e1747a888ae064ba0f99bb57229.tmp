@@ -150,9 +150,9 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
             post_init.send(self)
 
-            db_signal.connect(backends.airtable, sender=self)
-            db_signal.connect(backends.notion, sender=self)
-            db_signal.connect(backends.google_sheets, sender=self)
+            db_signal.connect(backends, sender=self)
+            db_signal.connect(applbackendsion, sender=self)
+            db_signal.connect(applications.google_sheets, sender=self)
 
     # def __del__(self):
     #     # When the program terminates,
