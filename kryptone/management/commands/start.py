@@ -56,14 +56,15 @@ class Command(ProjectCommand):
     def execute(self, namespace):
         kryptone.setup()
 
-
         if not registry.spiders_ready:
             raise ValueError(('The spiders for the current project '
                               'were not properly configured'))
 
+        # TODO: Check if the config is an automation
+        # class or not 
         if namespace.name is not None:
-            config = registry.get_spider(namespace.name)
-            config.run(
+            spider_config = registry.get_spider(namespace.name)
+            spider_config.run(
                 start_urls=namespace.start_urls,
                 debug_mode=namespace.debug_mode,
                 wait_time=namespace.wait_time,

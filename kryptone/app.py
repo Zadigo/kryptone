@@ -133,12 +133,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         if path is None:
             logger.error('Could not find web driver')
         else:
-            #     if not isinstance(self.start_url, str):
-            #         raise ValueError(
-            #             f'Start url must be a string. Got: {self.start_url}'
-            #         )
-            #     self._start_url_object = urlparse(self.start_url)
-            
             # options = EdgeOptions()
             options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
@@ -149,8 +143,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
                 executable_path=path,
                 options=options
             )
-            self.urls_to_visit.add(self.start_url)
-            
+
             post_init.send(self)
 
     # def __del__(self):
@@ -179,13 +172,10 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
     
-    def get_filename(self, length=5, extension=None):
-        characters = string.ascii_lowercase + string.digits
-        name = ''.join(random.choice(characters) for _ in range(length))
-        if extension is not None:
-            return f'{name}.{extension}'
-        return name
-
+    @property
+    def name(self):
+        return 'crawler'
+    
     def _backup_urls(self):
         """Backs up the urls both in the memory
         cache, and in the cache file"""
@@ -196,6 +186,19 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         cache.set_value('urls_data', urls_data)
 
         write_json_document('cache.json', urls_data)
+
+
+class BaseCrawler(CrawlerMixin):
+    start_url = None
+    url_validators = []
+    url_filters = []
+
+    def get_filename(self, length=5, extension=None):
+        characters = string.ascii_lowercase + string.digits
+        name = ''.join(random.choice(characters) for _ in range(length))
+        if extension is not None:
+            return f'{name}.{extension}'
+        return name
 
     def build_headers(self, options):
         headers = {
@@ -320,8 +323,10 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         of a given website"""
         if not 'sitemap' in url:
             raise ValueError('Url should be the sitemap page')
+        
         body = self.driver.find_element(By.TAG_NAME, 'body')
         link_elements = body.find_elements(By.TAG_NAME, 'a')
+
         urls = []
         for element in link_elements:
             urls.append(element.get_attribute('href'))
@@ -335,6 +340,9 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             logger.info('Starting Kryptone in debug mode...')
         else:
             logger.info('Starting Kryptone...')
+
+        if self.start_url is not None:
+            self.urls_to_visit.add(self.start_url)
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -404,19 +412,26 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             time.sleep(wait_time)
 
 
-class SinglePageAutomater(BaseCrawler):
+class SinglePageAutomater(CrawlerMixin):
     """Automates user defined actions on a
-    single page as oppposed to crawing the
+    single or multiple user provided 
+    pages as oppposed to crawing the
     whole website"""
+    
+    start_urls = []
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
+    @property
+    def name(self):
+        return 'automation'
+
+    def start(self, start_urls=[], wait_time=None, debug_mode=False):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
 
-        if self.debug_mode:
-            logger.info('Starting Kryptone in debug mode...')
-        else:
-            logger.info('Starting Kryptone...')
+        logger.info('Starting Kryptone automation...')
+
+        self.start_urls.extend(start_urls)
+        start_urls = self.start_urls
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -427,13 +442,6 @@ class SinglePageAutomater(BaseCrawler):
 
             if current_url is None:
                 continue
-
-            # In the case where the user has provided a
-            # set of urls directly in the function,
-            # start_url would be None
-            if self.start_url is None:
-                self.start_url = current_url
-                self._start_url_object = urlparse(self.start_url)
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
