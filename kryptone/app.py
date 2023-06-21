@@ -16,14 +16,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
+from kryptone.db import applications
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.urls import URLFile
 
 post_init = Signal()
+navigation = Signal()
+db_signal = Signal()
 
 cache = Cache()
 
@@ -146,6 +150,10 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
             post_init.send(self)
 
+            db_signal.connect(applications.airtable, sender=self)
+            db_signal.connect(applications.notion, sender=self)
+            db_signal.connect(applications.google_sheets, sender=self)
+
     # def __del__(self):
     #     # When the program terminates,
     #     # always back up the urls that
@@ -175,6 +183,13 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     @property
     def name(self):
         return 'crawler'
+    
+    def create_dump(self):
+        """Dumps the collected results to a file.
+        This functions is called only when an exception
+        occurs during the crawling process
+        """
+        
     
     def _backup_urls(self):
         """Backs up the urls both in the memory
@@ -370,6 +385,7 @@ class BaseCrawler(CrawlerMixin):
             
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
+            navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -403,6 +419,10 @@ class BaseCrawler(CrawlerMixin):
                 elements=self.get_page_link_elements
             )
             write_csv_document('emails.csv', self.emails_container)
+            db_signal.send(
+                self,
+                emails=self.emails_container
+            )
 
             # Run custom user actions once 
             # everything is completed
@@ -430,6 +450,9 @@ class SinglePageAutomater(CrawlerMixin):
 
         logger.info('Starting Kryptone automation...')
 
+        if isinstance(self.start_urls, URLFile):
+            self.start_urls = list(self.start_urls)
+
         self.start_urls.extend(start_urls)
         start_urls = self.start_urls
 
@@ -445,6 +468,7 @@ class SinglePageAutomater(CrawlerMixin):
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
+            navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -464,6 +488,10 @@ class SinglePageAutomater(CrawlerMixin):
             # Run custom user actions once
             # everything is completed
             self.run_actions(current_url)
+            db_signal.send(
+                self,
+                emails=self.emails_container
+            )
 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)
