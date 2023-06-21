@@ -411,6 +411,12 @@ class SinglePageAutomater(BaseCrawler):
     """Automates user defined actions on a
     single page as oppposed to crawing the
     whole website"""
+    
+    start_urls = []
+
+    @property
+    def name(self):
+        return 'automation'
 
     def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
         """Entrypoint to start the web scrapper"""
