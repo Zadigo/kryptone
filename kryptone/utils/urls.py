@@ -4,6 +4,7 @@ from kryptone.utils.file_readers import read_document
 import requests
 
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.conf import settings
 
 
 class URL:
@@ -61,11 +62,21 @@ class URL:
 class URLFile:
     urls = []
     def __init__(self, processor=None):
-        data = read_document('urls.txt')
-        urls = data.split('\n')
-        if processor is not None:
-            for url in urls:
-                self.urls.append(processor(url))
+        filename = 'urls.txt'
+        if settings.PROJECT_PATH is not None:
+            filename = settings.PROJECT_PATH / filename
+        try:
+            data = read_document(filename)
+        except:
+            pass 
+        else:
+            urls = data.split('\n')
+            if processor is not None:
+                for url in urls:
+                    self.urls.append(processor(url))
 
     def __iter__(self):
         return iter(self.urls)
+    
+    def __str__(self):
+        return self.urls
