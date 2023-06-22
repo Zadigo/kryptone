@@ -16,14 +16,18 @@ from selenium.webdriver.support.ui import WebDriverWait
 from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
+from kryptone.db import backends
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.urls import URLFile
 
-post_init = Signal()
+# post_init = Signal()
+# navigation = Signal()
+db_signal = Signal()
 
 cache = Cache()
 
@@ -78,18 +82,16 @@ class ActionsMixin:
     def click_consent_button(self, element_id=None, element_class=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
-        element = None
-        if element_id is not None:
-            element = self.driver.find_element(By.ID, element_id)
+        try:
+            element = None
+            if element_id is not None:
+                element = self.driver.find_element(By.ID, element_id)
 
-        if element_class is not None:
-            element = self.driver.find_element(By.ID, element_id)
-
-        if element is not None:
-            try:
-                element.click()
-            except:
-                logger.info('Consent button not found')
+            if element_class is not None:
+                element = self.driver.find_element(By.CLASS_NAME, element_id)
+            element.click()
+        except:
+            logger.info('Consent button not found')
 
 
     def _test_scroll_page(self, xpath=None, css_selector=None):
@@ -119,15 +121,12 @@ class ActionsMixin:
         return script
 
 
-class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
-    start_url = None
+class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     urls_to_visit = set()
     visited_urls = set()
-    url_validators = []
-    url_filters = []
     webdriver = Chrome
-    # webdriver = Edge
     debug_mode = False
+    # webdriver = Edge
 
     def __init__(self):
         self._start_url_object = None
@@ -136,12 +135,6 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         if path is None:
             logger.error('Could not find web driver')
         else:
-            #     if not isinstance(self.start_url, str):
-            #         raise ValueError(
-            #             f'Start url must be a string. Got: {self.start_url}'
-            #         )
-            #     self._start_url_object = urlparse(self.start_url)
-            
             # options = EdgeOptions()
             options = ChromeOptions()
             options.add_argument('--remote-allow-origins=*')
@@ -152,9 +145,12 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 executable_path=path,
                 options=options
             )
-            self.urls_to_visit.add(self.start_url)
-            
-            post_init.send(self)
+
+            # post_init.send(self)
+
+            db_signal.connect(backends.airtable_backend, sender=self)
+            db_signal.connect(backends.notion_backend, sender=self)
+            db_signal.connect(backends.google_sheets_backend, sender=self)
 
     # def __del__(self):
     #     # When the program terminates,
@@ -182,13 +178,17 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
     
-    def get_filename(self, length=5, extension=None):
-        characters = string.ascii_lowercase + string.digits
-        name = ''.join(random.choice(characters) for _ in range(length))
-        if extension is not None:
-            return f'{name}.{extension}'
-        return name
-
+    @property
+    def name(self):
+        return 'crawler'
+    
+    def create_dump(self):
+        """Dumps the collected results to a file.
+        This functions is called only when an exception
+        occurs during the crawling process
+        """
+        
+    
     def _backup_urls(self):
         """Backs up the urls both in the memory
         cache, and in the cache file"""
@@ -199,6 +199,19 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         cache.set_value('urls_data', urls_data)
 
         write_json_document('cache.json', urls_data)
+
+
+class BaseCrawler(CrawlerMixin):
+    start_url = None
+    url_validators = []
+    url_filters = []
+
+    def get_filename(self, length=5, extension=None):
+        characters = string.ascii_lowercase + string.digits
+        name = ''.join(random.choice(characters) for _ in range(length))
+        if extension is not None:
+            return f'{name}.{extension}'
+        return name
 
     def build_headers(self, options):
         headers = {
@@ -323,21 +336,29 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
         of a given website"""
         if not 'sitemap' in url:
             raise ValueError('Url should be the sitemap page')
+        
         body = self.driver.find_element(By.TAG_NAME, 'body')
         link_elements = body.find_elements(By.TAG_NAME, 'a')
+
         urls = []
         for element in link_elements:
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=25, run_audit=False, language='en'):
+    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language='en'):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
+
+        wait_time = wait_time or settings.WAIT_TIME
 
         if self.debug_mode:
             logger.info('Starting Kryptone in debug mode...')
         else:
             logger.info('Starting Kryptone...')
+
+        if self.start_url is not None:
+            self.urls_to_visit.add(self.start_url)
+            self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -365,6 +386,7 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
+            # navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -397,7 +419,14 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
                 self.get_transformed_raw_page_text,
                 elements=self.get_page_link_elements
             )
-            write_csv_document('emails.csv', self.emails_container)
+            # Format each email as [[...], ...] in order to comply
+            # with the way that the csv writer outputs the rows
+            emails = list(map(lambda x: [x], self.emails_container))
+            write_csv_document('emails.csv', emails)
+            db_signal.send(
+                self,
+                emails=self.emails_container
+            )
 
             # Run custom user actions once 
             # everything is completed
@@ -407,19 +436,29 @@ class BaseCrawler(ActionsMixin, SEOMixin, EmailMixin):
             time.sleep(wait_time)
 
 
-class SinglePageAutomater(BaseCrawler):
+class SinglePageAutomater(CrawlerMixin):
     """Automates user defined actions on a
-    single page as oppposed to crawing the
+    single or multiple user provided 
+    pages as oppposed to crawing the
     whole website"""
+    
+    start_urls = []
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=25, language='en'):
+    @property
+    def name(self):
+        return 'automation'
+
+    def start(self, start_urls=[], wait_time=None, debug_mode=False):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
 
-        if self.debug_mode:
-            logger.info('Starting Kryptone in debug mode...')
-        else:
-            logger.info('Starting Kryptone...')
+        logger.info('Starting Kryptone automation...')
+
+        if isinstance(self.start_urls, URLFile):
+            self.start_urls = list(self.start_urls)
+
+        self.start_urls.extend(start_urls)
+        start_urls = self.start_urls
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -431,15 +470,9 @@ class SinglePageAutomater(BaseCrawler):
             if current_url is None:
                 continue
 
-            # In the case where the user has provided a
-            # set of urls directly in the function,
-            # start_url would be None
-            if self.start_url is None:
-                self.start_url = current_url
-                self._start_url_object = urlparse(self.start_url)
-
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
+            # navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -459,6 +492,11 @@ class SinglePageAutomater(BaseCrawler):
             # Run custom user actions once
             # everything is completed
             self.run_actions(current_url)
+            db_signal.send(
+                self,
+                current_url=current_url,
+                emails=self.emails_container
+            )
 
             logger.info(f"Waiting {wait_time} seconds...")
             time.sleep(wait_time)

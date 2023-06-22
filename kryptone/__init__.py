@@ -16,15 +16,20 @@ class Logger:
         handler = logging.StreamHandler()
         logger.addHandler(handler)
 
-        # file_handler = logging.FileHandler('access.log')
-        # logger.addHandler(file_handler)
+        
 
         log_format = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s: %(message)s',
-            datefmt='%Y-%m-%d'
+            datefmt='%Y-%m-%d %H:%M'
         )
         handler.setFormatter(log_format)
-        # file_handler.setFormatter(log_format)
+
+        # from kryptone.conf import settings
+        # if settings.PROJECT_PATH is not None:
+        #     file_handler = logging.FileHandler(settings.PROJECT_PATH / 'access.log')
+        #     logger.addHandler(file_handler)
+        #     file_handler.setFormatter(log_format)
+
         self.instance = logger
 
     @classmethod
