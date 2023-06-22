@@ -418,7 +418,10 @@ class BaseCrawler(CrawlerMixin):
                 self.get_transformed_raw_page_text,
                 elements=self.get_page_link_elements
             )
-            write_csv_document('emails.csv', self.emails_container)
+            # Format each email as [[...], ...] in order to comply
+            # with the way that the csv writer outputs the rows
+            emails = list(map(lambda x: [x], self.emails_container))
+            write_csv_document('emails.csv', emails)
             db_signal.send(
                 self,
                 emails=self.emails_container
