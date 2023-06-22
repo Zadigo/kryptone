@@ -2,14 +2,16 @@ import inspect
 import os
 from collections import OrderedDict
 from functools import lru_cache
-from kryptone import logger
 from importlib import import_module
 from pathlib import Path
 
+from kryptone import logger
+from kryptone.conf import settings
 from kryptone.signals import Signal
+from kryptone.utils.urls import URLFile
 
-registry_populated = Signal()
-pre_init_spider = Signal()
+# registry_populated = Signal()
+# pre_init_spider = Signal()
 
 SPIDERS_MODULE = 'spiders'
 
@@ -26,7 +28,9 @@ class SpiderConfig:
         self.name = name
         self.dotted_path = None
         self.registry = None
+        self.initial_start_urls = []
         self.spider_class = getattr(spiders_module, name, None)
+        self.is_automater = False
 
         self.MODULE = spiders_module
 
@@ -69,7 +73,27 @@ class SpiderConfig:
             raise ValueError(
                 f'Could not start spider in project: {self.dotted_path}'
             )
-        self.spider_class().start(**kwargs)
+        spider_instance = self.spider_class()
+
+        # TODO: Import the browser that we are 
+        # going to use with Selenium
+        python_path = settings.WEBDRIVER
+        module, klass = python_path.rsplit('.', maxsplit=1)
+        selenium_module = import_module(module)
+        browser = getattr(selenium_module, klass, None)
+
+        try:
+            spider_instance.start(**kwargs)
+        except KeyboardInterrupt:
+            spider_instance.create_dump()
+        except Exception as e:
+            spider_instance.create_dump()
+            raise ExceptionGroup(
+                'Multiple exceptions occurred',
+                [
+                    Exception(e)
+                ]
+            )
 
 
 class MasterRegistry:
@@ -131,7 +155,7 @@ class MasterRegistry:
                 f"Could not load the project's related module: '{dotted_path}'"
             )
 
-        from kryptone.app import BaseCrawler
+        from kryptone.app import BaseCrawler, SinglePageAutomater
         from kryptone.conf import settings
         
         self.absolute_path = Path(project_module.__path__[0])
@@ -157,28 +181,66 @@ class MasterRegistry:
             predicate=inspect.isclass
         )
         
-        valid_spiders = filter(lambda x: issubclass(x[1], BaseCrawler), elements)
+        valid_spiders = filter(lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)), elements)
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
-        for name in valid_spider_names:
-            if name not in settings.SPIDERS:
-                continue
+        # try:
+        #     # Load the urls.py file which might contain
+        #     # initial urls to use for the crawling
+        #     urls_module = import_module(f'{dotted_path}.urls')
+        # except ImportError:
+        #     pass
+        # else:
+        #     initial_start_urls = []
+        #     start_urls = getattr(urls_module, 'start_urls', [])
+        #     for item in start_urls:
+        #         if isinstance(item, URLFile):
+        #             initial_start_urls.extend(list(item))
+                
+        #         if isinstance(item, str):
+        #             initial_start_urls.append(item)
 
-            instance = SpiderConfig.create(name, spiders_module)
-            self.spiders[name] = instance
-            instance.registry = self
+        for name in valid_spider_names:
+            if name in settings.SPIDERS or name in settings.AUTOMATERS:
+                instance = SpiderConfig.create(name, spiders_module)
+                instance.registry = self
+                # instance.initial_start_urls = initial_start_urls
+
+                if name in settings.AUTOMATERS:
+                    instance.is_automater = True
+
+                self.spiders[name] = instance
 
         for config in self.spiders.values():
             config.check_ready()
 
         self.spiders_ready = True
-        registry_populated.send(self, registry=registry)
+        # registry_populated.send(self, registry=registry)
 
         # Cache the registry in the settings
         # file for performance reasons
         settings['REGISTRY'] = self
 
         self.pre_configure_project(dotted_path, settings)
+
+    def run_all_automaters(self, **kwargs):
+        if not self.has_spiders:
+            logger.info(("There are no registered spiders in your project. If you created spiders, "
+                         "register them within the SPIDERS variable of your "
+                         "settings.py file."), Warning, stacklevel=0)
+        else:
+            for config in self.get_spiders():
+                # pre_init_spider.send(self, spider=config)
+                
+                if not config.is_automater:
+                    raise ValueError(f'{config} is not an automater')
+
+                try:
+                    config.run(**kwargs)
+                except Exception:
+                    logger.critical((f"Could not start {config}. "
+                                     "Did you use the correct class name?"), stack_info=True)
+                    raise
 
     def run_all_spiders(self, **kwargs):
         if not self.has_spiders:
@@ -187,7 +249,7 @@ class MasterRegistry:
                            "settings.py file."), Warning, stacklevel=0)
         else:
             for config in self.get_spiders():
-                pre_init_spider.send(self, spider=config)
+                # pre_init_spider.send(self, spider=config)
                 try:
                     config.run(**kwargs)
                 except Exception:
@@ -201,8 +263,8 @@ class MasterRegistry:
             return self.spiders[spider_name]
         except KeyError:
             logger.error((f"The spider with the name '{spider_name}' does not "
-                                            f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
-                                            f"If you forgot to register {spider_name}, check your settings file."), stack_info=True)
+                            f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
+                            f"If you forgot to register {spider_name}, check your settings file."), stack_info=True)
             raise ValueError(spider_name)
 
 

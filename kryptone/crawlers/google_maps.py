@@ -56,6 +56,10 @@ def generate_search_url(search):
 
 
 class GoogleMapsMixin:
+    @staticmethod
+    def transform_to_json(items):
+        return list(map(lambda x: x.as_json, items))
+    
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
             data = json.load(f)
@@ -67,7 +71,6 @@ class GoogleMapsMixin:
                     container = [
                         item['name'],
                         item['address'],
-                        # item['rating'],
                         item['number_of_reviews'],
                         comment['period'],
                         comment['rating'],
@@ -86,8 +89,8 @@ class GoogleMapsMixin:
 class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
     final_result = []
 
-    # start_url = "https://www.google.com/maps/search/Marie+Blach%C3%A8re/@44.2399522,1.6699718,8.75z?entry=ttu"
-    # start_url = generate_search_url('la mie câline')
+    def create_dump(self):
+        write_json_document('dump.json', self.transform_to_json(self.final_result))
 
     def post_visit_actions(self, **kwargs):
         try:
@@ -669,24 +672,24 @@ class GoogleMapsPlace(GoogleMaps):
         # completion_time = (time.time() - current_time) / 60
 
 
-if __name__ == '__main__':
-    # try:
-    #     instance = GoogleMapsPlace()
-    #     # instance = GoogleMaps()
-    #     urls = [
-    #         'https://www.google.fr/maps/place/Bricomarch%C3%A9/@45.0623843,5.0824153,13z/data=!4m10!1m2!2m1!1sbricomarch%C3%A9!3m6!1s0x478ab2c99e97aba7:0xf9a321930a23c394!8m2!3d45.05827!4d5.107725!15sCgxicmljb21hcmNow6kiA4gBAZIBFGRvX2l0X3lvdXJzZWxmX3N0b3Jl4AEA!16s%2Fg%2F1w8w8xmm?entry=ttu'
-    #     ]
-    #     instance.start(start_urls=urls, wait_time=1)
-    # except KeyboardInterrupt:
-    #     data = list(map(lambda x: x.as_json, instance.final_result))
-    #     write_json_document('dump.json', data)
-    #     logger.critical(f"Dumping data to 'dump.json'")
-    # except Exception:
-    #     data = list(map(lambda x: x.as_json, instance.final_result))
-    #     write_json_document('dump.json', data)
-    #     logger.critical(f"Dumping data to 'dump.json'")
-    #     raise
+# if __name__ == '__main__':
+#     # try:
+#     #     instance = GoogleMapsPlace()
+#     #     # instance = GoogleMaps()
+#     #     urls = [
+#     #         'https://www.google.fr/maps/place/Bricomarch%C3%A9/@45.0623843,5.0824153,13z/data=!4m10!1m2!2m1!1sbricomarch%C3%A9!3m6!1s0x478ab2c99e97aba7:0xf9a321930a23c394!8m2!3d45.05827!4d5.107725!15sCgxicmljb21hcmNow6kiA4gBAZIBFGRvX2l0X3lvdXJzZWxmX3N0b3Jl4AEA!16s%2Fg%2F1w8w8xmm?entry=ttu'
+#     #     ]
+#     #     instance.start(start_urls=urls, wait_time=1)
+#     # except KeyboardInterrupt:
+#     #     data = list(map(lambda x: x.as_json, instance.final_result))
+#     #     write_json_document('dump.json', data)
+#     #     logger.critical(f"Dumping data to 'dump.json'")
+#     # except Exception:
+#     #     data = list(map(lambda x: x.as_json, instance.final_result))
+#     #     write_json_document('dump.json', data)
+#     #     logger.critical(f"Dumping data to 'dump.json'")
+#     #     raise
 
-    instance = GoogleMapsPlace()
-    url_file = URLFile(processor=generate_search_url)
-    instance.start(start_urls=list(url_file))
+#     instance = GoogleMapsPlace()
+#     url_file = URLFile(processor=generate_search_url)
+#     instance.start(start_urls=list(url_file))

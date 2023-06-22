@@ -10,11 +10,10 @@ class BaseEmailServer:
     This is the base class used to create a
     an SMTP connection to a server.
 
-    Description
-    -----------
-
     This class should not be used directly but subclassed
     in order to create a connection to a given SMTP server.
+
+    >>> Gmail('test@gmail.com', 'xxx')
     """
     def __init__(self, host, port, user, password):
         try:
@@ -22,9 +21,8 @@ class BaseEmailServer:
             # :: <smtplib.SMTP> object
             smtp_connection = SMTP(host=host, port=port)
         except smtplib.SMTPConnectError:
-            raise
+            raise Exception('Could not connect to SMTP client')
         else:
-            
             # Optional : Identify ourselves to
             # the server - normaly this is called
             # when .sendemail() is called
@@ -39,19 +37,12 @@ class BaseEmailServer:
             try:
                 smtp_connection.login(user, password)
             except smtplib.SMTPAuthenticationError:
-                # Provided credentials are not good?
-                # Get credentials from configuration
-                # Raise an error since there's no purpose
-                # using such an app without credentials
-                # configuration = Configuration()
-                # If user and password are none,
-                # raises an ImproperlyConfiguredError()
-                # user = configuration['USER']
-                # password = configuration['PASSWORD']
-                raise
+                raise Exception('Could not login user to SMTP server')
             else:
-                print(f'Logged in as {user} to {smtp_connection._host}.')
                 self.smtp_connection = smtp_connection
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__}>"
 
     @cached_property
     def get_connection(self):
