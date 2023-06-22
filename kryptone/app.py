@@ -82,18 +82,16 @@ class ActionsMixin:
     def click_consent_button(self, element_id=None, element_class=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
-        element = None
-        if element_id is not None:
-            element = self.driver.find_element(By.ID, element_id)
+        try:
+            element = None
+            if element_id is not None:
+                element = self.driver.find_element(By.ID, element_id)
 
-        if element_class is not None:
-            element = self.driver.find_element(By.ID, element_id)
-
-        if element is not None:
-            try:
-                element.click()
-            except:
-                logger.info('Consent button not found')
+            if element_class is not None:
+                element = self.driver.find_element(By.CLASS_NAME, element_id)
+            element.click()
+        except:
+            logger.info('Consent button not found')
 
 
     def _test_scroll_page(self, xpath=None, css_selector=None):
