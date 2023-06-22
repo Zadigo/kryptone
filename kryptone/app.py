@@ -25,8 +25,8 @@ from kryptone.utils.file_readers import (read_json_document,
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
 
-post_init = Signal()
-navigation = Signal()
+# post_init = Signal()
+# navigation = Signal()
 db_signal = Signal()
 
 cache = Cache()
@@ -148,11 +148,11 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
                 options=options
             )
 
-            post_init.send(self)
+            # post_init.send(self)
 
-            db_signal.connect(backends.airtable, sender=self)
-            db_signal.connect(backends.notion, sender=self)
-            db_signal.connect(backends.google_sheets, sender=self)
+            db_signal.connect(backends.airtable_backend, sender=self)
+            db_signal.connect(backends.notion_backend, sender=self)
+            db_signal.connect(backends.google_sheets_backend, sender=self)
 
     # def __del__(self):
     #     # When the program terminates,
@@ -358,6 +358,7 @@ class BaseCrawler(CrawlerMixin):
 
         if self.start_url is not None:
             self.urls_to_visit.add(self.start_url)
+            self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.urls_to_visit.update(set(start_urls))
@@ -385,7 +386,7 @@ class BaseCrawler(CrawlerMixin):
             
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
-            navigation.send(self, current_url=current_url)
+            # navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -471,7 +472,7 @@ class SinglePageAutomater(CrawlerMixin):
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
-            navigation.send(self, current_url=current_url)
+            # navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -493,6 +494,7 @@ class SinglePageAutomater(CrawlerMixin):
             self.run_actions(current_url)
             db_signal.send(
                 self,
+                current_url=current_url,
                 emails=self.emails_container
             )
 
