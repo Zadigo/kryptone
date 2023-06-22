@@ -6,6 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 from kryptone import logger
+from kryptone.conf import settings
 from kryptone.signals import Signal
 from kryptone.utils.urls import URLFile
 
@@ -73,6 +74,13 @@ class SpiderConfig:
                 f'Could not start spider in project: {self.dotted_path}'
             )
         spider_instance = self.spider_class()
+
+        # TODO: Import the browser that we are 
+        # going to use with Selenium
+        python_path = settings.WEBDRIVER
+        module, klass = python_path.rsplit('.', maxsplit=1)
+        selenium_module = import_module(module)
+        browser = getattr(selenium_module, klass, None)
 
         try:
             spider_instance.start(**kwargs)
