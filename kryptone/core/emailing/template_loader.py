@@ -3,6 +3,7 @@ from functools import cached_property
 
 from jinja2.environment import Environment
 from jinja2.loaders import FileSystemLoader
+
 from kryptone.conf import settings
 
 environment = Environment()
