@@ -115,7 +115,3 @@ class SendEmailFromTemplate(SendEmail):
         html_body = render_template(html_template, context=context)
         super().__init__(sender, receiver, subject,
                          email_body=email_body, html_body=html_body)
-
-
-s = SendEmailFromTemplate('pendenquejohn@gmail.com',
-                          'padodep875@byorby.com', 'test', email_template='failure.txt', html_template='failure.html')
