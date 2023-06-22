@@ -345,9 +345,11 @@ class BaseCrawler(CrawlerMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=25, run_audit=False, language='en'):
+    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language='en'):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
+
+        wait_time = wait_time or settings.WAIT_TIME
 
         if self.debug_mode:
             logger.info('Starting Kryptone in debug mode...')
