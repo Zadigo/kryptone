@@ -9,8 +9,8 @@ from kryptone import logger
 from kryptone.signals import Signal
 from kryptone.utils.urls import URLFile
 
-registry_populated = Signal()
-pre_init_spider = Signal()
+# registry_populated = Signal()
+# pre_init_spider = Signal()
 
 SPIDERS_MODULE = 'spiders'
 
@@ -75,10 +75,7 @@ class SpiderConfig:
         spider_instance = self.spider_class()
 
         try:
-            spider_instance.start(
-                # start_urls=self.initial_start_urls,
-                **kwargs
-            )
+            spider_instance.start(**kwargs)
         except KeyboardInterrupt:
             spider_instance.create_dump()
         except Exception as e:
@@ -210,7 +207,7 @@ class MasterRegistry:
             config.check_ready()
 
         self.spiders_ready = True
-        registry_populated.send(self, registry=registry)
+        # registry_populated.send(self, registry=registry)
 
         # Cache the registry in the settings
         # file for performance reasons
@@ -225,7 +222,7 @@ class MasterRegistry:
                          "settings.py file."), Warning, stacklevel=0)
         else:
             for config in self.get_spiders():
-                pre_init_spider.send(self, spider=config)
+                # pre_init_spider.send(self, spider=config)
                 
                 if not config.is_automater:
                     raise ValueError(f'{config} is not an automater')
@@ -244,7 +241,7 @@ class MasterRegistry:
                            "settings.py file."), Warning, stacklevel=0)
         else:
             for config in self.get_spiders():
-                pre_init_spider.send(self, spider=config)
+                # pre_init_spider.send(self, spider=config)
                 try:
                     config.run(**kwargs)
                 except Exception:
