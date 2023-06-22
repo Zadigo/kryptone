@@ -1,6 +1,7 @@
 import kryptone
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
+import multiprocessing
 
 
 class Command(ProjectCommand):
@@ -65,5 +66,25 @@ class Command(ProjectCommand):
         if namespace.name is not None:
             spider_config = registry.get_spider(namespace.name)
             spider_config.run(**params)
+            # process = multiprocessing.Process(
+            #     target=spider_config.run,
+            #     kwargs=params
+            # )
+            # try:
+            #     process.start()
+            # except:
+            #     raise
+            # else:
+            #     process.join()
         else:
             registry.run_all_spiders(**params)
+            # process = multiprocessing.Process(
+            #     target=registry.run_all_spiders, 
+            #     kwargs=params
+            # )
+            # try:
+            #     process.start()
+            # except:
+            #     raise
+            # else:
+            #     process.join()
