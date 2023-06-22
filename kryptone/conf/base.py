@@ -19,10 +19,7 @@ AUTOMATERS = []
 
 
 # The browser to use
-WEBDRIVER = {
-    'driver': 'selenium.webdriver.Edge',
-    'executable_path': None,
-}
+WEBDRIVER = 'selenium.webdriver.Chrome'
 
 
 # The folder in which to save
