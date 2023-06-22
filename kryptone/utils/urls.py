@@ -62,11 +62,8 @@ class URL:
 class URLFile:
     urls = []
     def __init__(self, processor=None):
-        filename = 'urls.txt'
-        if settings.PROJECT_PATH is not None:
-            filename = settings.PROJECT_PATH / filename
         try:
-            data = read_document(filename)
+            data = read_document('urls.txt')
         except:
             pass 
         else:
