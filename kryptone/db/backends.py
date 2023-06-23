@@ -1,9 +1,14 @@
+import functools
+
 import airtable
+import redis
 import requests
 
 from kryptone.conf import settings
+from kryptone.db.connections import memcache_connection, redis_connection
 
 AIRTABLE_ID_CACHE = set()
+
 
 def airtable_backend(sender, **kwargs):
     if 'airtable' in settings.ACTIVE_STORAGE_BACKENDS:
@@ -12,7 +17,6 @@ def airtable_backend(sender, **kwargs):
             return False
         table = airtable.Airtable(
             config.get('base_id', None),
-            config.get('table_name', None),
             config.get('api_key', None)
         )
         records = []
@@ -53,3 +57,9 @@ def notion_backend(sender, **kwargs):
 
 def google_sheets_backend(sender, **kwargs):
     pass
+
+
+def redis_backend(sender, **kwargs):
+    instance = redis_connection()
+    if instance:
+        pass

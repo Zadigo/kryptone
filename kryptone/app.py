@@ -451,7 +451,7 @@ class SinglePageAutomater(CrawlerMixin):
     def start(self, start_urls=[], wait_time=None, debug_mode=False):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
-
+        
         logger.info('Starting Kryptone automation...')
 
         if isinstance(self.start_urls, URLFile):

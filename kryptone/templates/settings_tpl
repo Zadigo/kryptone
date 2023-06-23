@@ -10,8 +10,8 @@ PROJECT_PATH = None
 SPIDERS = []
 
 
-# Register spiders to automate
-# actions on different websites
+# Register classes to automate
+# actions on different urls
 AUTOMATERS = []
 
 
@@ -30,6 +30,11 @@ MEDIA_FOLDER = 'media'
 # The amount of time the driver should
 # wait before moving to the next url
 WAIT_TIME = 25
+
+# Use this setting to indicate that the
+# waiting time should be a random value
+# within the provided array
+WAIT_TIME_RANGE = None
 
 
 # The name of the cache file
@@ -79,7 +84,7 @@ STORAGE_BACKENDS = {
 # Email setting values used essentially
 # for alerting users for failed events
 # or sending captured data
-EMAIL_HOST = 'smtp.gmail'
+EMAIL_HOST = 'gmail'
 
 EMAIL_HOST = None
 

@@ -1,3 +1,12 @@
+"""
+This is the main module for creating
+spiders that will crawl a whole website.
+
+Define an entrypoint from which the spider
+should start an will gather urls on each
+page to keep going forward.
+"""
+
 from kryptone.app import BaseCrawler
 
 
