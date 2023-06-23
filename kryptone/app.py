@@ -22,6 +22,7 @@ from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
+from kryptone.utils.module_loaders import import_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
 
@@ -30,6 +31,36 @@ from kryptone.utils.urls import URLFile
 db_signal = Signal()
 
 cache = Cache()
+
+
+WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+
+
+def get_selenium_browser_instance(executable_path=None):
+    """Creates a new selenium browser instance"""
+    python_path = settings.WEBDRIVER
+    module, browser_name = python_path.rsplit('.', maxsplit=1)
+    klass = Chrome if browser_name == 'Chrome' else Edge
+    # module = import_module(module)
+    # klass = getattr(module, browser_name, None)
+    # if klass is None:
+    #     raise ValueError(f'Could not load browser from module: {python_path}')
+    executable_path = executable_path or os.environ.get(
+        WEBDRIVER_ENVIRONMENT_PATH,
+        None
+    )
+
+    if executable_path is None:
+        logger.error('Could not find web driver')
+        return None
+    else:
+        options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
+        options = options_klass()
+        options.add_argument('--remote-allow-origins=*')
+        options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+        instance = klass(executable_path=executable_path, options=options)
+        return instance
+
 
 
 class ActionsMixin:
