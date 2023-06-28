@@ -58,6 +58,7 @@ Array.from(document.querySelectorAll('div[data-review-id^="Ch"]'))
     .filter((item) => { return item !== undefined })
 
 
+// Async 
 
 async function resolveComment (item) {
     const promise = new Promise((resolve, reject) => {
@@ -133,7 +134,7 @@ async function getComments () {
     }
 
     const seen = []
-    return c.map((item) => {
+    const cleanedComments = c.map((item) => {
         if (seen.includes(item.id)) {
             // pass
         } else {
@@ -145,8 +146,12 @@ async function getComments () {
             }
         }
     }).filter(item => item !== undefined)
+    localStorage.setItem('kryptone', JSON.stringify(cleanedComments))
+    return cleanedComments
 }
 getComments()
+JSON.parse(localStorage.getItem('kryptone'))
+
 
 
 
