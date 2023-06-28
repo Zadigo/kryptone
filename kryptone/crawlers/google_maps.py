@@ -18,6 +18,106 @@ from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
 from kryptone.utils.urls import URLFile
 
+RETRIEVE_COMMENTS_SCRIPT = """
+    async function resolveComment (item) {
+        const promise = new Promise((resolve, reject) => {
+            // Javascript code used to parse the comments on
+            // on a Google Maps business page
+            let dataReviewId = item.dataset['reviewId']
+            try {
+                let moreButton = null
+
+                moreButton = (
+                    // Try by getting the button using the specific review ID
+                    item.querySelector(`button[data-review-id="${dataReviewId}"][aria-controls="${dataReviewId}"][aria-expanded="false"]`) ||
+                    // Try the "Voir plus" button"
+                    item.querySelector('button[aria-label="Voir plus"]') ||
+                    // Try the "See more" button"
+                    item.querySelector('button[aria-label="See more"]') ||
+                    // On last resort try "aria-expanded"
+                    item.querySelector('button[aria-expanded="false"]')
+                )
+                moreButton.click()
+            } catch (e) {
+                console.info('No additional content for', dataReviewId)
+            }
+
+            setTimeout(() => {
+                try {
+                    // Or, item.querySelector('.DU9Pgb').innerText
+                    period = item.querySelector('.rsqaWe').innerText
+                } catch (e) {
+                    // pass
+                }
+                
+                try {
+                    text = item.querySelector('.MyEned').innerText
+                } catch (e) {
+                    text = ''
+                }
+        
+                try {
+                    rating = item.querySelector('span[role="img"]').ariaLabel
+                } catch (e) {
+                    // pass
+                }
+        
+                resolve({
+                    id: dataReviewId,
+                    period: period,
+                    rating: rating,
+                    text: text
+                })
+            }, 1000)
+        })
+
+        let comment = {}
+        const thenedPromise = promise.then((data) => {
+            comment = data
+        })
+
+        await thenedPromise
+        return comment
+    }
+
+    const result = Array.from(document.querySelectorAll('div[data-review-id^="Ch"]'))
+        .map(resolveComment)
+        .filter((item) => { return item !== undefined })
+
+    // Remove duplicate comments and null items
+    async function getComments () {
+        let c
+        c = await Promise.all(result)
+
+        function onlyUnique(value, index, array) {
+            return array.indexOf(value) === index;
+        }
+
+        const seen = []
+        const cleanedComments = c.map((item) => {
+            if (seen.includes(item.id)) {
+                // pass
+            } else {
+                seen.push(item.id)
+                return {
+                    period: item.period,
+                    rating: item.rating,
+                    text: item.text
+                }
+            }
+        }).filter(item => item !== undefined)
+        
+        // To resolve the problem with getting the result from the Promise,
+        // store the comments to the localStorage
+        localStorage.setItem('kryptone', JSON.stringify(cleanedComments))
+        // return cleanedComments
+    }
+
+    getComments()
+
+    return JSON.parse(localStorage.getItem('kryptone'))
+"""
+
 
 @dataclasses.dataclass
 class GoogleBusiness:
@@ -38,11 +138,11 @@ class GoogleBusiness:
             'number_of_reviews': self.number_of_reviews,
             'comments': self.comments
         }
-    
+
     def as_csv(self):
         rows = []
         for comment in self.comments:
-            row = [self.name, self.url, self.address, self.rating, 
+            row = [self.name, self.url, self.address, self.rating,
                    self.number_of_reviews, comment['period'], comment['text']]
             rows.append(row)
         return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
@@ -59,7 +159,7 @@ class GoogleMapsMixin:
     @staticmethod
     def transform_to_json(items):
         return list(map(lambda x: x.as_json, items))
-    
+
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
             data = json.load(f)
@@ -77,7 +177,7 @@ class GoogleMapsMixin:
                         comment['text']
                     ]
                     business_comments.append(container)
-            
+
             with open('ange.csv', mode='w', encoding='utf-8', newline='\n') as f:
                 writer = csv.writer(f)
                 for row in business_comments:
@@ -87,10 +187,14 @@ class GoogleMapsMixin:
 
 
 class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
+    """Start from a Google Maps search and retrieve information
+    for all available businesses on the page"""
+
     final_result = []
 
     def create_dump(self):
-        write_json_document('dump.json', self.transform_to_json(self.final_result))
+        write_json_document(
+            'dump.json', self.transform_to_json(self.final_result))
 
     def post_visit_actions(self, **kwargs):
         try:
@@ -163,7 +267,7 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
         # and can result in errors. Try-Except these.
         # items = feed.find_elements(By.CSS_SELECTOR, 'div:not([class])')
         items = feed.find_elements(By.CSS_SELECTOR, 'div[role="article"]')
-        
+
         # Intermediate save - Saves the first initital results
         # that were found in he feed
         rows = []
@@ -196,7 +300,8 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 link = business.find_element(By.TAG_NAME, 'a')
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
-                rating = business.find_element(By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
+                rating = business.find_element(
+                    By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
             except:
                 continue
             else:
@@ -228,7 +333,8 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 # aria-label="la mie CÂLINE - Atelier "Pains & Restauration"" which
                 # breaks the script. We'll just keep going if we cannot get
                 # no business information
-                information = self.driver.execute_script(business_information_script)
+                information = self.driver.execute_script(
+                    business_information_script)
             except Exception as e:
                 counter = counter + 1
                 logger.critical(f'Could not parse business information: {url}')
@@ -294,70 +400,9 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
             # raise a small pause here
             time.sleep(2)
 
-            retrieve_comments_script = """
-            const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
-            
-            return Array.from(commentsWrapper).map((item) => {
-                let dataReviewId = item.dataset['reviewId']
-
-                let text = ''
-                let period = null
-                let rating = null
-                const textSection = item.querySelector("*[class='MyEned']")
-
-                try {
-                    // Sometimes there is a read more button
-                    // that we have to click
-                    
-                    moreButton = (
-                        // Try the "Voir plus" button"
-                        item.querySelector('button[aria-label="Voir plus"]') ||
-                        // Try the "See more" button"
-                        item.querySelector('button[aria-label="See more"]') ||
-                        // On last resort try "aria-expanded"
-                        item.querySelector('button[aria-expanded="false"]')
-                    )
-                    moreButton.click()
-                } catch (e) {
-                    console.log('No additional data for', dataReviewId)
-                }
-                
-                try {
-                    // Or, item.querySelector('.rsqaWe').innerText
-                    period = item.querySelector('.DU9Pgb').innerText
-                } catch (e) {
-                    // pass
-                }
-
-                try {
-                    rating = item.querySelector('span[role="img"]').ariaLabel
-                } catch (e) {
-                    // pass
-                }
-
-                try {
-                    text = textSection.innerText
-                } catch (e) {
-                    // pass
-                }
-
-                try {
-                    reviewerName = item.querySelector('class*="d4r55"').innerText
-                    reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
-                } catch (e) {
-                    // pass
-                }
-
-                return {
-                    text: text,
-                    rating: rating,
-                    period: period
-                }
-            })
-            """
             clean_comments = []
             try:
-                comments = self.driver.execute_script(retrieve_comments_script)
+                comments = self.driver.execute_script(RETRIEVE_COMMENTS_SCRIPT)
             except Exception as e:
                 comments = ''
                 logger.error(f'Comments not found for {name}: {e.args}')
@@ -366,10 +411,10 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 for comment in comments:
                     if not isinstance(comment, dict):
                         continue
-                    
+
                     clean_dict = {}
                     for key, value in comment.items():
-                        clean_text = self.clean_text(value) 
+                        clean_text = self.clean_text(value)
                         clean_dict[key] = clean_text
                     clean_comments.append(clean_dict)
                 logger.info(f'Found {len(clean_comments)} reviews')
@@ -378,7 +423,7 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 # Remove useless data from the array
                 # of values that we have received
                 exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
-                            'vendredi', 'samedi', 'dimanche']
+                           'vendredi', 'samedi', 'dimanche']
                 result1 = []
                 for text in items:
                     if text in exclude:
@@ -407,7 +452,6 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                     result2.append(text)
                 return result2
 
-
             business_information.name = name
             business_information.url = url
             business_information.address = clean_information_list(
@@ -430,14 +474,18 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
 
 
 class GoogleMapsPlace(GoogleMaps):
+    """Retrieve information for a single business"""
+
     def run_actions(self, current_url, **kwargs):
         current_time = time.time()
         business_information = GoogleBusiness()
 
         try:
-            name = self.driver.find_element(By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
+            name = self.driver.find_element(
+                By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
             url = self.driver.current_url
-            rating_section = self.driver.find_element(By.CSS_SELECTOR, '.F7nice')
+            rating_section = self.driver.find_element(
+                By.CSS_SELECTOR, '.F7nice')
             rating, number_of_reviews = rating_section.text.split('\n')
         except:
             name = None
@@ -533,78 +581,21 @@ class GoogleMapsPlace(GoogleMaps):
             # does not get updated and stays the same which
             # means that we have reached the bottom of the page
             if comments_saved_position is not None and current_position == comments_saved_position:
+                # TODO: Retry scrolling x amount of times and when we
+                # have surpassed the trial we can pass
+
                 comments_is_scrollable = False
             comments_saved_position = current_position
             time.sleep(1)
 
-        # Before retrieving all the comments
-        # raise a small pause here
         time.sleep(2)
 
-        retrieve_comments_script = """
-        const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
-        
-        return Array.from(commentsWrapper).map((item) => {
-            let dataReviewId = item.dataset['reviewId']
-
-            let text = ''
-            let period = null
-            let rating = null
-            const textSection = item.querySelector("*[class='MyEned']")
-
-            try {
-                // Sometimes there is a read more button
-                // that we have to click
-                
-                moreButton = (
-                    // Try the "Voir plus" button"
-                    item.querySelector('button[aria-label="Voir plus"]') ||
-                    // Try the "See more" button"
-                    item.querySelector('button[aria-label="See more"]') ||
-                    // On last resort try "aria-expanded"
-                    item.querySelector('button[aria-expanded="false"]')
-                )
-                moreButton.click()
-            } catch (e) {
-                console.log('No additional data for', dataReviewId)
-            }
-            
-            try {
-                // Or, item.querySelector('.rsqaWe').innerText
-                period = item.querySelector('.DU9Pgb').innerText
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                rating = item.querySelector('span[role="img"]').ariaLabel
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                text = textSection.innerText
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                reviewerName = item.querySelector('class*="d4r55"').innerText
-                reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
-            } catch (e) {
-                // pass
-            }
-
-            return {
-                text: text,
-                rating: rating,
-                period: period
-            }
-        })
-        """
         clean_comments = []
         try:
-            comments = self.driver.execute_script(retrieve_comments_script)
+            # Inject an async function in the browser that will
+            # loop over each comment and try to click on the "More"
+            # button if there is one.
+            comments = self.driver.execute_script(RETRIEVE_COMMENTS_SCRIPT)
         except Exception as e:
             comments = ''
             logger.error(f'Comments not found for {name}: {e.args}')
@@ -625,7 +616,7 @@ class GoogleMapsPlace(GoogleMaps):
             # Remove useless data from the array
             # of values that we have received
             exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
-                        'vendredi', 'samedi', 'dimanche']
+                       'vendredi', 'samedi', 'dimanche']
             result1 = []
             for text in items:
                 if text in exclude:

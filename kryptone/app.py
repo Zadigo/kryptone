@@ -233,6 +233,8 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
 
 class BaseCrawler(CrawlerMixin):
+    """Crawls a whole website"""
+    
     start_url = None
     url_validators = []
     url_filters = []
@@ -468,10 +470,12 @@ class BaseCrawler(CrawlerMixin):
 
 
 class SinglePageAutomater(CrawlerMixin):
-    """Automates user defined actions on a
+    """
+    Automates user defined actions on a
     single or multiple user provided 
     pages as oppposed to crawing the
-    whole website"""
+    whole website like the BaseCrawler does
+    """
     
     start_urls = []
 
