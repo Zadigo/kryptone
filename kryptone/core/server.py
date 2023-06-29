@@ -33,9 +33,11 @@ class TaskServer(BaseServer):
     @property
     def tasks(self):
         try:
-            return self.connection.get('kryptone_tasks')
+            tasks = self.connection.get('kryptone_tasks')
         except:
             return []
+        else:
+            return tasks or []
 
     def run(self, *args, **kwargs):
         if self.has_tasks:
