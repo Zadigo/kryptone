@@ -97,3 +97,10 @@ EMAIL_HOST_PASSWORD = None
 EMAIL_USE_TLS = True
 
 DEFAULT_FROM_EMAIL = None
+
+
+# The default language used by the website.
+# This is useful when auditing the website by
+# determining the nature of the stop words to
+# block when gathering the text
+WEBSITE_LANGUAGE = 'fr'
