@@ -77,7 +77,7 @@ class SpiderConfig:
 
         # TODO: Import the browser that we are
         # going to use with Selenium
-        python_path = settings.WEBDRIVER
+        python_path = settings.WEBDRIVER['driver']
         module, klass = python_path.rsplit('.', maxsplit=1)
         selenium_module = import_module(module)
         browser = getattr(selenium_module, klass, None)
