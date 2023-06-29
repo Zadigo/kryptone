@@ -6,7 +6,7 @@ nltk==3.7
 numpy==1.23.4
 pandas==1.5.1
 pillow>=8.0.1
-psycopg2==2.9.5
+psycopg==3.1.9
 pyaml==21.10.1
 pymemcache==4.0.0
 quart==0.18.4
