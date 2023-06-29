@@ -60,11 +60,11 @@ class TaskServer(BaseServer):
     #         )
 
     def run(self, *args, **kwargs):
+        logger.info('Way!')
         if self.has_tasks:
             # subprocess.call()
             logger.info(self.tasks())
         time.sleep(3)
-        print('google')
 
 
 def run_server(*args, **kwargs):
