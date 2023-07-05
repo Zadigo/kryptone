@@ -1,10 +1,16 @@
 import threading
 
 import quart
+from quart import jsonify, request
 
 from kryptone.conf import settings
+from kryptone.server.connections import RedisConnection
+
+PUBLICATION_CHANNEL = 'kryptone_channel'
 
 app = quart.Quart(__name__)
+
+redis = RedisConnection().get_connection()
 
 
 async def handle_redis_message(message):
@@ -12,7 +18,12 @@ async def handle_redis_message(message):
 
 
 async def redis_listener():
-    await handle_redis_message(message)
+    with app.app_context():
+        channel = redis.pubsub()
+        channel.subscribe(PUBLICATION_CHANNEL)
+
+        for message in channel.listen():
+            await handle_redis_message(message)
 
 
 @app.before_first_request
@@ -23,4 +34,7 @@ async def start_redis_listener():
 
 @app.route('/create')
 async def create_new_task():
-    pass
+    data = await request.form
+    url = data['url']
+    redis.publish(PUBLICATION_CHANNEL, url)
+    return jsonify({})
