@@ -11,6 +11,9 @@ sklearn = "*"
 requests = "*"
 beautifulsoup4 = "*"
 airtable = "*"
+pymemcache = "*"
+python-dotenv = "*"
+quart = "*"
 
 [dev-packages]
 
