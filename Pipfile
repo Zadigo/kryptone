@@ -9,6 +9,8 @@ nltk = "*"
 selenium = "*"
 sklearn = "*"
 requests = "*"
+beautifulsoup4 = "*"
+airtable = "*"
 
 [dev-packages]
 

@@ -17,23 +17,54 @@ from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
+from kryptone.db.connections import redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
+from kryptone.utils.module_loaders import import_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
 
 # post_init = Signal()
-# navigation = Signal()
+navigation = Signal()
 db_signal = Signal()
 
 cache = Cache()
 
 
+WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+
+
+def get_selenium_browser_instance(executable_path=None):
+    """Creates a new selenium browser instance"""
+    python_path = settings.WEBDRIVER
+    module, browser_name = python_path.rsplit('.', maxsplit=1)
+    klass = Chrome if browser_name == 'Chrome' else Edge
+    # module = import_module(module)
+    # klass = getattr(module, browser_name, None)
+    # if klass is None:
+    #     raise ValueError(f'Could not load browser from module: {python_path}')
+    executable_path = executable_path or os.environ.get(
+        WEBDRIVER_ENVIRONMENT_PATH,
+        None
+    )
+
+    if executable_path is None:
+        logger.error('Could not find web driver')
+        return None
+    else:
+        options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
+        options = options_klass()
+        options.add_argument('--remote-allow-origins=*')
+        options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+        instance = klass(executable_path=executable_path, options=options)
+        return instance
+
+
 class ActionsMixin:
-     # Default speed at which the robot
+    # Default speed at which the robot
     # should scroll a given page
     default_scroll_step = 80
 
@@ -92,7 +123,6 @@ class ActionsMixin:
             element.click()
         except:
             logger.info('Consent button not found')
-
 
     def _test_scroll_page(self, xpath=None, css_selector=None):
         if css_selector:
@@ -177,18 +207,17 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
         return round(result, 0)
-    
+
     @property
     def name(self):
         return 'crawler'
-    
+
     def create_dump(self):
         """Dumps the collected results to a file.
         This functions is called only when an exception
         occurs during the crawling process
         """
-        
-    
+
     def _backup_urls(self):
         """Backs up the urls both in the memory
         cache, and in the cache file"""
@@ -199,6 +228,10 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         cache.set_value('urls_data', urls_data)
 
         write_json_document('cache.json', urls_data)
+        db_signal.send(
+            self,
+            urls_data=urls_data
+        )
 
 
 class BaseCrawler(CrawlerMixin):
@@ -315,7 +348,14 @@ class BaseCrawler(CrawlerMixin):
         """From a previous list of urls to visit 
         and visited urls, resume the previous
         scraping session"""
-        data = read_json_document('cache.json')
+        # Redis is our primary database. If
+        # we cannot get anything, resort to
+        # the basic file cache
+        redis = redis_connection()
+        if redis:
+            data = redis.get('cache')
+        else:
+            data = read_json_document('cache.json')
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
         self.start(**kwargs)
@@ -336,7 +376,7 @@ class BaseCrawler(CrawlerMixin):
         of a given website"""
         if not 'sitemap' in url:
             raise ValueError('Url should be the sitemap page')
-        
+
         body = self.driver.find_element(By.TAG_NAME, 'body')
         link_elements = body.find_elements(By.TAG_NAME, 'a')
 
@@ -345,7 +385,7 @@ class BaseCrawler(CrawlerMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language='en'):
+    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None):
         """Entrypoint to start the web scrapper"""
         self.debug_mode = debug_mode
 
@@ -383,10 +423,10 @@ class BaseCrawler(CrawlerMixin):
             # in exploring the whole internet
             if current_url_object.netloc != self._start_url_object.netloc:
                 continue
-            
+
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
-            # navigation.send(self, current_url=current_url)
+            navigation.send(self, current_url=current_url)
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
@@ -402,8 +442,7 @@ class BaseCrawler(CrawlerMixin):
             self._backup_urls()
 
             if run_audit:
-                # Audit the website TODO: Improve the way in
-                # in which the text is extracted from the page
+                language = language or settings.WEBSITE_LANGUAGE
                 self.audit_page(current_url, language=language)
                 write_json_document('audit.json', self.page_audits)
 
@@ -412,6 +451,11 @@ class BaseCrawler(CrawlerMixin):
 
                 cache.set_value('page_audit', self.page_audits)
                 cache.set_value('global_audit', vocabulary)
+                db_signal.send(
+                    self, 
+                    page_audit=self.page_audits,
+                    global_audit=vocabulary
+                )
 
                 logger.info('Audit complete...')
 
@@ -428,7 +472,7 @@ class BaseCrawler(CrawlerMixin):
                 emails=self.emails_container
             )
 
-            # Run custom user actions once 
+            # Run custom user actions once
             # everything is completed
             self.run_actions(current_url)
 
@@ -441,7 +485,7 @@ class SinglePageAutomater(CrawlerMixin):
     single or multiple user provided 
     pages as oppposed to crawing the
     whole website"""
-    
+
     start_urls = []
 
     @property

@@ -88,7 +88,7 @@ class TextMixin:
 
         normalized_text = str(text).lower().strip()
         if '\n' in normalized_text:
-            normalized_text = normalized_text.replace('\n', '')
+            normalized_text = normalized_text.replace('\n', ' ')
 
         text_without_null = ' '.join(drop_null(normalized_text.split(' ')))
         final_text = self._remove_punctuation(text_without_null)

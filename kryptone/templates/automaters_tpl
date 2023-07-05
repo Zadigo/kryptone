@@ -1,0 +1,14 @@
+"""
+An automater is a class that allows you to
+automate certain sets of actions an a specific
+page or multiple user selected pages.
+
+The difference between an automater and a spider
+is that the spider will crawl the whole website
+regardless of the page.
+"""
+
+from kryptone.app import SinglePageAutomater
+
+class MyAutomater(SinglePageAutomater):
+    start_urls = []

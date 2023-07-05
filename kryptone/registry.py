@@ -75,9 +75,9 @@ class SpiderConfig:
             )
         spider_instance = self.spider_class()
 
-        # TODO: Import the browser that we are 
+        # TODO: Import the browser that we are
         # going to use with Selenium
-        python_path = settings.WEBDRIVER
+        python_path = settings.WEBDRIVER['driver']
         module, klass = python_path.rsplit('.', maxsplit=1)
         selenium_module = import_module(module)
         browser = getattr(selenium_module, klass, None)
@@ -104,6 +104,7 @@ class MasterRegistry:
         self.project_name = None
         self.absolute_path = None
         self.middlewares = []
+        self.has_running_spiders = False
 
     @property
     def has_spiders(self):
@@ -115,12 +116,12 @@ class MasterRegistry:
 
     def has_spider(self, name):
         return name in self.spiders
-    
+
     def check_spiders_ready(self):
         if not self.has_spiders:
             raise ValueError(("Spiders are not yet loaded or "
                               "there are no registered ones."))
-    
+
     def pre_configure_project(self, dotted_path, settings):
         # If the user did not explicitly set the path
         # to a MEDIA_FOLDER, we will be doing it
@@ -157,7 +158,7 @@ class MasterRegistry:
 
         from kryptone.app import BaseCrawler, SinglePageAutomater
         from kryptone.conf import settings
-        
+
         self.absolute_path = Path(project_module.__path__[0])
         self.project_name = self.absolute_path.name
         setattr(settings, 'PROJECT_PATH', self.absolute_path)
@@ -173,15 +174,16 @@ class MasterRegistry:
                         "Failed to load the project's spiders submodule")
                 ]
             )
-        
+
         # Check that there are class objects that can be used
         # and are subclasses of the main Spider class object
         elements = inspect.getmembers(
             spiders_module,
             predicate=inspect.isclass
         )
-        
-        valid_spiders = filter(lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)), elements)
+
+        valid_spiders = filter(lambda x: issubclass(
+            x[1], (BaseCrawler, SinglePageAutomater)), elements)
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
         # try:
@@ -196,7 +198,7 @@ class MasterRegistry:
         #     for item in start_urls:
         #         if isinstance(item, URLFile):
         #             initial_start_urls.extend(list(item))
-                
+
         #         if isinstance(item, str):
         #             initial_start_urls.append(item)
 
@@ -231,7 +233,7 @@ class MasterRegistry:
         else:
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
-                
+
                 if not config.is_automater:
                     raise ValueError(f'{config} is not an automater')
 
@@ -244,28 +246,39 @@ class MasterRegistry:
 
     def run_all_spiders(self, **kwargs):
         if not self.has_spiders:
-            logger.info(("There are no registered spiders in your project. If you created spiders, "
-                           "register them within the SPIDERS variable of your "
-                           "settings.py file."), Warning, stacklevel=0)
+            message = ("There are no registered spiders in your project. If you created spiders, "
+                       "register them within the SPIDERS variable of your "
+                       "settings.py file.")
+            logger.info(message, Warning, stacklevel=0)
         else:
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
                 try:
+                    self.has_running_spiders = True
                     config.run(**kwargs)
-                except Exception:
-                    logger.critical((f"Could not start {config}. "
-                                              "Did you use the correct class name?"), stack_info=True)
-                    raise
+                except Exception as e:
+                    message = f"Could not start {config}. Did you use the correct class name?"
+                    raise ExceptionGroup(
+                        message,
+                        [
+                            Exception(e)
+                        ]
+                    )
 
     def get_spider(self, spider_name):
         self.check_spiders_ready()
         try:
             return self.spiders[spider_name]
         except KeyError:
-            logger.error((f"The spider with the name '{spider_name}' does not "
-                            f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
-                            f"If you forgot to register {spider_name}, check your settings file."), stack_info=True)
-            raise ValueError(spider_name)
+            message = (f"The spider with the name '{spider_name}' does not "
+                       f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
+                       f"If you forgot to register '{spider_name}', check your settings file.")
+            raise ExceptionGroup(
+                message,
+                [
+                    ValueError(spider_name)
+                ]
+            )
 
 
 registry = MasterRegistry()

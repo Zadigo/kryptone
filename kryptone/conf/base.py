@@ -31,6 +31,11 @@ MEDIA_FOLDER = 'media'
 # wait before moving to the next url
 WAIT_TIME = 25
 
+# Use this setting to indicate that the
+# waiting time should be a random value
+# within the provided array
+WAIT_TIME_RANGE = None
+
 
 # The name of the cache file
 # CACHE_FILE_NAME = 'cache.json'
@@ -92,3 +97,10 @@ EMAIL_HOST_PASSWORD = None
 EMAIL_USE_TLS = True
 
 DEFAULT_FROM_EMAIL = None
+
+
+# The default language used by the website.
+# This is useful when auditing the website by
+# determining the nature of the stop words to
+# block when gathering the text
+WEBSITE_LANGUAGE = 'fr'

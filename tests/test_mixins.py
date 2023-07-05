@@ -29,7 +29,6 @@ class TestTextMixin(unittest.TestCase):
             language='fr'
         )
         self.assertGreater(len(result), 0)
-        print(result)
 
     def test_rare_words(self):
         text = self.mixin.fit(self.text)
