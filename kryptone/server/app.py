@@ -1,9 +1,10 @@
 import threading
-
+import asyncio
 import quart
 from quart import jsonify, request
 
 from kryptone.conf import settings
+from kryptone.registry import registry
 from kryptone.server.connections import RedisConnection
 
 PUBLICATION_CHANNEL = 'kryptone_channel'
