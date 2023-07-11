@@ -1,7 +1,7 @@
+import json
 import os
 import random
 import string
-import json
 import time
 from multiprocessing import Process
 from urllib.parse import urlparse
