@@ -1,13 +1,10 @@
 import asyncio
 import json
-import threading
 
 import quart
-from quart_cors import cors, websocket_cors
-from quart import copy_current_websocket_context, jsonify, request, websocket
+from quart import copy_current_websocket_context, websocket
+from quart_cors import cors
 
-from kryptone.conf import settings
-from kryptone.registry import registry
 from kryptone.server.connections import RedisConnection
 
 PUBLICATION_CHANNEL = 'kryptone_channel'
@@ -27,15 +24,13 @@ redis = RedisConnection().get_connection
 
 
 async def manage(data, queue):
-    pass
+    print('m', data, queue)
 
 
 async def ping(queue):
     while True:
         await asyncio.sleep(5)
         await queue.put({"response": "ping"})
-
-# @app.route('/schedule')
 
 
 @app.websocket('/ws/scraper')
@@ -46,12 +41,14 @@ async def schedule_task():
     async def receive_data():
         while True:
             message = await websocket.receive()
+            print('b', message)
             await manage(json.loads(message), queue)
 
     @copy_current_websocket_context
     async def send_data():
         while True:
             data = await queue.get()
+            print('a', json.dumps(data))
             await websocket.send(json.dumps(data))
 
     producer = asyncio.ensure_future(send_data())
