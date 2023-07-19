@@ -23,27 +23,8 @@ app = cors(
 
 redis = RedisConnection().get_connection
 
-
-# async def handle_redis_message(message):
-#     pass
-
-
-# async def redis_listener():
-#     with app.app_context():
-#         channel = redis.pubsub()
-#         channel.subscribe(PUBLICATION_CHANNEL)
-
-#         for message in channel.listen():
-#             await handle_redis_message(message)
-
-
-# @app.before_first_request
-# async def start_redis_listener():
-#     thread = threading.Thread(target=redis_listener)
-#     thread.start()
-
-
 # https://www.metal3d.org/blog/2020/de-flask-%C3%A0-quart/
+
 
 async def manage(data, queue):
     pass
@@ -56,10 +37,11 @@ async def ping(queue):
 
 # @app.route('/schedule')
 
+
 @app.websocket('/ws/scraper')
 async def schedule_task():
     queue = asyncio.Queue()
-    
+
     @copy_current_websocket_context
     async def receive_data():
         while True:
@@ -82,8 +64,6 @@ async def schedule_task():
         producer.cancel()
         consumer.cancel()
         pinger.cancel()
-
-    return jsonify({})
 
 
 if __name__ == '__main__':
