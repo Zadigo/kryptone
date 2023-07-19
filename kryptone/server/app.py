@@ -1,10 +1,10 @@
 import asyncio
 import json
-
+import threading
 import quart
 from quart import copy_current_websocket_context, websocket
 from quart_cors import cors
-
+from kryptone.base import BaseCrawler, SinglePageAutomater
 from kryptone.server.connections import RedisConnection
 
 PUBLICATION_CHANNEL = 'kryptone_channel'
@@ -24,6 +24,17 @@ redis = RedisConnection().get_connection
 
 
 async def manage(data, queue):
+    # crawler = BaseCrawler()
+    # crawler.start_url = 'http://example.com'
+    # thread = threading.Thread(target=crawler.start, kwargs={})
+
+    # automater = SinglePageAutomater()
+    # automater.start_urls = 'http://example.com'
+    # thread = threading.Thread(target=automater.start)
+    # try:
+    #     thread.start()
+    # finally:
+    #     thread.join()
     print('m', data, queue)
 
 
