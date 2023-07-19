@@ -11,6 +11,8 @@ sklearn = "*"
 requests = "*"
 beautifulsoup4 = "*"
 airtable = "*"
+quart = "*"
+quart-cors = "*"
 
 [dev-packages]
 
