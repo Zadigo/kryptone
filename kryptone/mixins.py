@@ -125,6 +125,9 @@ class TextMixin:
             stemmer = SnowballStemmer('english')
 
         for document in self.page_documents:
+            if use_multipass:
+                result1 = self._remove_stop_words_multipass(document)
+            else:
             result1 = self._remove_stop_words(document)
 
             # 1. Remove special carachters
