@@ -1,7 +1,17 @@
 import csv
 import json
+from functools import lru_cache, wraps
+from io import FileIO
 
 from kryptone.conf import settings
+
+
+def tokenize(func):
+    @lru_cache(maxsize=100)
+    def reader(filename, *, as_list=False):
+        data = func(filename)
+        return data.split('\n') if as_list else data
+    return reader
 
 
 def get_media_folder(filename):
@@ -10,7 +20,9 @@ def get_media_folder(filename):
     return filename
 
 
+@tokenize
 def read_document(filename):
+    """Reads a document of some sort"""
     path = get_media_folder(filename)
     with open(path, mode='r', encoding='utf-8') as f:
         data = f.read()
@@ -57,5 +69,5 @@ def write_csv_document(filename, data):
 
         if not isinstance(data, list):
             data = [data]
-            
+
         writer.writerows(data)
