@@ -22,12 +22,17 @@ class TextMixin:
     fitted_page_documents = []
     tokenizer_class = NLTKWordTokenizer
 
-    @lru_cache(maxsize=10)
-    def _stop_words(self, language='en'):
+    @cached_property
+    def stop_words_english(self):
         global_path = settings.GLOBAL_KRYPTONE_PATH
+        filename = global_path / 'data/stop_words_english.txt'
+        return read_document(filename, as_list=True)
 
-        filename = 'english' if language == 'en' else 'french'
-        natural_language_path = global_path / f'data/stop_words_{filename}.txt'
+    @cached_property
+    def stop_words_french(self):
+        global_path = settings.GLOBAL_KRYPTONE_PATH
+        filename = global_path / 'data/stop_words_french.txt'
+        return read_document(filename, as_list=True)
 
         data = read_documents(
             natural_language_path,
