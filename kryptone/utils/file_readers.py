@@ -17,6 +17,21 @@ def read_document(filename):
     return data
 
 
+def read_documents(*filenames):
+    """Reads and combines multiple documents at once"""
+    items = []
+    for filename in filenames:
+        data = read_document(filename, as_list=True)
+        items.extend(data)
+    return items
+    # text = []
+    # for item in items:
+    #     data = item.read()
+    #     text.extend(data.decode().split('\r\n'))
+    #     item.close()
+    # return text
+
+
 def read_json_document(filename):
     path = get_media_folder(filename)
     with open(path, mode='r', encoding='utf-8') as f:
