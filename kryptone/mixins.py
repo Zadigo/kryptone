@@ -34,10 +34,13 @@ class TextMixin:
         filename = global_path / 'data/stop_words_french.txt'
         return read_document(filename, as_list=True)
 
-        data = read_documents(
-            natural_language_path,
-            global_path / 'data/html_tags.txt'
-        )
+    @cached_property
+    def stop_words_html(self):
+        global_path = settings.GLOBAL_KRYPTONE_PATH
+        filename = global_path / 'data/html_tags.txt'
+        return read_document(filename, as_list=True)
+
+    @lru_cache(maxsize=10)
         return list(drop_null(data))
 
         # regular_language_stop_words = read_document(path)
