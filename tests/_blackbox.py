@@ -1,6 +1,6 @@
 from selenium.webdriver.common.by import By
 
-from kryptone.app import BaseCrawler
+from kryptone.base import BaseCrawler
 from kryptone.utils.file_readers import write_json_document
 from kryptone.utils.text import parse_price
 

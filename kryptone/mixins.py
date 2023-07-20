@@ -122,16 +122,15 @@ class TextMixin:
             rare_words = self._rare_words(result2)
             common_words = self._common_words(result2)
             words_to_remove = rare_words + common_words
-            words_to_remove = list(map(lambda x: x[0], words_to_remove))
+            words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
+            tokenized_text = self._tokenize(result2)
             simplified_text = drop_while(
                 lambda x: x in words_to_remove,
-                self._tokenize(result2)
+                tokenized_text
             )
-            result3 = ' '.join(simplified_text)
 
             # 3. Use stemmer to get the stems
-            words = re.split('\s+', result3)
-            stemmed_words = [stemmer.stem(word=word) for word in words]
+            stemmed_words = [stemmer.stem(word=word) for word in simplified_text]
             result3 = ' '.join(stemmed_words)
 
             self.fitted_page_documents.append(result3)
@@ -236,13 +235,13 @@ class SEOMixin(TextMixin):
         matrix = vectorizer.fit_transform(self.fit_transform(text))
         return matrix, vectorizer
     
-    def global_audit(self, language='fr'):
+    def global_audit(self):
         """Returns a global audit of the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
         return self.normalize_integers(vectorizer.vocabulary_)
     
-    def audit_page(self, current_url, language='fr'):
+    def audit_page(self, current_url):
         """Audit the current page by analyzing different
         key metrics from the title, the description etc."""
         matrix, vectorizer = self.vectorize_page(self.get_page_text)
