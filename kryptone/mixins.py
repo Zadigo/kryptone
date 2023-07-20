@@ -2,7 +2,7 @@ import itertools
 import re
 import string
 from collections import Counter, defaultdict
-from functools import lru_cache
+from functools import lru_cache, cached_property
 
 from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
@@ -72,7 +72,8 @@ class TextMixin:
 
     @staticmethod
     def _tokenize(text):
-        return list(drop_null(text.split(' ')))
+        tokens = text.split(' ')
+        return list(drop_null(tokens))
 
     @staticmethod
     def simple_clean_text(text, encoding='utf-8'):
@@ -93,7 +94,7 @@ class TextMixin:
     def _remove_stop_words(self, text, language='en'):
         """Removes all stop words from a given document"""
         tokens = self._tokenize(text)
-        stop_words = self._stop_words(language=language)
+        stop_words = self.stop_words(language=language)
         result = drop_while(lambda x: x in stop_words, tokens)
         return ' '.join(result)
 
@@ -102,10 +103,8 @@ class TextMixin:
         against both french and english language"""
         tokens = self._tokenize(text)
 
-        english_stop_words = self._stop_words(language='en')
-        french_stop_words = self._stop_words(language='fr')
-
-        stop_words = english_stop_words + french_stop_words
+        stop_words = self.stop_words_english + \
+            self.stop_words_french + self.stop_words_html
         result = drop_while(lambda x: x in stop_words, tokens)
         return ' '.join(result)
 
@@ -182,36 +181,25 @@ class TextMixin:
             # 2. Remove rare and common words
             rare_words = self._rare_words(result2)
             common_words = self._common_words(result2)
+
             words_to_remove = rare_words + common_words
             words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
+            
             tokenized_text = self._tokenize(result2)
             simplified_text = drop_while(
                 lambda x: x in words_to_remove,
                 tokenized_text
             )
 
-            # Run custom text processors before
-            # stemming the words
-            # processed_tokens = []
-            # for processor in text_processors:
-            #     if not callable(processor):
-            #         continue
+            # 3. Run custom text processors
+            simplified_text = self._run_processors(
+                simplified_text, text_processors
+            )
 
-            #     for token in simplified_text:
-            #         result = processor(token)
-            #         # Processors should return a boolean.
-            #         # On fail, just return the token as is
-            #         if not isinstance(result, bool):
-            #             processed_tokens.append(token)
-
-            #         if result:
-            #             processed_tokens.append(token)
-            # simplified_text = processed_tokens
-
-            # 3. Use stemmer to get the stems
+            # 4. Use stemmer
             stemmed_words = [
                 stemmer.stem(word=word)
-                    for word in simplified_text
+                for word in simplified_text
             ]
             result3 = ' '.join(stemmed_words)
 
