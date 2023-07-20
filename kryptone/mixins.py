@@ -135,6 +135,8 @@ class TextMixin:
                     yield token
 
     def normalize_spaces(self, text):
+        return ' '.join(self._tokenize(text))
+
     def fit(self, text):
         """Normalize the document by removing newlines,
         useless spaces, punctuations and removing null
