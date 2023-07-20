@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
-from kryptone.app import BaseCrawler, SinglePageAutomater
+from kryptone.base import BaseCrawler, SinglePageAutomater
 from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null

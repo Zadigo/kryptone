@@ -10,8 +10,8 @@ selenium = "*"
 requests = "*"
 beautifulsoup4 = "*"
 airtable = "*"
+quart = "*"
 quart-cors = "*"
-scikit-learn = "*"
 
 [dev-packages]
 

@@ -156,7 +156,7 @@ class MasterRegistry:
                 f"Could not load the project's related module: '{dotted_path}'"
             )
 
-        from kryptone.app import BaseCrawler, SinglePageAutomater
+        from kryptone.base import BaseCrawler, SinglePageAutomater
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])

@@ -75,11 +75,19 @@ class Utility:
 
     def _parse_incoming_commands(self, args: list):
         if len(args) <= 1:
-            raise ValueError(('You called manage.py or python -m Krytone '
-                              'without specifying any commands to run.'))
+            message = (
+                'You called manage.py or python -m kryptone '
+                'without specifying a commands to run.'
+            )
+            raise ValueError(message)
         name = args[0]
         remaining_tokens = args[1:]
         return name, remaining_tokens
+    
+    def _find_similar_command(self, name):
+        command_names = self.commands_registry.keys()
+        commands = list(filter(lambda x: name in x, command_names))
+        return ' or '.join(commands)
 
     def call_command(self, name: list):
         """
@@ -89,7 +97,11 @@ class Utility:
         command_name = tokens.pop(0)
         command_instance = self.commands_registry.get(command_name, None)
         if command_instance is None:
-            raise ValueError(f'Command {command_name} does not exist.')
+            message = (
+                f"Command '{command_name}' does not exist. "
+                f"Did you mean {self._find_similar_command(command_name)}?"
+            )
+            raise ValueError(message)
 
         parser = command_instance.create_parser()
         namespace = parser.parse_args()

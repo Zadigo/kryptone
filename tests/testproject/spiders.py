@@ -1,6 +1,6 @@
 import time
 
-from kryptone.app import BaseCrawler
+from kryptone.base import BaseCrawler
 from kryptone.utils.file_readers import read_document
 from selenium.webdriver.common.by import By
 

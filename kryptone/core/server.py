@@ -58,6 +58,3 @@ def run_server(*args, **kwargs):
     kryptone_main_thread.start()
     while True:
         kryptone_main_thread.join()
-
-
-run_server()

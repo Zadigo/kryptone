@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import string
@@ -68,47 +69,163 @@ class ActionsMixin:
     # should scroll a given page
     default_scroll_step = 80
 
-    @property
-    def scrolled_to_bottom(self):
-        """Checks that we have scrolled to the bottom of the page"""
-        script = """
-        // The scroll element does not go that far down after
-        // a moment so adjust the scrollHeight number by reducing
-        // it by  a 100
-        return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)
-        """
-        return self.driver.execute_script(script)
+    # TODO:
+    # def scroll_page(self, wait_time=8):
+    #     can_scroll = True
 
-    def scroll_page(self, pixels=2000):
-        """Continuously scroll the current page
-        in order to load a set of products. This function
-        will scroll the window as long as the position
-        has not reached the bottom of the page"""
-        new_pixels = pixels
-        is_scrollable = True
-        while is_scrollable:
-            self.scroll_window(pixels=new_pixels)
-            is_scrollable = True if not self.scrolled_to_bottom else False
-            time.sleep(3)
-            # Increment the number of pixels to
-            # accomplish scrolling the whole page
-            new_pixels = new_pixels + pixels
+    #     scroll_script = """
+    #     const elementHeight = document.body.scrollHeight
+    #     let currentPosition = window.scrollY
 
-    def scroll_to(self, percentage=80):
-        """Scroll to a specific section of the page"""
-        percentage = percentage / 100
-        script = f"""
-        const height = document.body.scrollHeight
-        const pixels = Math.round(height * {percentage});
-        window.scrollTo(0, pixels);
-        """
+    #     // Indicates the scrolling speed
+    #     const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+    #     currentPosition += scrollStep
+    #     window.scroll(0, currentPosition)
+
+    #     return [ currentPosition, elementHeight ]
+    #     """
+    #     scroll_script = scroll_script.format(
+    #         scroll_step=self.default_scroll_step
+    #     )
+
+    #     max_tries = 10
+    #     bottom_of_page_tries = 0
+    #     scroll_height_tries = 0
+    #     previous_position = 0
+    #     previous_scroll_height = 0
+
+    #     while can_scroll:
+    #         current_position, scroll_height = self.driver.execute_script(scroll_script)
+
+    #         # If we have reached the bottom of the page, try to
+    #         # scroll for a maximum amount of tries before stopping
+    #         # in order to ensure all data was loaded
+    #         if previous_position > 0 and current_position >= scroll_height:
+    #             bottom_of_page_tries = bottom_of_page_tries + 1
+
+    #             if bottom_of_page_tries > max_tries:
+    #                 can_scroll = False
+
+    #         # FIXME: There are cases when the curent_position > scroll_height
+    #         # but there's still more content to be loaded which means that
+    #         # technically, the document height isn't always equal to the
+    #         # to the current position and my never reach it.
+    #         # Sleep in order to allow page to refresh correctly and evenually
+    #         # get more data to load
+    #         if previous_scroll_height > 0 and scroll_height == previous_scroll_height:
+    #             scroll_height_tries = scroll_height_tries + 1
+                
+    #             # If we were able to refresh the new document 
+    #             # height keep scrolling
+    #             if scroll_height != previous_scroll_height:
+    #                 scroll_height_tries = 0
+    #                 bottom_of_page_tries = 0
+    #                 time.sleep(2)
+
+    #             if scroll_height_tries > max_tries:
+    #                 can_scroll = False
+
+
+    #         # Trigger when the scroll position is equal
+    #         # to the total scrollable size of the page
+    #         if current_position == scroll_height:
+    #             can_scroll = False
+
+    #         previous_position = current_position
+    #         previous_scroll_height = scroll_height
+
+    #         # Sleep a couple of seconds because sometimes
+    #         # webpages will load content once we hit a given
+    #         # scroll position
+    #         time.sleep(wait_time)
+    #         print('scrolling', current_position, scroll_height,
+    #               'bottom_of_page_tries', bottom_of_page_tries, 'scroll_height_tries', scroll_height_tries)
+
+    def save_to_local_storage(self, name, data):
+        data = json.dumps(data)
+        script = f"""localStorage.setItem('{name}', {data})"""
         self.driver.execute_script(script)
 
-    def scroll_window(self, pixels=2000):
-        """Scroll the whole window"""
-        # script = "window.scrollTo(0, document.body.scrollHeight)"
-        script = f"window.scrollTo(0, {pixels})"
-        self.driver.execute_script(script)
+    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
+        can_scroll = True
+        new_scroll_pixels = 1000
+
+        # scroll_script = """
+        # async function runScroll() {
+        #     setTimeout(() => {
+        #         window.scroll(0, %(scroll_step)s)
+        #     }, %(wait_time)s)
+        # }
+
+        # runScroll()
+        # """
+
+        while can_scroll:
+            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
+
+            # new_scroll_script = scroll_script % {
+            #     'scroll_step': new_scroll_pixels,
+            #     'wait_time': wait_time * 1000
+            # }
+
+            self.driver.execute_script(scroll_script)
+            # Scrolls until we get a result that determines that we
+            # have actually scrolled to the bottom of the page
+            has_reached_bottom = self.driver.execute_script(
+                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
+            )
+            if has_reached_bottom:
+                can_scroll = False
+
+            current_position = self.driver.execute_script("""return window.scrollY""")
+            if stop_at is not None and current_position > stop_at:
+                can_scroll = False
+
+            new_scroll_pixels = new_scroll_pixels + increment
+            time.sleep(wait_time)
+
+    # @property
+    # def scrolled_to_bottom(self):
+    #     """Checks that we have scrolled to the bottom of the page"""
+    #     script = """
+    #     // The scroll element does not go that far down after
+    #     // a moment so adjust the scrollHeight number by reducing
+    #     // it by  a 100
+    #     return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)
+    #     """
+    #     return self.driver.execute_script(script)
+
+    # def scroll_page(self, pixels=2000):
+    #     """Continuously scroll the current page
+    #     in order to load a set of products. This function
+    #     will scroll the window as long as the position
+    #     has not reached the bottom of the page"""
+    #     new_pixels = pixels
+    #     is_scrollable = True
+    #     while is_scrollable:
+    #         self.scroll_window(pixels=new_pixels)
+    #         is_scrollable = True if not self.scrolled_to_bottom else False
+    #         time.sleep(3)
+    #         # Increment the number of pixels to
+    #         # accomplish scrolling the whole page
+    #         new_pixels = new_pixels + pixels
+
+    # def scroll_to(self, percentage=80):
+    #     """Scroll to a specific section of the page"""
+    #     percentage = percentage / 100
+    #     script = f"""
+    #     const height = document.body.scrollHeight
+    #     const pixels = Math.round(height * {percentage});
+    #     window.scrollTo(0, pixels);
+    #     """
+    #     self.driver.execute_script(script)
+
+    # def scroll_window(self, pixels=2000):
+    #     """Scroll the whole window"""
+    #     # script = "window.scrollTo(0, document.body.scrollHeight)"
+    #     script = f"window.scrollTo(0, {pixels})"
+    #     self.driver.execute_script(script)
 
     def click_consent_button(self, element_id=None, element_class=None):
         """Click the consent to cookies button which often
@@ -125,6 +242,7 @@ class ActionsMixin:
             logger.info('Consent button not found')
 
     def _test_scroll_page(self, xpath=None, css_selector=None):
+        """Scrolls a specific portion on the page"""
         if css_selector:
             selector = """const mainWrapper = document.querySelector('{condition}')"""
             selector = selector.format(condition=css_selector)
@@ -149,6 +267,14 @@ class ActionsMixin:
 
         script = css_selector + '\n' + body
         return script
+    
+    def evaluate_xpath(self, path):
+        return self.driver.execute_script(
+            f"""
+            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            return result.singleNodeValue
+            """
+        )
 
 
 class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
@@ -212,12 +338,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     def name(self):
         return 'crawler'
 
-    def create_dump(self):
-        """Dumps the collected results to a file.
-        This functions is called only when an exception
-        occurs during the crawling process
-        """
-
     def _backup_urls(self):
         """Backs up the urls both in the memory
         cache, and in the cache file"""
@@ -232,6 +352,23 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             self,
             urls_data=urls_data
         )
+
+    def post_visit_actions(self, **kwargs):
+        """Actions to run on the page just after
+        the crawler has visited a page e.g. clicking
+        on cookie button banner"""
+        pass
+
+    def run_actions(self, current_url, **kwargs):
+        """Additional custom actions to execute on the page
+        once all the default steps are completed"""
+        pass
+
+    def create_dump(self):
+        """Dumps the collected results to a file.
+        This functions is called only when an exception
+        occurs during the crawling process
+        """
 
 
 class BaseCrawler(CrawlerMixin):
@@ -332,17 +469,6 @@ class BaseCrawler(CrawlerMixin):
         self.urls_to_visit = set(self.run_filters())
 
         logger.info(f"Found {len(elements)} urls")
-
-    def post_visit_actions(self, **kwargs):
-        """Actions to run on the page just after
-        the crawler has visited a page e.g. clicking
-        on cookie button banner"""
-        pass
-
-    def run_actions(self, current_url, **kwargs):
-        """Additional custom actions to execute on the page
-        once all the default steps are completed"""
-        pass
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
@@ -543,4 +669,4 @@ class SinglePageAutomater(CrawlerMixin):
             )
 
             logger.info(f"Waiting {wait_time} seconds...")
-            time.sleep(wait_time)
+            time.sleep(wait_time or 15)

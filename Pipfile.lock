@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f40dd882d0591ef1a5d70e324e47a5c5df0253b1c5887bd52fe5a21a4c772ca2"
+            "sha256": "7225e11251ec338c14ff0bb5a1528f0f7c494bca138960c78e193322b3c25fe1"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -31,14 +31,6 @@
             ],
             "index": "pypi",
             "version": "==0.4.8"
-        },
-        "async-generator": {
-            "hashes": [
-                "sha256:01c7bf666359b4967d2cda0000cc2e4af16a0ae098cbffcb8472fb9e8ad6585b",
-                "sha256:6ebb3d106c12920aaae42ccb6f787ef5eefdcdd166ea3d628fa8476abe712144"
-            ],
-            "markers": "python_version >= '3.5'",
-            "version": "==1.10"
         },
         "async-timeout": {
             "hashes": [
@@ -458,7 +450,7 @@
                 "sha256:578a466bcd8c58b947b384ca3517c2a2f3bfeec8f58f4ff5038d4506ffee6be7",
                 "sha256:c1766f269cdb85daf9da67ba54170abf7839aca97304dcb4cd0778eabfb442c6"
             ],
-            "markers": "python_version >= '3.7'",
+            "index": "pypi",
             "version": "==0.18.4"
         },
         "quart-cors": {
@@ -670,14 +662,6 @@
             "markers": "python_version >= '3.7'",
             "version": "==2.4.1"
         },
-        "threadpoolctl": {
-            "hashes": [
-                "sha256:2b7818516e423bdaebb97c723f86a7c6b0a83d3f3b0970328d66f4d9104dc032",
-                "sha256:c96a0ba3bdddeaca37dc4cc7344aafad41cdb8c313f74fdfe387a867bba93355"
-            ],
-            "markers": "python_version >= '3.8'",
-            "version": "==3.2.0"
-        },
         "tqdm": {
             "hashes": [
                 "sha256:1871fb68a86b8fb3b59ca4cdd3dcccbc7e6d613eeed31f4c332531977b89beb5",
@@ -703,7 +687,6 @@
             "version": "==0.10.3"
         },
         "urllib3": {
-            "extras": [],
             "hashes": [
                 "sha256:48e7fafa40319d358848e1bc6809b208340fafe2096f1725d05d67443d0483d1",
                 "sha256:bee28b5e56addb8226c96f7f13ac28cb4c301dd5ea8a6ca179c0b9835e032825"
