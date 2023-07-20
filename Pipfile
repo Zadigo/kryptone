@@ -7,10 +7,11 @@ name = "pypi"
 redis = "*"
 nltk = "*"
 selenium = "*"
-sklearn = "*"
 requests = "*"
 beautifulsoup4 = "*"
 airtable = "*"
+quart-cors = "*"
+scikit-learn = "*"
 
 [dev-packages]
 
