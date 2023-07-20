@@ -75,10 +75,14 @@ class TextMixin:
         return list(drop_null(text.split(' ')))
 
     @staticmethod
-    def clean_text(text):
-        result = text.replace('\n', ' ')
-        result = str(result).encode('utf-8').decode('utf-8')
-        return result.strip()
+    def simple_clean_text(text, encoding='utf-8'):
+        """Applies simple cleaning techniques on the
+        text by removing newlines, lowering the characters
+        and removing extra spaces"""
+        lowered_text = str(text).lower().strip()
+        text = lowered_text.encode(encoding).decode(encoding)
+        normalized_text = text.replace('\n', ' ')
+        return normalized_text.strip()
 
     def _remove_punctuation(self, text):
         # We should not replace the "@" in the document since
