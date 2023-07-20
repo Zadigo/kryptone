@@ -139,18 +139,18 @@ class TextMixin:
 
     def fit(self, text):
         """Normalize the document by removing newlines,
-        useless spaces, punctuations and removing null
-        values"""
+        useless spaces, punctuations and null values. 
+        The fit method fits the text before running
+        in depth text transformation"""
         if text is None:
             return None
 
-        normalized_text = str(text).lower().strip()
-        if '\n' in normalized_text:
-            normalized_text = normalized_text.replace('\n', ' ')
-
-        text_without_null = ' '.join(drop_null(normalized_text.split(' ')))
-        final_text = self._remove_punctuation(text_without_null)
+        normalized_text = self.simple_clean_text(text)
+        final_text = self.normalize_spaces(
+            self._remove_punctuation(normalized_text)
+        )
         self.page_documents.append(final_text)
+
         return final_text
 
     def fit_transform(self, text=None, language='en', use_multipass=False, text_processors=[]):
