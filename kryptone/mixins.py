@@ -69,6 +69,18 @@ class TextMixin:
         result = drop_while(lambda x: x in stop_words, tokens)
         return ' '.join(result)
 
+    def _remove_stop_words_multipass(self, text):
+        """Remove stop words from a given document
+        against both french and english language"""
+        tokens = self._tokenize(text)
+
+        english_stop_words = self._stop_words(language='en')
+        french_stop_words = self._stop_words(language='fr')
+
+        stop_words = english_stop_words + french_stop_words
+        result = drop_while(lambda x: x in stop_words, tokens)
+        return ' '.join(result)
+
     def _common_words(self, text):
         tokens = self._tokenize(text)
         counter = Counter(tokens)
