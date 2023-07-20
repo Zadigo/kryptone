@@ -41,6 +41,9 @@ class TextMixin:
         return read_document(filename, as_list=True)
 
     @lru_cache(maxsize=10)
+    def stop_words(self, language='en'):
+        natural_language_stop_words = self.stop_words_english if language == 'en' else self.stop_words_french
+        data = natural_language_stop_words + self.stop_words_html
         return list(drop_null(data))
 
         # regular_language_stop_words = read_document(path)
