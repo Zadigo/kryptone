@@ -8,7 +8,7 @@ from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
-from kryptone.utils.file_readers import read_document
+from kryptone.utils.file_readers import read_document, read_documents
 from kryptone.utils.iterators import drop_null, drop_while
 
 EMAIL_REGEX = r'\S+\@\S+'
@@ -22,18 +22,31 @@ class TextMixin:
     fitted_page_documents = []
     tokenizer_class = NLTKWordTokenizer
 
-    @lru_cache(maxsize=5)
+    @lru_cache(maxsize=10)
     def _stop_words(self, language='en'):
-        if language == 'en':
-            path = settings.GLOBAL_KRYPTONE_PATH / 'data/stop_words_english.txt'
-        else:
-            path = settings.GLOBAL_KRYPTONE_PATH / 'data/stop_words_french.txt'
-        data = read_document(path)
+        global_path = settings.GLOBAL_KRYPTONE_PATH
 
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        tokenizer = TfidfVectorizer().build_tokenizer()
-        tokenized_stop_words = [tokenizer(word) for word in data.split('\n')]
-        return list(itertools.chain(*tokenized_stop_words))
+        filename = 'english' if language == 'en' else 'french'
+        natural_language_path = global_path / f'data/stop_words_{filename}.txt'
+
+        data = read_documents(
+            natural_language_path,
+            global_path / 'data/html_tags.txt'
+        )
+        return list(drop_null(data))
+
+        # regular_language_stop_words = read_document(path)
+        # html_names_stop_words = read_document(
+        #     global_path / 'data/html_tags.txt'
+        # )
+        # data = regular_language_stop_words.split('\n')
+        # data.extend(html_names_stop_words.split('\n'))
+        # return list(drop_null(data))
+
+        # from sklearn.feature_extraction.text import TfidfVectorizer
+        # tokenizer = TfidfVectorizer().build_tokenizer()
+        # tokenized_stop_words = [tokenizer(word) for word in data]
+        # return list(itertools.chain(*tokenized_stop_words))
 
     @staticmethod
     def get_text_length(text):
@@ -49,7 +62,7 @@ class TextMixin:
     @staticmethod
     def _tokenize(text):
         return list(drop_null(text.split(' ')))
-    
+
     @staticmethod
     def clean_text(text):
         result = text.replace('\n', ' ')
@@ -107,7 +120,7 @@ class TextMixin:
         self.page_documents.append(final_text)
         return final_text
 
-    def fit_transform(self, text=None, language='en'):
+    def fit_transform(self, text=None, language='en', use_multipass=False, text_processors=[]):
         """Fit a document and then transform it into
         a usable element for text analysis"""
         text = self.fit(text)
@@ -128,7 +141,7 @@ class TextMixin:
             if use_multipass:
                 result1 = self._remove_stop_words_multipass(document)
             else:
-            result1 = self._remove_stop_words(document)
+                result1 = self._remove_stop_words(document)
 
             # 1. Remove special carachters
             result2 = re.sub('\W', ' ', result1)
@@ -144,8 +157,29 @@ class TextMixin:
                 tokenized_text
             )
 
+            # Run custom text processors before
+            # stemming the words
+            # processed_tokens = []
+            # for processor in text_processors:
+            #     if not callable(processor):
+            #         continue
+
+            #     for token in simplified_text:
+            #         result = processor(token)
+            #         # Processors should return a boolean.
+            #         # On fail, just return the token as is
+            #         if not isinstance(result, bool):
+            #             processed_tokens.append(token)
+
+            #         if result:
+            #             processed_tokens.append(token)
+            # simplified_text = processed_tokens
+
             # 3. Use stemmer to get the stems
-            stemmed_words = [stemmer.stem(word=word) for word in simplified_text]
+            stemmed_words = [
+                stemmer.stem(word=word)
+                    for word in simplified_text
+            ]
             result3 = ' '.join(stemmed_words)
 
             self.fitted_page_documents.append(result3)
@@ -243,19 +277,19 @@ class SEOMixin(TextMixin):
         vectorizer = CountVectorizer()
         matrix = vectorizer.fit_transform(self.fitted_page_documents)
         return matrix, vectorizer
-    
+
     def vectorize_page(self, text):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
         matrix = vectorizer.fit_transform(self.fit_transform(text))
         return matrix, vectorizer
-    
+
     def global_audit(self):
         """Returns a global audit of the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
         return self.normalize_integers(vectorizer.vocabulary_)
-    
+
     def audit_page(self, current_url):
         """Audit the current page by analyzing different
         key metrics from the title, the description etc."""
@@ -327,7 +361,8 @@ class EmailMixin(TextMixin):
     def find_emails_from_text(self, text):
         """Return emails embedded in plain text"""
         fitted_text = self.fit(text)
-        emails_from_text = map(self.identify_email, self._tokenize(fitted_text))
+        emails_from_text = map(self.identify_email,
+                               self._tokenize(fitted_text))
         return set(emails_from_text)
 
     def find_emails_from_links(self, elements):
