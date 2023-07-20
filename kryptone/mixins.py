@@ -119,6 +119,22 @@ class TextMixin:
         counter = Counter(tokens)
         return counter.most_common()[:-5:-1]
 
+    def _run_processors(self, tokens, processors):
+        for processor in processors:
+            if not callable(processor):
+                continue
+
+            for token in tokens:
+                result = processor(token)
+                # Processors should return a boolean.
+                # On fail, just return the token as is
+                if not isinstance(result, bool):
+                    yield token
+
+                if result:
+                    yield token
+
+    def normalize_spaces(self, text):
     def fit(self, text):
         """Normalize the document by removing newlines,
         useless spaces, punctuations and removing null
