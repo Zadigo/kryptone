@@ -267,6 +267,14 @@ class ActionsMixin:
 
         script = css_selector + '\n' + body
         return script
+    
+    def evaluate_xpath(self, path):
+        return self.driver.execute_script(
+            f"""
+            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            return result.singleNodeValue
+            """
+        )
 
 
 class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
@@ -361,7 +369,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         This functions is called only when an exception
         occurs during the crawling process
         """
-
 
 
 class BaseCrawler(CrawlerMixin):
