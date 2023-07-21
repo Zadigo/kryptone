@@ -71,3 +71,36 @@ def write_csv_document(filename, data):
             data = [data]
 
         writer.writerows(data)
+
+
+class URLCache:
+    def __init__(self):
+        self.data = {}
+        self._urls_to_visit = []
+        self._visited_urls = []
+
+    def __repr__(self) -> str:
+        statistics = f'urls_to_visit={len(self._urls_to_visit)} '
+        f'_visited_urls={len(self._visited_urls)}'
+        return f'<URLCache: {statistics}>'
+
+    @property
+    def urls_to_visit(self):
+        return set(self._urls_to_visit)
+
+    @property
+    def visited_urls(self):
+        return set(self._visited_urls)
+
+    def load_from_file(self):
+        data = read_json_document('cache.json')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        self.data = data
+
+    def load_from_dict(self, data):
+        if not isinstance(data, dict):
+            raise ValueError('Data should be a dictionnary')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        self.data = data

@@ -387,10 +387,10 @@ class BaseCrawler(CrawlerMixin):
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
         and visited urls, resume the previous
-        scraping session"""
-        # Redis is our primary database. If
-        # we cannot get anything, resort to
-        # the basic file cache
+        scraping session. We check Redis as the
+        primary database if there is connection,
+        then PyMemcache and finally the file cache
+        as a finale resort"""
         redis = redis_connection()
         if redis:
             data = redis.get('cache')
