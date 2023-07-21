@@ -248,6 +248,10 @@ def custom_receiver(url):
     pass
 ```
 
+## Monitoring
+
+Your spiders can be monitered in through multiple ways. The custom monitoring method used by Kryptone is emailing. If an emailing system is present in your project, Kryptone will use this for any detected failure. Exceptions are bubbled up so you can have a precise idea of what exactly went wrong in your project.
+
 ## Settings
 
 You can specify a wait time for which the web scrapper is supposed to wait until going to the next page.
