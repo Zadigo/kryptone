@@ -16,9 +16,29 @@ If you want to automate certain steps on a single page or a group or different p
 
 ## How to use
 
+### Starting a project
+
+The easiest way to use Kryptone is by starting a project through `python -m krytpone start_project`. You can read the hiearchy of a project below.
+
+```bash
+├── project
+│   ├── media
+│   │   ├── /**/*.json
+│   │   ├── /**/*.jpeg
+│   ├── cache.json
+│   ├── kryptone.log
+│   ├── automaters.py
+│   ├── manage.py
+│   ├── models.py
+│   ├── settings.py
+│   └── spiders.py
+```
+
+Projects are self contained in order to efficiently separate each crawling methods. Though a project can contain multiple spiders, it is advised to regroup your spiders by theme in order to organize the massive amount of data that could be collected through one or multiple runs.
+
 ### Crawling a website
 
-First you need to define an entrypoint from which the spider will start gathering urls. One the urls added to urls to visit, the spider will move to the next page after the wait time completed.
+You need to define an entrypoint from which the spider will start gathering urls. Once the urls added to urls to visit, the spider will move to the next page after the wait time completed.
 
 ```python
 from kryptone.base import BaseCrawler
@@ -47,7 +67,7 @@ class MyWebscrapper(BaseCrawler):
         self.click_consent_button(element_id='button')
 ```
 
-### User actions
+#### User actions
 
 These actions are executed once all urls are gathered on the page and before the robot is ready to move to a different page.
 
@@ -131,6 +151,32 @@ Most times, the most interesting method to crawl the important pages of a websit
 #### Starting from a website's HTML sitemap
 
 Some websites will have user friendly sitemap to facilitate navigation. This can also be used as an entrypoint.
+
+## Project commands
+
+This is the list of available project commands for Krytpone.
+
+### Automate
+
+Launches the automaters registered in `AUTOMATERS` in the settings file.
+
+### Create task
+
+### Healthcheck
+
+### Run server
+
+### Start project
+
+Creates a new project in the local directory from which the command was called.
+
+### Start
+
+Launches the spiders registered in `SPIDERS` in the settings file.
+
+### Test project
+
+Tests that a given project can be launched. This is an integrity check.
 
 ## Models
 
