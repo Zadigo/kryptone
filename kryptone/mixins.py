@@ -4,7 +4,7 @@ import string
 from collections import Counter, defaultdict
 from functools import lru_cache, cached_property
 
-from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
+# from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
@@ -20,7 +20,9 @@ class TextMixin:
 
     page_documents = []
     fitted_page_documents = []
-    tokenizer_class = NLTKWordTokenizer
+    # TODO: load these modules inside of the class
+    # because they are extremely slow on start up
+    # tokenizer_class = NLTKWordTokenizer
 
     @cached_property
     def stop_words_english(self):
@@ -184,7 +186,7 @@ class TextMixin:
 
             words_to_remove = rare_words + common_words
             words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
-            
+
             tokenized_text = self._tokenize(result2)
             simplified_text = drop_while(
                 lambda x: x in words_to_remove,

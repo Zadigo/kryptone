@@ -16,8 +16,6 @@ class Logger:
         handler = logging.StreamHandler()
         logger.addHandler(handler)
 
-        
-
         log_format = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s: %(message)s',
             datefmt='%Y-%m-%d %H:%M'
