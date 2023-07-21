@@ -1,6 +1,7 @@
 FROM ubuntu:latest
 
-# Update the package lists in the container
+# Update the package lists 
+# in the container
 RUN apt-get update
 
 # Install Python and pip

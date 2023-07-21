@@ -287,7 +287,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
 class BaseCrawler(CrawlerMixin):
     start_url = None
-    url_validators = []
     url_filters = []
 
     def get_filename(self, length=5, extension=None):

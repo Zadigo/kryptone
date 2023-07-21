@@ -1,5 +1,6 @@
 import pathlib
 
+
 # Absolute path to the Kryptone project
 GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 
@@ -9,21 +10,22 @@ PROJECT_PATH = None
 
 
 # Register spiders to crawl
-# the internet
+# pages on a website
 SPIDERS = []
 
 
 # Register spiders to automate
-# actions on different websites
+# actions on a set of pages
 AUTOMATERS = []
 
 
-# The browser to use
+# Indicates the Selenium
+# browser to use
 WEBDRIVER = 'Chrome'
 
 
-# The folder in which to save
-# media files
+# Indicates the name of the media folder
+# which will also be used as a path
 MEDIA_FOLDER = 'media'
 
 
@@ -31,29 +33,25 @@ MEDIA_FOLDER = 'media'
 # wait before moving to the next url
 WAIT_TIME = 25
 
-# Use this setting to indicate that the
-# waiting time should be a random value
-# within the provided array
+
+# Indicates the range the driver should
+# use as the waiting time before moving
+# to the next url
 WAIT_TIME_RANGE = None
 
 
-# The name of the cache file
-# CACHE_FILE_NAME = 'cache.json'
+# The name of the file used to cache
+# the urls to visit and the visited urls
+CACHE_FILE_NAME = 'cache'
 
 
-# CACHE = {
-#     'default': 'kryptone.cache.Cache',
-#     'location': None
-# }
-
-
-# Additional storage backends to use
+# Register additional storage backends to
+# use for the project
 ACTIVE_STORAGE_BACKENDS = []
 
 
 # External storage backends to use to save the
-# data gathered by the spiders. The default storage
-# method is a JSON file
+# data gathered by the spiders
 STORAGE_BACKENDS = {
     'airtable': {
         'type': 'online',
@@ -85,8 +83,6 @@ STORAGE_BACKENDS = {
 # for alerting users for failed events
 # or sending captured data
 EMAIL_HOST = 'smtp.gmail'
-
-EMAIL_HOST = None
 
 EMAIL_PORT = 587
 
