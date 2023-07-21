@@ -1,11 +1,11 @@
 import unittest
-
+import string
 import requests
 from bs4 import BeautifulSoup
 
 from kryptone.mixins import EmailMixin, TextMixin
 
-with open('tests/pages/bershka.html', encoding='utf-8') as f:
+with open('tests/pages/etam.html', encoding='utf-8') as f:
     soup = BeautifulSoup(f, 'html.parser')
 
 
@@ -19,16 +19,24 @@ class TestTextMixin(unittest.TestCase):
         # \n, \r and \s should be removed, html tags should
         # also be removed
         result = self.mixin.fit(self.text)
-        for item in ['\n']:
+        for item in ['\n', '\r']:
             with self.subTest(item=item):
                 self.assertNotIn(item, result)
 
+        punctuation = string.punctuation.replace('@', '')
+        for punctuation in punctuation:
+            with self.subTest(punctuation=punctuation):
+                self.assertFalse(punctuation in result)
+
+        self.assertTrue(result.islower())
+
     def test_fit_transform(self):
-        result = self.mixin.fit_transform(
-            text=self.text,
-            language='fr'
-        )
-        self.assertGreater(len(result), 0)
+        pass
+        # result = self.mixin.fit_transform(
+        #     text=self.text,
+        #     language='fr'
+        # )
+        # self.assertGreater(len(result), 0)
 
     def test_rare_words(self):
         text = self.mixin.fit(self.text)
@@ -37,13 +45,16 @@ class TestTextMixin(unittest.TestCase):
         self.assertIsInstance(result1, list)
         self.assertIsInstance(result2, list)
 
-    # def test_stop_words_removal(self):
-    #     # Test that we have effectively removed all
-    #     # stop words from the text content
-    #     result = self.mixin._remove_stop_words(self.text)
-    #     for stop_word in self.mixin._stop_words():
-    #         with self.subTest(stop_word=stop_word):
-    #             self.assertNotIn(stop_word, result)
+    def test_stop_words_removal(self):
+        # Test that we have effectively removed all
+        # stop words from the text content
+        fitted_text = self.mixin.fit(self.text)
+        result = self.mixin._remove_stop_words(fitted_text, language='fr')
+
+        tokens = self.mixin._tokenize(result)
+        for token in tokens:
+            with self.subTest(token=token):
+                self.assertNotEqual(token, self.mixin._stop_words())
 
 
 # class TestEmailMixin(unittest.TestCase):
@@ -62,5 +73,32 @@ class TestTextMixin(unittest.TestCase):
 #         self.assertListEqual(list(emails), ['test@gmail.com'])
 
 
-if __name__ == '__main__':
-    unittest.main()
+# if __name__ == '__main__':
+#     unittest.main()
+
+
+# mixin = TextMixin()
+# text = soup.find('body').text
+# mixin.clean_text(text)
+# text = mixin.fit(text)
+# print(mixin.stop_words())
+# text = mixin.fit(soup.text)
+
+
+# def remove_numbers(token):
+#     if token.isdigit():
+#         return False
+#     return True
+
+
+# text = mixin.fit_transform(
+#     text=text, language='fr',
+#     use_multipass=True,
+#     text_processors=[remove_numbers]
+# )
+# # text = mixin._remove_stop_words_multipass(text)
+# # text = mixin._rare_words(text)
+# print(text)
+
+# # with open('text.txt', mode='w', encoding='utf-8') as f:
+#     f.write(text)

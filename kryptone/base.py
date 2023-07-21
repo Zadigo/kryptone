@@ -106,8 +106,8 @@ class ActionsMixin:
     #         # get more data to load
     #         if previous_scroll_height > 0 and scroll_height == previous_scroll_height:
     #             scroll_height_tries = scroll_height_tries + 1
-                
-    #             # If we were able to refresh the new document 
+
+    #             # If we were able to refresh the new document
     #             # height keep scrolling
     #             if scroll_height != previous_scroll_height:
     #                 scroll_height_tries = 0
@@ -116,7 +116,6 @@ class ActionsMixin:
 
     #             if scroll_height_tries > max_tries:
     #                 can_scroll = False
-
 
     #         # Trigger when the scroll position is equal
     #         # to the total scrollable size of the page
@@ -169,7 +168,8 @@ class ActionsMixin:
             if has_reached_bottom:
                 can_scroll = False
 
-            current_position = self.driver.execute_script("""return window.scrollY""")
+            current_position = self.driver.execute_script(
+                """return window.scrollY""")
             if stop_at is not None and current_position > stop_at:
                 can_scroll = False
 
@@ -258,7 +258,7 @@ class ActionsMixin:
 
         script = css_selector + '\n' + body
         return script
-    
+
     def evaluate_xpath(self, path):
         return self.driver.execute_script(
             f"""
@@ -554,7 +554,7 @@ class BaseCrawler(CrawlerMixin):
                 cache.set_value('page_audit', self.page_audits)
                 cache.set_value('global_audit', vocabulary)
                 db_signal.send(
-                    self, 
+                    self,
                     page_audit=self.page_audits,
                     global_audit=vocabulary
                 )
