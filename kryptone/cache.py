@@ -34,3 +34,18 @@ class Cache:
 
     def reset_key(self, key):
         self.container[key] = []
+
+    def extend_list(self, key, values):
+        # TEST: This has to be tested
+        items = self.container[key]
+        items.extend(values)
+
+    def set_value_and_backup(self, key, value, extend=False, filename=None):
+        # TEST: This has to be tested
+        from kryptone.utils.file_readers import write_json_document
+        container = self.container[key]
+        if extend:
+            container.extend(value)
+        else:
+            container.append(value)
+        write_json_document(filename, container) 

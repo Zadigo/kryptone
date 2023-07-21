@@ -38,11 +38,11 @@ class GoogleBusiness:
             'number_of_reviews': self.number_of_reviews,
             'comments': self.comments
         }
-    
+
     def as_csv(self):
         rows = []
         for comment in self.comments:
-            row = [self.name, self.url, self.address, self.rating, 
+            row = [self.name, self.url, self.address, self.rating,
                    self.number_of_reviews, comment['period'], comment['text']]
             rows.append(row)
         return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
@@ -59,7 +59,7 @@ class GoogleMapsMixin:
     @staticmethod
     def transform_to_json(items):
         return list(map(lambda x: x.as_json, items))
-    
+
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
             data = json.load(f)
@@ -77,7 +77,7 @@ class GoogleMapsMixin:
                         comment['text']
                     ]
                     business_comments.append(container)
-            
+
             with open('ange.csv', mode='w', encoding='utf-8', newline='\n') as f:
                 writer = csv.writer(f)
                 for row in business_comments:
@@ -90,7 +90,8 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
     final_result = []
 
     def create_dump(self):
-        write_json_document('dump.json', self.transform_to_json(self.final_result))
+        write_json_document(
+            'dump.json', self.transform_to_json(self.final_result))
 
     def post_visit_actions(self, **kwargs):
         try:
@@ -163,7 +164,7 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
         # and can result in errors. Try-Except these.
         # items = feed.find_elements(By.CSS_SELECTOR, 'div:not([class])')
         items = feed.find_elements(By.CSS_SELECTOR, 'div[role="article"]')
-        
+
         # Intermediate save - Saves the first initital results
         # that were found in he feed
         rows = []
@@ -196,7 +197,8 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 link = business.find_element(By.TAG_NAME, 'a')
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
-                rating = business.find_element(By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
+                rating = business.find_element(
+                    By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
             except:
                 continue
             else:
@@ -228,7 +230,8 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 # aria-label="la mie CÂLINE - Atelier "Pains & Restauration"" which
                 # breaks the script. We'll just keep going if we cannot get
                 # no business information
-                information = self.driver.execute_script(business_information_script)
+                information = self.driver.execute_script(
+                    business_information_script)
             except Exception as e:
                 counter = counter + 1
                 logger.critical(f'Could not parse business information: {url}')
@@ -366,10 +369,10 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 for comment in comments:
                     if not isinstance(comment, dict):
                         continue
-                    
+
                     clean_dict = {}
                     for key, value in comment.items():
-                        clean_text = self.clean_text(value) 
+                        clean_text = self.clean_text(value)
                         clean_dict[key] = clean_text
                     clean_comments.append(clean_dict)
                 logger.info(f'Found {len(clean_comments)} reviews')
@@ -378,7 +381,7 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                 # Remove useless data from the array
                 # of values that we have received
                 exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
-                            'vendredi', 'samedi', 'dimanche']
+                           'vendredi', 'samedi', 'dimanche']
                 result1 = []
                 for text in items:
                     if text in exclude:
@@ -407,7 +410,6 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
                     result2.append(text)
                 return result2
 
-
             business_information.name = name
             business_information.url = url
             business_information.address = clean_information_list(
@@ -435,9 +437,11 @@ class GoogleMapsPlace(GoogleMaps):
         business_information = GoogleBusiness()
 
         try:
-            name = self.driver.find_element(By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
+            name = self.driver.find_element(
+                By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
             url = self.driver.current_url
-            rating_section = self.driver.find_element(By.CSS_SELECTOR, '.F7nice')
+            rating_section = self.driver.find_element(
+                By.CSS_SELECTOR, '.F7nice')
             rating, number_of_reviews = rating_section.text.split('\n')
         except:
             name = None
@@ -625,7 +629,7 @@ class GoogleMapsPlace(GoogleMaps):
             # Remove useless data from the array
             # of values that we have received
             exclude = ['lundi', 'mardi', 'mercredi', 'jeudi',
-                        'vendredi', 'samedi', 'dimanche']
+                       'vendredi', 'samedi', 'dimanche']
             result1 = []
             for text in items:
                 if text in exclude:
@@ -670,26 +674,3 @@ class GoogleMapsPlace(GoogleMaps):
         data = list(map(lambda x: x.as_json, self.final_result))
         write_json_document('ssr.json', data)
         # completion_time = (time.time() - current_time) / 60
-
-
-# if __name__ == '__main__':
-#     # try:
-#     #     instance = GoogleMapsPlace()
-#     #     # instance = GoogleMaps()
-#     #     urls = [
-#     #         'https://www.google.fr/maps/place/Bricomarch%C3%A9/@45.0623843,5.0824153,13z/data=!4m10!1m2!2m1!1sbricomarch%C3%A9!3m6!1s0x478ab2c99e97aba7:0xf9a321930a23c394!8m2!3d45.05827!4d5.107725!15sCgxicmljb21hcmNow6kiA4gBAZIBFGRvX2l0X3lvdXJzZWxmX3N0b3Jl4AEA!16s%2Fg%2F1w8w8xmm?entry=ttu'
-#     #     ]
-#     #     instance.start(start_urls=urls, wait_time=1)
-#     # except KeyboardInterrupt:
-#     #     data = list(map(lambda x: x.as_json, instance.final_result))
-#     #     write_json_document('dump.json', data)
-#     #     logger.critical(f"Dumping data to 'dump.json'")
-#     # except Exception:
-#     #     data = list(map(lambda x: x.as_json, instance.final_result))
-#     #     write_json_document('dump.json', data)
-#     #     logger.critical(f"Dumping data to 'dump.json'")
-#     #     raise
-
-#     instance = GoogleMapsPlace()
-#     url_file = URLFile(processor=generate_search_url)
-#     instance.start(start_urls=list(url_file))

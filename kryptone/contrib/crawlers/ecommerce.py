@@ -1,10 +1,14 @@
 import time
 
-from kryptone.base import SinglePageAutomater
 
+class EcommerceCrawlerMixin:
+    """Adds specific functionnalities dedicated
+    to crawling ecommerce websites"""
 
-class EcommerceMixin:
     scroll_step = 30
+    products = []
+    product_objects = []
+
     def scroll_page(self):
         can_scroll = True
         previous_scroll_position = None
@@ -25,20 +29,3 @@ class EcommerceMixin:
                 can_scroll = False
             previous_scroll_position = scroll_position
             time.sleep(2)
-
-
-class Etam(EcommerceMixin, SinglePageAutomater):
-    start_url = 'https://int.etam.com/en_CA/knickers/all-bottoms'
-
-    def run_actions(self, current_url, **kwargs):
-        self.scroll_page()
-
-
-if __name__ == '__main__':
-    try:
-        instance = Etam()
-        instance.start(wait_time=1)
-    except KeyboardInterrupt:
-        pass
-    except Exception:
-        pass

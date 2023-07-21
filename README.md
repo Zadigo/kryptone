@@ -136,9 +136,71 @@ Some websites will have user friendly sitemap to facilitate navigation. This can
 
 Storing data is the second most important step when crawling a website. Kryptone comes with a set of pre-built models which are based on the default `dataclass` python library.
 
+## Caching
+
+Kryptone uses two type of caching mechanisms by default:
+
+* File
+* Redis
+
+### File
+
+This means that everytime the list of urls are updated, the `cache.json` file is also updated. Caching allows to resume crawling if necessary when/if an exception occurs during runs.
+
+### Redis
+
+If a connection exists, temporary elements are stored in the Redis database backend. The backend is not exposed to the internet and should not be exposed if sensitive data will be persisted.
+
 ## Signals
 
-Krytpone uses signals at certain given steps which can be also used to run additional actions.
+Krytpone uses signals at certain given steps in order to run additional actions.
+
+### Navigation
+
+Signal used to indicate that a navigation has occured.
+
+### Collect images
+
+Everytime a page is visited, the images are collected. This is a default action that can stopped in the settings file e.g `COLLECT_IMAGES`.
+
+### Custom signals
+
+You can create custom signals in two different manners. The first manner requires that you have functions or callable classes that can be used a receivers. They need to be connected to your custom signal.
+
+```python
+from kryptone.signals import Signal
+
+my_signal = Signal()
+
+
+def some_receiver(url):
+    pass
+
+
+class MyScrapper(BaseCrawler):
+    start_url = 'http://example.com'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        my_signal.connect(my_signal, sender=self)
+```
+
+The second method below will connect your custom signal to a custom receiver and every time the signal is called, the receivers in the `my_signal` pool will be triggered.
+
+```python
+from kryptone.signals import Signal
+
+my_signal = Signal()
+
+
+class MyScrapper(BaseCrawler):
+    start_url = 'http://example.com'
+
+
+@function_to_receiver(my_signal)
+def custom_receiver(url):
+    pass
+```
 
 ## Settings
 
