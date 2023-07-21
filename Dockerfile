@@ -15,10 +15,10 @@ RUN pip install -r requirements.txt
 # Add the directory to the PYTHONPATH
 ENV PYTHONPATH="${PYTHONPATH}:/home/app"
 
-COPY .. .
+COPY . .
 
 EXPOSE 5589
 
-CMD [ "my_script" ]
+CMD [ "kryptone", "runserver" ]
 
 ENTRYPOINT [ "python3", "-m" ]

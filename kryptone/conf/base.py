@@ -19,7 +19,7 @@ AUTOMATERS = []
 
 
 # The browser to use
-WEBDRIVER = 'selenium.webdriver.Chrome'
+WEBDRIVER = 'Chrome'
 
 
 # The folder in which to save

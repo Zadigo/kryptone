@@ -1,3 +1,4 @@
+from selenium.webdriver.chrome.service import Service
 import json
 import os
 import random
@@ -27,6 +28,8 @@ from kryptone.utils.file_readers import (read_json_document,
 from kryptone.utils.module_loaders import import_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 
 # post_init = Signal()
 navigation = Signal()
@@ -34,34 +37,22 @@ db_signal = Signal()
 
 cache = Cache()
 
-
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
 
-def get_selenium_browser_instance(executable_path=None):
+def get_selenium_browser_instance(browser_name=None):
     """Creates a new selenium browser instance"""
-    python_path = settings.WEBDRIVER
-    module, browser_name = python_path.rsplit('.', maxsplit=1)
-    klass = Chrome if browser_name == 'Chrome' else Edge
-    # module = import_module(module)
-    # klass = getattr(module, browser_name, None)
-    # if klass is None:
-    #     raise ValueError(f'Could not load browser from module: {python_path}')
-    executable_path = executable_path or os.environ.get(
-        WEBDRIVER_ENVIRONMENT_PATH,
-        None
-    )
+    browser_name = browser_name or settings.WEBDRIVER
+    browser = Chrome if browser_name == 'Chrome' else Edge
+    manager_instance = ChromeDriverManager if browser_name == 'Chrome' else EdgeChromiumDriverManager
 
-    if executable_path is None:
-        logger.error('Could not find web driver')
-        return None
-    else:
-        options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
-        options = options_klass()
-        options.add_argument('--remote-allow-origins=*')
-        options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
-        instance = klass(executable_path=executable_path, options=options)
-        return instance
+    options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
+    options = options_klass()
+    options.add_argument('--remote-allow-origins=*')
+    options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+
+    service = Service(manager_instance().install())
+    return browser(service=service, options=options)
 
 
 class ActionsMixin:
@@ -280,33 +271,18 @@ class ActionsMixin:
 class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     urls_to_visit = set()
     visited_urls = set()
-    webdriver = Chrome
+    browser_name = None
     debug_mode = False
-    # webdriver = Edge
 
     def __init__(self):
         self._start_url_object = None
+        self.driver = get_selenium_browser_instance(browser_name=self.browser_name)
 
-        path = os.environ.get('KRYPTONE_WEBDRIVER', None)
-        if path is None:
-            logger.error('Could not find web driver')
-        else:
-            # options = EdgeOptions()
-            options = ChromeOptions()
-            options.add_argument('--remote-allow-origins=*')
-            options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
-            # options.add_argument(f"--proxy-server={}")
+        # post_init.send(self)
 
-            self.driver = self.webdriver(
-                executable_path=path,
-                options=options
-            )
-
-            # post_init.send(self)
-
-            db_signal.connect(backends.airtable_backend, sender=self)
-            db_signal.connect(backends.notion_backend, sender=self)
-            db_signal.connect(backends.google_sheets_backend, sender=self)
+        db_signal.connect(backends.airtable_backend, sender=self)
+        db_signal.connect(backends.notion_backend, sender=self)
+        db_signal.connect(backends.google_sheets_backend, sender=self)
 
     # def __del__(self):
     #     # When the program terminates,
