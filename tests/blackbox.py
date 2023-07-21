@@ -17,7 +17,10 @@ class Etam(BaseCrawler):
     def post_visit_actions(self, **kwargs):
         self.click_consent_button(element_id='acceptAllCookies')
 
+    def run_actions(self, current_url, **kwargs):
+        self.save_to_local_storage('url', current_url)
+
 
 if __name__ == '__main__':
     instance = Etam()
-    instance.start(wait_time=4)
+    instance.start(wait_time=10)
