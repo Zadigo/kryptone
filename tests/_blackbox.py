@@ -7,6 +7,7 @@ from kryptone.utils.text import parse_price
 
 class Etam(BaseCrawler):
     start_url = 'https://www.etam.com/culottes-et-bas-tangas/'
+    browser_name = 'Edge'
 
     def post_visit_actions(self, **kwargs):
         self.click_consent_button(element_id='acceptAllCookies')
