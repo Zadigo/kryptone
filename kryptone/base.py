@@ -1,18 +1,18 @@
 import json
-import os
 import random
 import string
 import time
-from multiprocessing import Process
 from urllib.parse import urlparse
 
 import requests
-from bs4 import BeautifulSoup
 from lxml import etree
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import logger
 from kryptone.cache import Cache
@@ -24,7 +24,6 @@ from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.module_loaders import import_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
 
@@ -34,34 +33,22 @@ db_signal = Signal()
 
 cache = Cache()
 
-
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
 
-def get_selenium_browser_instance(executable_path=None):
+def get_selenium_browser_instance(browser_name=None):
     """Creates a new selenium browser instance"""
-    python_path = settings.WEBDRIVER
-    module, browser_name = python_path.rsplit('.', maxsplit=1)
-    klass = Chrome if browser_name == 'Chrome' else Edge
-    # module = import_module(module)
-    # klass = getattr(module, browser_name, None)
-    # if klass is None:
-    #     raise ValueError(f'Could not load browser from module: {python_path}')
-    executable_path = executable_path or os.environ.get(
-        WEBDRIVER_ENVIRONMENT_PATH,
-        None
-    )
+    browser_name = browser_name or settings.WEBDRIVER
+    browser = Chrome if browser_name == 'Chrome' else Edge
+    manager_instance = ChromeDriverManager if browser_name == 'Chrome' else EdgeChromiumDriverManager
 
-    if executable_path is None:
-        logger.error('Could not find web driver')
-        return None
-    else:
-        options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
-        options = options_klass()
-        options.add_argument('--remote-allow-origins=*')
-        options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
-        instance = klass(executable_path=executable_path, options=options)
-        return instance
+    options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
+    options = options_klass()
+    options.add_argument('--remote-allow-origins=*')
+    options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+
+    service = Service(manager_instance().install())
+    return browser(service=service, options=options)
 
 
 class ActionsMixin:
@@ -69,6 +56,63 @@ class ActionsMixin:
     # should scroll a given page
     default_scroll_step = 80
 
+    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
+        """Scrolls the entire window by incremeting the current
+        scroll position by a given number of pixels"""
+        can_scroll = True
+        new_scroll_pixels = 1000
+
+        while can_scroll:
+            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
+
+            self.driver.execute_script(scroll_script)
+            # Scrolls until we get a result that determines that we
+            # have actually scrolled to the bottom of the page
+            has_reached_bottom = self.driver.execute_script(
+                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
+            )
+            if has_reached_bottom:
+                can_scroll = False
+
+            current_position = self.driver.execute_script(
+                """return window.scrollY""")
+            if stop_at is not None and current_position > stop_at:
+                can_scroll = False
+
+            new_scroll_pixels = new_scroll_pixels + increment
+            time.sleep(wait_time)
+
+    def save_to_local_storage(self, name, data):
+        """Saves datat to the browsers local storage
+        for the current automation session"""
+        data = json.dumps(data)
+        script = f"""
+        localStorage.setItem('{name}', JSON.stringify({data}))
+        """
+        self.driver.execute_script(script)
+
+    def click_consent_button(self, element_id=None, element_class=None):
+        """Click the consent to cookies button which often
+        tends to appear on websites"""
+        try:
+            element = None
+            if element_id is not None:
+                element = self.driver.find_element(By.ID, element_id)
+
+            if element_class is not None:
+                element = self.driver.find_element(By.CLASS_NAME, element_id)
+            element.click()
+        except:
+            logger.info('Consent button not found')
+
+    def evaluate_xpath(self, path):
+        return self.driver.execute_script(
+            f"""
+            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            return result.singleNodeValue
+            """
+        )
+    
     # TODO:
     # def scroll_page(self, wait_time=8):
     #     can_scroll = True
@@ -115,8 +159,8 @@ class ActionsMixin:
     #         # get more data to load
     #         if previous_scroll_height > 0 and scroll_height == previous_scroll_height:
     #             scroll_height_tries = scroll_height_tries + 1
-                
-    #             # If we were able to refresh the new document 
+
+    #             # If we were able to refresh the new document
     #             # height keep scrolling
     #             if scroll_height != previous_scroll_height:
     #                 scroll_height_tries = 0
@@ -125,7 +169,6 @@ class ActionsMixin:
 
     #             if scroll_height_tries > max_tries:
     #                 can_scroll = False
-
 
     #         # Trigger when the scroll position is equal
     #         # to the total scrollable size of the page
@@ -141,105 +184,6 @@ class ActionsMixin:
     #         time.sleep(wait_time)
     #         print('scrolling', current_position, scroll_height,
     #               'bottom_of_page_tries', bottom_of_page_tries, 'scroll_height_tries', scroll_height_tries)
-
-    def save_to_local_storage(self, name, data):
-        data = json.dumps(data)
-        script = f"""localStorage.setItem('{name}', {data})"""
-        self.driver.execute_script(script)
-
-    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
-        can_scroll = True
-        new_scroll_pixels = 1000
-
-        # scroll_script = """
-        # async function runScroll() {
-        #     setTimeout(() => {
-        #         window.scroll(0, %(scroll_step)s)
-        #     }, %(wait_time)s)
-        # }
-
-        # runScroll()
-        # """
-
-        while can_scroll:
-            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
-
-            # new_scroll_script = scroll_script % {
-            #     'scroll_step': new_scroll_pixels,
-            #     'wait_time': wait_time * 1000
-            # }
-
-            self.driver.execute_script(scroll_script)
-            # Scrolls until we get a result that determines that we
-            # have actually scrolled to the bottom of the page
-            has_reached_bottom = self.driver.execute_script(
-                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
-            )
-            if has_reached_bottom:
-                can_scroll = False
-
-            current_position = self.driver.execute_script("""return window.scrollY""")
-            if stop_at is not None and current_position > stop_at:
-                can_scroll = False
-
-            new_scroll_pixels = new_scroll_pixels + increment
-            time.sleep(wait_time)
-
-    # @property
-    # def scrolled_to_bottom(self):
-    #     """Checks that we have scrolled to the bottom of the page"""
-    #     script = """
-    #     // The scroll element does not go that far down after
-    #     // a moment so adjust the scrollHeight number by reducing
-    #     // it by  a 100
-    #     return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)
-    #     """
-    #     return self.driver.execute_script(script)
-
-    # def scroll_page(self, pixels=2000):
-    #     """Continuously scroll the current page
-    #     in order to load a set of products. This function
-    #     will scroll the window as long as the position
-    #     has not reached the bottom of the page"""
-    #     new_pixels = pixels
-    #     is_scrollable = True
-    #     while is_scrollable:
-    #         self.scroll_window(pixels=new_pixels)
-    #         is_scrollable = True if not self.scrolled_to_bottom else False
-    #         time.sleep(3)
-    #         # Increment the number of pixels to
-    #         # accomplish scrolling the whole page
-    #         new_pixels = new_pixels + pixels
-
-    # def scroll_to(self, percentage=80):
-    #     """Scroll to a specific section of the page"""
-    #     percentage = percentage / 100
-    #     script = f"""
-    #     const height = document.body.scrollHeight
-    #     const pixels = Math.round(height * {percentage});
-    #     window.scrollTo(0, pixels);
-    #     """
-    #     self.driver.execute_script(script)
-
-    # def scroll_window(self, pixels=2000):
-    #     """Scroll the whole window"""
-    #     # script = "window.scrollTo(0, document.body.scrollHeight)"
-    #     script = f"window.scrollTo(0, {pixels})"
-    #     self.driver.execute_script(script)
-
-    def click_consent_button(self, element_id=None, element_class=None):
-        """Click the consent to cookies button which often
-        tends to appear on websites"""
-        try:
-            element = None
-            if element_id is not None:
-                element = self.driver.find_element(By.ID, element_id)
-
-            if element_class is not None:
-                element = self.driver.find_element(By.CLASS_NAME, element_id)
-            element.click()
-        except:
-            logger.info('Consent button not found')
 
     def _test_scroll_page(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
@@ -267,53 +211,23 @@ class ActionsMixin:
 
         script = css_selector + '\n' + body
         return script
-    
-    def evaluate_xpath(self, path):
-        return self.driver.execute_script(
-            f"""
-            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-            return result.singleNodeValue
-            """
-        )
 
 
 class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     urls_to_visit = set()
     visited_urls = set()
-    webdriver = Chrome
+    browser_name = None
     debug_mode = False
-    # webdriver = Edge
 
     def __init__(self):
         self._start_url_object = None
+        self.driver = get_selenium_browser_instance(browser_name=self.browser_name)
 
-        path = os.environ.get('KRYPTONE_WEBDRIVER', None)
-        if path is None:
-            logger.error('Could not find web driver')
-        else:
-            # options = EdgeOptions()
-            options = ChromeOptions()
-            options.add_argument('--remote-allow-origins=*')
-            options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
-            # options.add_argument(f"--proxy-server={}")
+        # post_init.send(self)
 
-            self.driver = self.webdriver(
-                executable_path=path,
-                options=options
-            )
-
-            # post_init.send(self)
-
-            db_signal.connect(backends.airtable_backend, sender=self)
-            db_signal.connect(backends.notion_backend, sender=self)
-            db_signal.connect(backends.google_sheets_backend, sender=self)
-
-    # def __del__(self):
-    #     # When the program terminates,
-    #     # always back up the urls that
-    #     # were visited or unvisited
-    #     self._backup_urls()
-    #     logger.info('Crawl finished')
+        db_signal.connect(backends.airtable_backend, sender=self)
+        db_signal.connect(backends.notion_backend, sender=self)
+        db_signal.connect(backends.google_sheets_backend, sender=self)
 
     @property
     def get_html_page_content(self):
@@ -373,7 +287,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
 class BaseCrawler(CrawlerMixin):
     start_url = None
-    url_validators = []
     url_filters = []
 
     def get_filename(self, length=5, extension=None):
@@ -473,10 +386,10 @@ class BaseCrawler(CrawlerMixin):
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
         and visited urls, resume the previous
-        scraping session"""
-        # Redis is our primary database. If
-        # we cannot get anything, resort to
-        # the basic file cache
+        scraping session. We check Redis as the
+        primary database if there is connection,
+        then PyMemcache and finally the file cache
+        as a finale resort"""
         redis = redis_connection()
         if redis:
             data = redis.get('cache')
@@ -578,7 +491,7 @@ class BaseCrawler(CrawlerMixin):
                 cache.set_value('page_audit', self.page_audits)
                 cache.set_value('global_audit', vocabulary)
                 db_signal.send(
-                    self, 
+                    self,
                     page_audit=self.page_audits,
                     global_audit=vocabulary
                 )

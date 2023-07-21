@@ -8,10 +8,11 @@ from kryptone import logger
 @functools.lru_cache(maxsize=1)
 def redis_connection(host='redis', port=6379):
     instance = redis.Redis(host, port)
-    logger.info('Connecting to Redis...')
     try:
+        logger.info('Connecting to Redis...')
         instance.ping()
     except:
+        logger.info('Redis connection failed')
         return False
     else:
         return instance
@@ -23,6 +24,7 @@ def memcache_connection(host='memcache', port=11211):
     instance = Client(f'{host}:{port}')
     try:
         instance._connect()
-        return instance
     except:
         return False
+    else:
+        return instance

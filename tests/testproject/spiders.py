@@ -1,13 +1,13 @@
 import time
 
-from kryptone.base import BaseCrawler
-from kryptone.utils.file_readers import read_document
+from selenium.webdriver import Edge
 from selenium.webdriver.common.by import By
 
-class Jennyfer(BaseCrawler):
-    """Web crawler for Kiabi. Injects javascript
-    in the browser to extract data"""
+from kryptone.base import BaseCrawler
 
+
+class Jennyfer(BaseCrawler):
+    webdriver = Edge
     start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/'
 
     def post_visit_actions(self, **kwargs):
@@ -28,4 +28,4 @@ class Jennyfer(BaseCrawler):
         return []
 
     def run_actions(self, current_url, **kwargs):
-        pass
+        self.scroll_window()

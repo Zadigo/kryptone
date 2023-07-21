@@ -12,6 +12,7 @@ beautifulsoup4 = "*"
 airtable = "*"
 quart = "*"
 quart-cors = "*"
+webdriver-manager = "*"
 
 [dev-packages]
 
