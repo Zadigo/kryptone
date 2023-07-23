@@ -319,6 +319,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
 class BaseCrawler(CrawlerMixin):
     start_url = None
+    start_xml_url = None
     url_filters = []
 
     def get_filename(self, length=5, extension=None):
@@ -447,10 +448,19 @@ class BaseCrawler(CrawlerMixin):
         if not url.endswith('.xml'):
             raise ValueError('Url should point to a sitemap')
 
-        response = requests.get(url)
+        headers = {'User-Agent': RANDOM_USER_AGENT()}
+        response = requests.get(url, headers=headers)
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
-        self.start(start_urls=[], **kwargs)
+
+        start_urls = []
+        for item in xml.iterchildren():
+            sub_children = list(item.iterchildren())
+            if not sub_children:
+                continue
+            start_urls.append(sub_children[0].text)
+        return start_urls
+        # self.start(start_urls=start_urls, **kwargs)
 
     def start_from_html_sitemap(self, url, **kwargs):
         """Start crawling from the sitemap HTML page
