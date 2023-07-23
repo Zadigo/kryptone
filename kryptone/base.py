@@ -486,6 +486,12 @@ class BaseCrawler(CrawlerMixin):
         >>> instance = BaseCrawler()
         ... instance.start(start_urls=["http://example.com"])
         """
+        # To ensure efficient navigation and/or
+        # scrapping, use a maximised window since
+        # layouts can fundamentally change when
+        # using a smaller window
+        self.driver.maximize_window()
+
         self.debug_mode = debug_mode
 
         wait_time = wait_time or settings.WAIT_TIME
