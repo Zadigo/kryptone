@@ -279,7 +279,11 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
+        d = self.get_current_date()
+
         urls_data = {
+            'spider': self.__class__.__name__,
+            'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
