@@ -10,29 +10,29 @@ class Command(ProjectCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '-a',
-            '--run-audit', 
+            '--run-audit',
             help='Audit the website',
             type=bool,
             default=False
         )
         parser.add_argument(
             '-d',
-            '--debug-mode', 
+            '--debug-mode',
             help='Run the crawler in debug mode',
             default=False,
             type=bool
         )
         parser.add_argument(
             '-l',
-            '--language', 
+            '--language',
             help='Specify the website language',
             default='fr',
             type=str
         )
         parser.add_argument(
             '-n',
-            '--name', 
-            help='Spider name to execute', 
+            '--name',
+            help='Spider name to execute',
             type=str
         )
         parser.add_argument(
@@ -44,7 +44,7 @@ class Command(ProjectCommand):
         )
         # parser.add_argument(
         #     '-w',
-        #     '--wait-time', 
+        #     '--wait-time',
         #     help='The amount of time the crawler should wait before going to the next pages',
         #     default=25,
         #     type=int
@@ -59,7 +59,7 @@ class Command(ProjectCommand):
                 "The spiders for the current project "
                 "were not properly configured"
             ))
-        
+
         params = {
             'start_urls': namespace.start_urls,
             'debug_mode': namespace.debug_mode,
@@ -84,7 +84,7 @@ class Command(ProjectCommand):
         else:
             registry.run_all_spiders(**params)
             # process = multiprocessing.Process(
-            #     target=registry.run_all_spiders, 
+            #     target=registry.run_all_spiders,
             #     kwargs=params
             # )
             # try:
