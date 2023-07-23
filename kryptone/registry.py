@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import os
 from collections import OrderedDict
@@ -244,6 +245,11 @@ class MasterRegistry:
                        "settings.py file.")
             logger.info(message, Warning, stacklevel=0)
         else:
+            # TODO: This runs synchronously which means
+            # that each spider will be executed one after
+            # another. Consider doing this section asynchronously
+            # and in concurrence. Each spider should run one along
+            # the other without blocking one or the other
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
                 try:
@@ -257,6 +263,30 @@ class MasterRegistry:
                             Exception(e)
                         ]
                     )
+
+            # async def spider_executor(config, **params):
+            #     try:
+            #         self.has_running_spiders = True
+            #         config.run(**params)
+            #     except:
+            #         message = f"Could not start {config}. Did you use the correct class name?"
+            #         raise ExceptionGroup(
+            #             message,
+            #             [
+            #                 Exception(e)
+            #             ]
+            #         )
+
+            # async def main(**params):
+            #     tasks = []
+            #     for config in self.get_spiders():
+            #         task = await asyncio.ensure_future(
+            #             spider_executor(config, **params)
+            #         )
+            #         tasks.append(task)
+            #     await asyncio.gather(*tasks)
+
+            # asyncio.run(main(**kwargs))
 
     def get_spider(self, spider_name):
         self.check_spiders_ready()
