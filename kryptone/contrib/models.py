@@ -40,13 +40,14 @@ class Product(BaseModel):
     description: str
     price: int
     url: str
-    # collection_id: str = None
+    collection_id: str = None
+    # pk: int = None
     # number_of_colors: int = 1
     # images:str = dataclasses.field(default_factory=[])
     # color: str = None
 
-    def get_collection_id(self, regex):
+    def set_collection_id(self, regex):
         result = re.search(regex, getattr(self, 'url'))
         if result:
-            return result.group(1)
+            self.collection_id = result.group(1)
         return None
