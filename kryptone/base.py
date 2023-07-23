@@ -1,8 +1,10 @@
 import json
 import random
+import datetime
 import re
 import string
 import time
+import pytz
 from collections import defaultdict
 from urllib.parse import urlparse
 
@@ -49,7 +51,6 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
     else:
         instance = JPEGImagesIterator(current_url, image_elements)
         logger.info(f'Collected {len(instance)} images')
-    finally:
         cache.extend_list('images', instance.urls)
 
 
@@ -501,7 +502,9 @@ class BaseCrawler(CrawlerMixin):
         else:
             logger.info('Starting Kryptone...')
 
-        if self.start_url is not None:
+        if self.start_xml_url is not None:
+            start_urls = self.start_from_sitemap_xml(self.start_xml_url)
+        elif self.start_url is not None:
             self.urls_to_visit.add(self.start_url)
             self._start_url_object = urlparse(self.start_url)
 
