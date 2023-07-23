@@ -236,10 +236,11 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     browser_name = None
     debug_mode = False
 
-    def __init__(self):
+    def __init__(self, browser_name=None):
         self._start_url_object = None
         self.driver = get_selenium_browser_instance(
-            browser_name=self.browser_name)
+            browser_name=browser_name or self.browser_name
+        )
 
         navigation.connect(collect_images_receiver, sender=self)
 
