@@ -235,6 +235,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     visited_urls = set()
     browser_name = None
     debug_mode = False
+    timezone = 'UTC'
 
     def __init__(self, browser_name=None):
         self._start_url_object = None
@@ -270,6 +271,10 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     @property
     def name(self):
         return 'crawler'
+
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
 
     def _backup_urls(self):
         """Backs up the urls both in memory
