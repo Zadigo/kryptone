@@ -60,6 +60,13 @@ class SpiderConfig:
         instance = cls(name, module)
         return instance
 
+    def get_spider_instance(self):
+        if self.spider_class is None:
+            raise ValueError(
+                f'Could not start spider in project: {self.dotted_path}'
+            )
+        return self.spider_class()
+
     def check_ready(self):
         """Marks the spider as configured and
         ready to be used"""
@@ -70,11 +77,7 @@ class SpiderConfig:
         """Runs the spider by calling the spider class
         which in return calls "start" method on the
         spider via the __init__ method"""
-        if self.spider_class is None:
-            raise ValueError(
-                f'Could not start spider in project: {self.dotted_path}'
-            )
-        spider_instance = self.spider_class()
+        spider_instance = self.get_spider_instance()
 
         try:
             spider_instance.start(**kwargs)
@@ -221,9 +224,14 @@ class MasterRegistry:
 
     def run_all_automaters(self, **kwargs):
         if not self.has_spiders:
-            logger.info(("There are no registered spiders in your project. If you created spiders, "
-                         "register them within the SPIDERS variable of your "
-                         "settings.py file."), Warning, stacklevel=0)
+            logger.info(
+                (
+                    "There are no registered spiders in your project. If you created spiders, "
+                    "register them within the SPIDERS variable of your "
+                    "settings.py file."
+                ),
+                Warning, stacklevel=0
+            )
         else:
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
@@ -234,15 +242,19 @@ class MasterRegistry:
                 try:
                     config.run(**kwargs)
                 except Exception:
-                    logger.critical((f"Could not start {config}. "
-                                     "Did you use the correct class name?"), stack_info=True)
+                    logger.critical((
+                        f"Could not start {config}. "
+                        "Did you use the correct class name?"), stack_info=True
+                    )
                     raise
 
     def run_all_spiders(self, **kwargs):
         if not self.has_spiders:
-            message = ("There are no registered spiders in your project. If you created spiders, "
-                       "register them within the SPIDERS variable of your "
-                       "settings.py file.")
+            message = (
+                "There are no registered spiders in your project. If you created spiders, "
+                "register them within the SPIDERS variable of your "
+                "settings.py file."
+            )
             logger.info(message, Warning, stacklevel=0)
         else:
             # TODO: This runs synchronously which means
@@ -293,9 +305,11 @@ class MasterRegistry:
         try:
             return self.spiders[spider_name]
         except KeyError:
-            message = (f"The spider with the name '{spider_name}' does not "
-                       f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
-                       f"If you forgot to register '{spider_name}', check your settings file.")
+            message = (
+                f"The spider with the name '{spider_name}' does not "
+                f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
+                f"If you forgot to register '{spider_name}', check your settings file."
+            )
             raise ExceptionGroup(
                 message,
                 [
