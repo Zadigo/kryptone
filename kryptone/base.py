@@ -18,7 +18,7 @@ from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
-from kryptone.db.connections import redis_connection
+from kryptone.db.connections import redis_connection, memcache_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
@@ -112,7 +112,7 @@ class ActionsMixin:
             return result.singleNodeValue
             """
         )
-    
+
     # TODO:
     # def scroll_page(self, wait_time=8):
     #     can_scroll = True
@@ -221,7 +221,8 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
     def __init__(self):
         self._start_url_object = None
-        self.driver = get_selenium_browser_instance(browser_name=self.browser_name)
+        self.driver = get_selenium_browser_instance(
+            browser_name=self.browser_name)
 
         # post_init.send(self)
 
@@ -385,23 +386,33 @@ class BaseCrawler(CrawlerMixin):
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
-        and visited urls, resume the previous
-        scraping session. We check Redis as the
-        primary database if there is connection,
-        then PyMemcache and finally the file cache
-        as a finale resort"""
+        and visited urls, resume a previous
+        crawling session.
+
+            * Redis is checked as the primary database for a cache
+            * Memcache is checked afterwards if no connection
+            * Finally, the file cache is used as a final resort """
         redis = redis_connection()
         if redis:
             data = redis.get('cache')
         else:
-            data = read_json_document('cache.json')
+            memcache = memcache_connection()
+            if memcache:
+                data = memcache.get('cache', [])
+            else:
+                data = read_json_document('cache.json')
+
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
-        """Start a new crawling session starting
-        from the sitemap of a given website"""
+        """Start crawling from the XML sitemap
+        page of a given website
+
+        >>> instance = BaseCrawler()
+        ... instance.start_from_html_sitemap("http://example.com/sitemap.xml")
+        """
         if not url.endswith('.xml'):
             raise ValueError('Url should point to a sitemap')
 
@@ -411,8 +422,12 @@ class BaseCrawler(CrawlerMixin):
         self.start(start_urls=[], **kwargs)
 
     def start_from_html_sitemap(self, url, **kwargs):
-        """Start crawling from the sitemap page section
-        of a given website"""
+        """Start crawling from the sitemap HTML page
+        section of a given website
+
+        >>> instance = BaseCrawler()
+        ... instance.start_from_html_sitemap("http://example.com/sitemap.html")
+        """
         if not 'sitemap' in url:
             raise ValueError('Url should be the sitemap page')
 
@@ -425,7 +440,11 @@ class BaseCrawler(CrawlerMixin):
         self.start(start_urls=urls, **kwargs)
 
     def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None):
-        """Entrypoint to start the web scrapper"""
+        """Entrypoint to start the spider
+
+        >>> instance = BaseCrawler()
+        ... instance.start(start_urls=["http://example.com"])
+        """
         self.debug_mode = debug_mode
 
         wait_time = wait_time or settings.WAIT_TIME

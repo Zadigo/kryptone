@@ -1,7 +1,9 @@
+import multiprocessing
+
 import kryptone
+from kryptone.checks.core import checks_registry
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
-import multiprocessing
 
 
 class Command(ProjectCommand):
@@ -50,10 +52,13 @@ class Command(ProjectCommand):
 
     def execute(self, namespace):
         kryptone.setup()
+        checks_registry.run()
 
         if not registry.spiders_ready:
-            raise ValueError(('The spiders for the current project '
-                              'were not properly configured'))
+            raise ValueError((
+                "The spiders for the current project "
+                "were not properly configured"
+            ))
         
         params = {
             'start_urls': namespace.start_urls,

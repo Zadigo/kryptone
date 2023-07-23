@@ -33,7 +33,7 @@ WAIT_TIME = 25
 # Indicates the range the driver should
 # use as the waiting time before moving
 # to the next url
-WAIT_TIME_RANGE = None
+WAIT_TIME_RANGE = []
 
 
 # The name of the file used to cache

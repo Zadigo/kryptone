@@ -2,6 +2,7 @@ import kryptone
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 import time
+from kryptone.checks.core import checks_registry
 
 class Command(ProjectCommand):
     def add_arguments(self, parser):
@@ -17,10 +18,13 @@ class Command(ProjectCommand):
         # without raising any error
         start_time = time.time()
         kryptone.setup()
+        checks_registry.run()
 
         if not registry.spiders_ready:
-            message = ('The spiders for the current project '
-                       'were not properly configured')
+            message = (
+                "The spiders for the current project "
+                "were not properly configured"
+            )
             raise ValueError(message)
         end_time = round(time.time() - start_time, 1)
         kryptone.logger.info(f'Test completed in {end_time}s')
