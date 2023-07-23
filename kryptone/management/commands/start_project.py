@@ -60,6 +60,13 @@ class Command(BaseCommand):
                     content
                 )
 
+            # if base_name == 'settings.py':
+            #     content = re.sub(
+            #         r'PROJECT\_PATH\s\=\sNone',
+            #         'PROJECT_PATH = pathlib.Path(__file__).parent.absolute()',
+            #         content
+            #     )
+
             with open(file_to_create, mode='wb') as d:
                 d.write(content.encode('utf-8'))
 

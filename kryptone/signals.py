@@ -27,7 +27,7 @@ def get_callable_parameters(func):
 
 def test_function_accept_kwargs(func):
     """Checks if a function accepts keyword arguments
-    
+
     >>> def test_function(**kwargs):
     ...     pass
     ...
@@ -107,7 +107,8 @@ class Signal:
         ...     pass
         ...
         ... signal.connect(my_receive_function, sender=my_send_function)
-        ... signal.send(my_send_function, a=1)"""
+        ... signal.send(my_send_function, a=1)
+        """
         if not callable(receiver):
             raise TypeError("A receiver should be a callable")
 
@@ -197,6 +198,15 @@ class Signal:
 
 
 def function_to_receiver(signal, **kwargs):
+    """Transform a function to a signal receiver
+    by connecting it to the signal pool
+
+    >>> custom_signal = Signal()
+    ...
+    ... @function_to_receiver(custom_signal)
+    ... def some_receiver(**kwargs):
+    ...     # Do something here
+    """
     def decorator(func):
         if isinstance(signal, (list, tuple)):
             for item in signal:

@@ -1,7 +1,9 @@
 import json
 import random
+import re
 import string
 import time
+from collections import defaultdict
 from urllib.parse import urlparse
 
 import requests
@@ -24,6 +26,7 @@ from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
                                          write_csv_document,
                                          write_json_document)
+from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URLFile
 
@@ -34,6 +37,20 @@ db_signal = Signal()
 cache = Cache()
 
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+
+
+def collect_images_receiver(sender, current_url=None, **kwargs):
+    """Collects every images present on the
+    actual webpage and classifies them"""
+    try:
+        image_elements = sender.driver.find_elements(By.TAG_NAME, 'img')
+    except:
+        pass
+    else:
+        instance = JPEGImagesIterator(current_url, image_elements)
+        logger.info(f'Collected {len(instance)} images')
+    finally:
+        cache.extend_list('images', instance.urls)
 
 
 def get_selenium_browser_instance(browser_name=None):
@@ -224,7 +241,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         self.driver = get_selenium_browser_instance(
             browser_name=self.browser_name)
 
-        # post_init.send(self)
+        navigation.connect(collect_images_receiver, sender=self)
 
         db_signal.connect(backends.airtable_backend, sender=self)
         db_signal.connect(backends.notion_backend, sender=self)
@@ -254,17 +271,21 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         return 'crawler'
 
     def _backup_urls(self):
-        """Backs up the urls both in the memory
-        cache, and in the cache file"""
+        """Backs up the urls both in memory
+        cache and file cache"""
         urls_data = {
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
         cache.set_value('urls_data', urls_data)
 
-        write_json_document('cache.json', urls_data)
+        write_json_document(
+            f'{settings.CACHE_FILE_NAME}.json',
+            urls_data
+        )
         db_signal.send(
             self,
+            data_type='urls',
             urls_data=urls_data
         )
 
@@ -484,19 +505,26 @@ class BaseCrawler(CrawlerMixin):
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
-            navigation.send(self, current_url=current_url)
+
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
             self.post_visit_actions(current_url=current_url)
 
+            # Post navigation signal
+            # TEST: This has to be tested
+            navigation.send(
+                self,
+                current_url=current_url,
+                images_list_filter=['jpg', 'jpeg', 'webp']
+            )
+
             self.visited_urls.add(current_url)
 
             # We can either crawl all the website
             # or just specific page
             self.get_page_urls()
-
             self._backup_urls()
 
             if run_audit:
@@ -574,15 +602,18 @@ class SinglePageAutomater(CrawlerMixin):
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
-            # navigation.send(self, current_url=current_url)
+
             # Always wait for the body section of
             # the page to be located  or visible
             wait = WebDriverWait(self.driver, 8)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
             self.post_visit_actions(current_url=current_url)
 
-            self.visited_urls.add(current_url)
+            # Post navigation signal
+            # TEST: This has to be tested
+            navigation.send(self, current_url=current_url)
 
+            self.visited_urls.add(current_url)
             self._backup_urls()
 
             self.emails(
