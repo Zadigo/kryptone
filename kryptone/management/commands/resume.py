@@ -35,20 +35,6 @@ class Command(ProjectCommand):
             help='Spider name to execute',
             type=str
         )
-        parser.add_argument(
-            '-u',
-            '--start-urls',
-            default=[],
-            help='A list of starting urls to use',
-            action='append'
-        )
-        # parser.add_argument(
-        #     '-w',
-        #     '--wait-time',
-        #     help='The amount of time the crawler should wait before going to the next pages',
-        #     default=25,
-        #     type=int
-        # )
 
     def execute(self, namespace):
         kryptone.setup()
@@ -59,9 +45,14 @@ class Command(ProjectCommand):
                 "The spiders for the current project "
                 "were not properly configured"
             ))
+        
+        from kryptone.conf import settings
+        from kryptone.utils.file_readers import read_json_document
+
+        start_urls = read_json_document(settings.PROJECT_PATH / 'cache.json')
 
         params = {
-            'start_urls': namespace.start_urls,
+            'start_urls': start_urls,
             'debug_mode': namespace.debug_mode,
             # 'wait_time': namespace.wait_time,
             'run_audit': namespace.run_audit,
@@ -71,25 +62,5 @@ class Command(ProjectCommand):
         if namespace.name is not None:
             spider_config = registry.get_spider(namespace.name)
             spider_config.run(**params)
-            # process = multiprocessing.Process(
-            #     target=spider_config.run,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()
         else:
             registry.run_all_spiders(**params)
-            # process = multiprocessing.Process(
-            #     target=registry.run_all_spiders,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()

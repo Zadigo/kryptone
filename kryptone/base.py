@@ -1,8 +1,10 @@
 import json
 import random
+import datetime
 import re
 import string
 import time
+import pytz
 from collections import defaultdict
 from urllib.parse import urlparse
 
@@ -20,7 +22,7 @@ from kryptone import logger
 from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
-from kryptone.db.connections import redis_connection
+from kryptone.db.connections import redis_connection, memcache_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
@@ -49,7 +51,6 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
     else:
         instance = JPEGImagesIterator(current_url, image_elements)
         logger.info(f'Collected {len(instance)} images')
-    finally:
         cache.extend_list('images', instance.urls)
 
 
@@ -235,11 +236,13 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     visited_urls = set()
     browser_name = None
     debug_mode = False
+    timezone = 'UTC'
 
-    def __init__(self):
+    def __init__(self, browser_name=None):
         self._start_url_object = None
         self.driver = get_selenium_browser_instance(
-            browser_name=self.browser_name)
+            browser_name=browser_name or self.browser_name
+        )
 
         navigation.connect(collect_images_receiver, sender=self)
 
@@ -270,10 +273,18 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     def name(self):
         return 'crawler'
 
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
+
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
+        d = self.get_current_date()
+
         urls_data = {
+            'spider': self.__class__.__name__,
+            'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
@@ -309,6 +320,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
 
 class BaseCrawler(CrawlerMixin):
     start_url = None
+    start_xml_url = None
     url_filters = []
 
     def get_filename(self, length=5, extension=None):
@@ -407,34 +419,57 @@ class BaseCrawler(CrawlerMixin):
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
-        and visited urls, resume the previous
-        scraping session. We check Redis as the
-        primary database if there is connection,
-        then PyMemcache and finally the file cache
-        as a finale resort"""
+        and visited urls, resume a previous
+        crawling session.
+
+            * Redis is checked as the primary database for a cache
+            * Memcache is checked afterwards if no connection
+            * Finally, the file cache is used as a final resort """
         redis = redis_connection()
         if redis:
             data = redis.get('cache')
         else:
-            data = read_json_document('cache.json')
+            memcache = memcache_connection()
+            if memcache:
+                data = memcache.get('cache', [])
+            else:
+                data = read_json_document('cache.json')
+
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
-        """Start a new crawling session starting
-        from the sitemap of a given website"""
+        """Start crawling from the XML sitemap
+        page of a given website
+
+        >>> instance = BaseCrawler()
+        ... instance.start_from_html_sitemap("http://example.com/sitemap.xml")
+        """
         if not url.endswith('.xml'):
             raise ValueError('Url should point to a sitemap')
 
-        response = requests.get(url)
+        headers = {'User-Agent': RANDOM_USER_AGENT()}
+        response = requests.get(url, headers=headers)
         parser = etree.XMLParser(encoding='utf-8')
         xml = etree.fromstring(response.content, parser)
-        self.start(start_urls=[], **kwargs)
+
+        start_urls = []
+        for item in xml.iterchildren():
+            sub_children = list(item.iterchildren())
+            if not sub_children:
+                continue
+            start_urls.append(sub_children[0].text)
+        return start_urls
+        # self.start(start_urls=start_urls, **kwargs)
 
     def start_from_html_sitemap(self, url, **kwargs):
-        """Start crawling from the sitemap page section
-        of a given website"""
+        """Start crawling from the sitemap HTML page
+        section of a given website
+
+        >>> instance = BaseCrawler()
+        ... instance.start_from_html_sitemap("http://example.com/sitemap.html")
+        """
         if not 'sitemap' in url:
             raise ValueError('Url should be the sitemap page')
 
@@ -447,7 +482,17 @@ class BaseCrawler(CrawlerMixin):
         self.start(start_urls=urls, **kwargs)
 
     def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None):
-        """Entrypoint to start the web scrapper"""
+        """Entrypoint to start the spider
+
+        >>> instance = BaseCrawler()
+        ... instance.start(start_urls=["http://example.com"])
+        """
+        # To ensure efficient navigation and/or
+        # scrapping, use a maximised window since
+        # layouts can fundamentally change when
+        # using a smaller window
+        self.driver.maximize_window()
+
         self.debug_mode = debug_mode
 
         wait_time = wait_time or settings.WAIT_TIME
@@ -457,7 +502,9 @@ class BaseCrawler(CrawlerMixin):
         else:
             logger.info('Starting Kryptone...')
 
-        if self.start_url is not None:
+        if self.start_xml_url is not None:
+            start_urls = self.start_from_sitemap_xml(self.start_xml_url)
+        elif self.start_url is not None:
             self.urls_to_visit.add(self.start_url)
             self._start_url_object = urlparse(self.start_url)
 

@@ -76,7 +76,7 @@ class Settings:
                         user_setting.extend(global_setting)
                     elif isinstance(user_setting, dict):
                         user_setting = user_setting | global_setting
-                        
+
                     setattr(self, key, user_setting)
 
     def __repr__(self):
@@ -92,6 +92,9 @@ class Settings:
 
     def get(self, name):
         return self.__getitem__(name)
+
+    def keys(self):
+        return [key for key in self.__dict__.keys()]
 
 
 settings = Settings()
