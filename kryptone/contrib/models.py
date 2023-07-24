@@ -41,9 +41,9 @@ class Product(BaseModel):
     price: int
     url: str
     collection_id: str = None
-    # pk: int = None
-    # number_of_colors: int = 1
-    # images:str = dataclasses.field(default_factory=[])
+    number_of_colors: int = 1
+    id_or_reference: str = None
+    images:str = dataclasses.field(default_factory=[])
     # color: str = None
 
     def set_collection_id(self, regex):

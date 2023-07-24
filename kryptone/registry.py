@@ -16,6 +16,8 @@ from kryptone.utils.urls import URLFile
 
 SPIDERS_MODULE = 'spiders'
 
+AUTOMATERS_MODULE = 'automaters'
+
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
 
@@ -56,14 +58,17 @@ class SpiderConfig:
         return f"<{self.__class__.__name__} for {self.name}>"
 
     @classmethod
-    def create(cls, name, module):
+    def create(cls, name, module, dotted_path=None):
         instance = cls(name, module)
+        instance.dotted_path = dotted_path
         return instance
 
     def get_spider_instance(self):
         if self.spider_class is None:
             raise ValueError(
-                f'Could not start spider in project: {self.dotted_path}'
+                f"Could not start spider '{self.name}' in "
+                f"project: {self.dotted_path} because the spider class "
+                "was None"
             )
         return self.spider_class()
 
@@ -171,43 +176,57 @@ class MasterRegistry:
                         "Failed to load the project's spiders submodule")
                 ]
             )
+        
+        try:
+            automaters_module = import_module(f'{dotted_path}.{AUTOMATERS_MODULE}')
+        except Exception as e:
+            raise ExceptionGroup(
+                "Project loading fail",
+                [
+                    Exception(e.args),
+                    ImportError(
+                        "Failed to load the project's automaters submodule")
+                ]
+            )
 
         # Check that there are class objects that can be used
         # and are subclasses of the main Spider class object
-        elements = inspect.getmembers(
+        spiders = inspect.getmembers(
             spiders_module,
             predicate=inspect.isclass
         )
 
-        valid_spiders = filter(lambda x: issubclass(
-            x[1], (BaseCrawler, SinglePageAutomater)), elements)
+        automaters = inspect.getmembers(
+            automaters_module,
+            predicate=inspect.isclass
+        )
+
+        elements = spiders + automaters
+
+        valid_spiders = filter(
+            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)), 
+            elements
+        )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
-        # try:
-        #     # Load the urls.py file which might contain
-        #     # initial urls to use for the crawling
-        #     urls_module = import_module(f'{dotted_path}.urls')
-        # except ImportError:
-        #     pass
-        # else:
-        #     initial_start_urls = []
-        #     start_urls = getattr(urls_module, 'start_urls', [])
-        #     for item in start_urls:
-        #         if isinstance(item, URLFile):
-        #             initial_start_urls.extend(list(item))
-
-        #         if isinstance(item, str):
-        #             initial_start_urls.append(item)
-
         for name in valid_spider_names:
-            if name in settings.SPIDERS or name in settings.AUTOMATERS:
-                instance = SpiderConfig.create(name, spiders_module)
+            if name in settings.SPIDERS:
+                instance = SpiderConfig.create(
+                    name, 
+                    spiders_module, 
+                    dotted_path=dotted_path
+                )
                 instance.registry = self
-                # instance.initial_start_urls = initial_start_urls
+                self.spiders[name] = instance
 
-                if name in settings.AUTOMATERS:
-                    instance.is_automater = True
-
+            if name in settings.AUTOMATERS:
+                instance = SpiderConfig.create(
+                    name,
+                    automaters_module,
+                    dotted_path=dotted_path
+                )
+                instance.is_automater = True
+                instance.registry = self
                 self.spiders[name] = instance
 
         for config in self.spiders.values():

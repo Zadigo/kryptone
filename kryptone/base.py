@@ -609,6 +609,12 @@ class SinglePageAutomater(CrawlerMixin):
 
     def start(self, start_urls=[], wait_time=None, debug_mode=False):
         """Entrypoint to start the web scrapper"""
+        # To ensure efficient navigation and/or
+        # scrapping, use a maximised window since
+        # layouts can fundamentally change when
+        # using a smaller window
+        self.driver.maximize_window()
+        
         self.debug_mode = debug_mode
 
         logger.info('Starting Kryptone automation...')
