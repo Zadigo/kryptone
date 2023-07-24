@@ -21,10 +21,8 @@ class ApplicationChecks(GlobalMixins):
 
         for func in self._checks.values():
             new_errors = func()
-            self._errors.extend(new_errors)
-
-        for error in self._errors:
-            warnings.warn(error, stacklevel=1)
+            exceptions = [Exception(error) for error in new_errors]
+            self._errors.extend(exceptions)
 
         if self._errors:
             # raise ImproperlyConfiguredError(self._errors)
