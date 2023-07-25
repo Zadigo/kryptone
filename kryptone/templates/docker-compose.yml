@@ -9,11 +9,11 @@ services:
     build: .
     container_name: app_kryptone
     ports:
-      - 5589:5589
+      - 5589:80
     networks:
       - kryptone_network
     volumes:
-      - .:/kryptone
+      - .:/app
       
   redis:
     image: redis
