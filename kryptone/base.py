@@ -358,6 +358,31 @@ class BaseCrawler(CrawlerMixin):
         # or this might return nothing
         return self.urls_to_visit
 
+    def add_urls(self, *urls_or_paths):
+        """Manually add urls to the current urls to
+        visit. This is useful for cases where urls are
+        nested in other elements than links and that
+        cannot actually be retrieved by the spider"""
+        for item in urls_or_paths:
+            new_url = str(item)
+            if item.startswith('/'):
+                new_url = urlunparse((
+                    self._start_url_object.scheme,
+                    self._start_url_object.netloc,
+                    item,
+                    None,
+                    None,
+                    None
+                ))
+
+            if new_url in self.visited_urls:
+                continue
+
+            if new_url in self.urls_to_visit:
+                continue
+
+            self.urls_to_visit.add(new_url)
+
     def get_page_urls(self, same_domain=True):
         """Returns all the urls present on the
         actual given page"""
