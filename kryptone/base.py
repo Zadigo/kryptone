@@ -19,7 +19,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import logger
-from kryptone.cache import Cache
+# from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
 from kryptone.db.connections import redis_connection, memcache_connection
@@ -36,7 +36,7 @@ from kryptone.utils.urls import URLFile
 navigation = Signal()
 db_signal = Signal()
 
-cache = Cache()
+# cache = Cache()
 
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
@@ -288,7 +288,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
-        cache.set_value('urls_data', urls_data)
+        # cache.set_value('urls_data', urls_data)
 
         write_json_document(
             f'{settings.CACHE_FILE_NAME}.json',
@@ -564,8 +564,8 @@ class BaseCrawler(CrawlerMixin):
                 vocabulary = self.global_audit(language=language)
                 write_json_document('global_audit.json', vocabulary)
 
-                cache.set_value('page_audit', self.page_audits)
-                cache.set_value('global_audit', vocabulary)
+                # cache.set_value('page_audit', self.page_audits)
+                # cache.set_value('global_audit', vocabulary)
                 db_signal.send(
                     self,
                     page_audit=self.page_audits,
