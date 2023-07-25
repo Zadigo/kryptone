@@ -273,10 +273,6 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
     def name(self):
         return 'crawler'
 
-    def get_current_date(self):
-        timezone = pytz.timezone(self.timezone)
-        return datetime.datetime.now(tz=timezone)
-
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
@@ -299,6 +295,11 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             data_type='urls',
             urls_data=urls_data
         )
+        
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
+
 
     def post_visit_actions(self, **kwargs):
         """Actions to run on the page just after
