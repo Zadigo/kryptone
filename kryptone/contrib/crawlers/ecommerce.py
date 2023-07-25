@@ -2,7 +2,7 @@ import pathlib
 import asyncio
 import mimetypes
 from urllib.parse import urlparse
-
+from collections import deque
 import requests
 
 from kryptone.conf import settings
@@ -17,11 +17,15 @@ class EcommerceCrawlerMixin:
     # TEST:
 
     scroll_step = 30
-    products = []
-    product_objects = []
+    products = deque()
+    product_objects = deque()
+    seen_products = deque()
     
-    def add_product(self, data):
+    def add_product(self, data, track_id=False):
+        """Add a product to the global product container"""
         product_object = Product(**data)
+        if track_id:
+            product_object.id = self.products.count() + 1
         self.product_objects.append(product_object)
         self.products.append(product_object.as_json())
         return product_object
@@ -29,7 +33,6 @@ class EcommerceCrawlerMixin:
     def save_images(self, product, path, filename=None):
         """Asynchronously save images to the project's
         media folder"""
-
         async def main():
             urls_to_use = product.images.copy()
             queue = asyncio.Queue()

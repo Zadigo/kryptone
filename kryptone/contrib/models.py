@@ -6,6 +6,9 @@ from urllib.parse import urlparse
 
 
 class BaseModel:
+    def __hash__(self):
+        return hash((self.name, self.id_or_reference))
+    
     @cached_property
     def fields(self):
         """Get the fields present on the model"""
@@ -76,6 +79,7 @@ class Product(BaseModel):
     collection_id: str = None
     number_of_colors: int = 1
     id_or_reference: str = None
+    id: int = None
     images:str = dataclasses.field(default_factory=[])
     color: str = None
 
