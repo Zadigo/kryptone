@@ -25,14 +25,14 @@ class EcommerceCrawlerMixin:
         self.products.append(product_object.as_json())
         return product_object
 
-    def save_images(self, urls, path):
+    def save_images(self, product, path, filename=None):
         """Asynchronously save images to the project's
         media folder"""
-        urls_to_use = list(urls).copy()
+        urls_to_use = product.urls.copy()
         queue = asyncio.Queue()
 
         async def request_image():
-            while urls:
+            while urls_to_use:
                 url = urls_to_use.pop()
                 headers = {'User-Agent': RANDOM_USER_AGENT()}
                 response = requests.get(url, headers=headers)
@@ -47,12 +47,15 @@ class EcommerceCrawlerMixin:
                     await asyncio.wait(1)
         
         async def save_image():
+            index = 1
             while not queue.empty():
                 extension, content = await queue.get()
-                full_path = settings.MEDIA_FOLDER.join(f'{path}{extension}')
+                name = filename or f'{path}{product.url_stem}_{index}{extension}'
+                full_path = settings.MEDIA_FOLDER.join(name)
                 with open(full_path, mode='wb') as f:
                     if content is not None:
                         f.write(content)
+                        index = index + 1
         
         asyncio.gather(request_image, save_image)
 

@@ -1,4 +1,5 @@
 import dataclasses
+import pathlib
 import re
 from functools import cached_property, lru_cache
 from urllib.parse import urlparse
@@ -14,7 +15,39 @@ class BaseModel:
     @cached_property
     def url_object(self):
         return urlparse(getattr(self, 'url', ''))
-
+    
+    @cached_property
+    def get_url_object(self):
+        return urlparse(self.url)
+    
+    @cached_property
+    def get_images_url_objects(self):
+        items = []
+        for url in self.images: 
+            items.append(urlparse(url))
+        return items
+    
+    @cached_property
+    def number_of_images(self):
+        return len(self.images)
+    
+    @cached_property
+    def url_stem(self):
+        return pathlib.Path(self.url).stem
+    
+    def build_directory_from_url(self, exclude=[]):
+        """Build the logical local directory in the local project
+        using the natural structure of the product url
+        
+        >>> self.build_directory_from_url('/ma/woman/clothing/dresses/short-dresses/shirt-dress-1.html', exclude=['ma'])
+        ... "/woman/clothing/dresses/short-dresses"
+        """
+        tokens = self.url_object.path.split('/')
+        tokens = list(filter(lambda x: x not in exclude, tokens))
+        tokens = map(lambda x: x.replace('-', '_'), tokens)
+        tokens.pop(-1)
+        return '/'.join(tokens)
+    
     def as_json(self):
         """Return the object as dictionnary"""
         item = {}
@@ -44,7 +77,7 @@ class Product(BaseModel):
     number_of_colors: int = 1
     id_or_reference: str = None
     images:str = dataclasses.field(default_factory=[])
-    # color: str = None
+    color: str = None
 
     def set_collection_id(self, regex):
         result = re.search(regex, getattr(self, 'url'))
