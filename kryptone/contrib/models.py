@@ -43,10 +43,10 @@ class BaseModel:
         ... "/woman/clothing/dresses/short-dresses"
         """
         tokens = self.url_object.path.split('/')
-        tokens = list(filter(lambda x: x not in exclude, tokens))
-        tokens = map(lambda x: x.replace('-', '_'), tokens)
+        tokens = filter(lambda x: x not in exclude and x != '', tokens)
+        tokens = list(map(lambda x: x.replace('-', '_'), tokens))
         tokens.pop(-1)
-        return '/'.join(tokens)
+        return pathlib.Path('/'.join(tokens))
     
     def as_json(self):
         """Return the object as dictionnary"""
