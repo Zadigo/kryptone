@@ -1,17 +1,60 @@
-import time
+import asyncio
+import mimetypes
+from urllib.parse import urlparse
+
+import requests
+
+from kryptone.conf import settings
+from kryptone.contrib.models import Product
+from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
     to crawling ecommerce websites"""
 
+    # TEST:
+
     scroll_step = 30
     products = []
     product_objects = []
     
-    def add_product(self, item):
-        self.product_objects.append(item)
-        self.products.append(item.as_json())
+    def add_product(self, data):
+        product_object = Product(**data)
+        self.product_objects.append(product_object)
+        self.products.append(product_object.as_json())
+        return product_object
+
+    def save_images(self, urls, path):
+        """Asynchronously save images to the project's
+        media folder"""
+        urls_to_use = list(urls).copy()
+        queue = asyncio.Queue()
+
+        async def request_image():
+            while urls:
+                url = urls_to_use.pop()
+                headers = {'User-Agent': RANDOM_USER_AGENT()}
+                response = requests.get(url, headers=headers)
+
+                url_object = urlparse(url)
+
+                mimetype = mimetypes.guess_type(url_object.path)
+                extension = mimetypes.guess_extension(mimetype)
+
+                if response.status_code == 200:
+                    await queue.put((extension, response.content))
+                    await asyncio.wait(1)
+        
+        async def save_image():
+            while not queue.empty():
+                extension, content = await queue.get()
+                full_path = settings.MEDIA_FOLDER.join(f'{path}{extension}')
+                with open(full_path, mode='wb') as f:
+                    if content is not None:
+                        f.write(content)
+        
+        asyncio.gather(request_image, save_image)
 
     # def scroll_page(self):
     #     can_scroll = True
