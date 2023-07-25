@@ -14,8 +14,6 @@ class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
     to crawling ecommerce websites"""
 
-    # TEST:
-
     scroll_step = 30
     products = deque()
     product_objects = deque()
@@ -26,6 +24,7 @@ class EcommerceCrawlerMixin:
         product_object = Product(**data)
         if track_id:
             product_object.id = self.products.count() + 1
+
         self.product_objects.append(product_object)
         self.products.append(product_object.as_json())
         return product_object
@@ -44,7 +43,9 @@ class EcommerceCrawlerMixin:
                     response = requests.get(url, headers=headers)
 
                     url_object = urlparse(url)
-
+                    
+                    # Guess the extension of the image that we
+                    # want to save locally
                     mimetype, _ = mimetypes.guess_type(url_object.path)
                     extension = mimetypes.guess_extension(mimetype, strict=True)
 
@@ -57,7 +58,14 @@ class EcommerceCrawlerMixin:
                 while not queue.empty():
                     extension, content = await queue.get()
                     name = filename or product.url_stem
-                    
+                    # We'll create directories that map the url
+                    # path structure. It's the easiest way to
+                    # find images in the local folder based
+                    # on the path the website's url
+                    # TEST: Instead of using the index below, we
+                    # can also create directory with product reference
+                    # that we retrieved from the url. Then generate
+                    # random names for the images
                     directory_path = settings.MEDIA_FOLDER / path
                     if not directory_path.exists():
                         directory_path.mkdir(parents=True)
@@ -66,12 +74,15 @@ class EcommerceCrawlerMixin:
                     with open(final_path, mode='wb') as f:
                         if content is not None:
                             f.write(content)
-                            index = index + 1
+                        index = index + 1
+                    # Delay this task slightly more than the
+                    # one above to allow requests to populate
+                    # the queue on time
                     await asyncio.sleep(3)
 
-            asyncio.gather(request_image(), save_image())
+            await asyncio.gather(request_image(), save_image())
+        
         asyncio.run(main())
-
 
     # def scroll_page(self):
     #     can_scroll = True
