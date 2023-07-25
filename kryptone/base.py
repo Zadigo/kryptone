@@ -616,7 +616,12 @@ class BaseCrawler(CrawlerMixin):
             # everything is completed
             self.run_actions(current_url)
 
-            logger.info(f"Waiting {wait_time} seconds...")
+            if settings.WAIT_TIME_RANGE:
+                start = settings.WAIT_TIME_RANGE[0]
+                stop = settings.WAIT_TIME_RANGE[1]
+                wait_time = random.randrange(start, stop)
+
+            logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
 
@@ -691,5 +696,10 @@ class SinglePageAutomater(CrawlerMixin):
                 emails=self.emails_container
             )
 
-            logger.info(f"Waiting {wait_time} seconds...")
+            if settings.WAIT_TIME_RANGE:
+                start = settings.WAIT_TIME_RANGE[0]
+                stop = settings.WAIT_TIME_RANGE[1]
+                wait_time = random.randrange(start, stop)
+
+            logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time or 15)
