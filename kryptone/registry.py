@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import threading
 import os
 from collections import OrderedDict
 from functools import lru_cache
@@ -86,12 +87,20 @@ class SpiderConfig:
 
         try:
             spider_instance.start(**kwargs)
+            # thread = threading.Thread(
+            #     target=spider_instance.start,
+            #     name=self.name,
+            #     kwargs=kwargs,
+            #     daemon=True
+            # )
+            # thread.start()
+            # thread.join()
         except KeyboardInterrupt:
             spider_instance.create_dump()
         except Exception as e:
             spider_instance.create_dump()
             raise ExceptionGroup(
-                'Multiple exceptions occurred',
+                'Some xceptions occurred while trying to start the project',
                 [
                     Exception(e)
                 ]
@@ -176,9 +185,10 @@ class MasterRegistry:
                         "Failed to load the project's spiders submodule")
                 ]
             )
-        
+
         try:
-            automaters_module = import_module(f'{dotted_path}.{AUTOMATERS_MODULE}')
+            automaters_module = import_module(
+                f'{dotted_path}.{AUTOMATERS_MODULE}')
         except Exception as e:
             raise ExceptionGroup(
                 "Project loading fail",
@@ -204,7 +214,7 @@ class MasterRegistry:
         elements = spiders + automaters
 
         valid_spiders = filter(
-            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)), 
+            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)),
             elements
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
@@ -212,8 +222,8 @@ class MasterRegistry:
         for name in valid_spider_names:
             if name in settings.SPIDERS:
                 instance = SpiderConfig.create(
-                    name, 
-                    spiders_module, 
+                    name,
+                    spiders_module,
                     dotted_path=dotted_path
                 )
                 instance.registry = self

@@ -1,13 +1,13 @@
+import datetime
 import json
 import random
-import datetime
 import re
 import string
 import time
-import pytz
 from collections import defaultdict
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urlunparse
 
+import pytz
 import requests
 from lxml import etree
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
@@ -22,7 +22,7 @@ from kryptone import logger
 # from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
-from kryptone.db.connections import redis_connection, memcache_connection
+from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
@@ -51,7 +51,7 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
     else:
         instance = JPEGImagesIterator(current_url, image_elements)
         logger.info(f'Collected {len(instance)} images')
-        cache.extend_list('images', instance.urls)
+        # cache.extend_list('images', instance.urls)
 
 
 def get_selenium_browser_instance(browser_name=None):
@@ -338,10 +338,10 @@ class BaseCrawler(CrawlerMixin):
         items = [f"--header={key}={value})" for key, value in headers.items()]
         options.add_argument(' '.join(items))
 
-    def run_filters(self, exclude=True):
-        """Filters out or in urls included in the list 
-        of urls to visit. The default action is to 
-        exclude all urls that meet sepcific conditions"""
+    def run_filters(self):
+        """Excludes urls in the list of urls to visit based
+        on the return value of the function in `url_filters`
+        """
         if self.url_filters:
             urls_to_filter = []
             for instance in self.url_filters:
@@ -350,7 +350,7 @@ class BaseCrawler(CrawlerMixin):
                 else:
                     urls_to_filter = list(filter(instance, urls_to_filter))
 
-            message = f"Url filter completed."
+            message = f"Url filter completed"
             logger.info(message)
             return urls_to_filter
         # Ensure that we return the original
@@ -387,16 +387,18 @@ class BaseCrawler(CrawlerMixin):
         """Returns all the urls present on the
         actual given page"""
         elements = self.get_page_link_elements
+        logger.info(f"Found {len(elements)} urls")
+
         for element in elements:
             link = element.get_attribute('href')
 
             # Turn the url into a Python object
-            # to make more usable for us
+            # to make it more usable for us
             link_object = urlparse(link)
 
-            # 1. We do not want to add an item
+            # We do not want to add an item
             # to the list if it already exists,
-            # if its invalid or None
+            # if it is invalid or None
             if link in self.urls_to_visit:
                 continue
 
@@ -408,39 +410,52 @@ class BaseCrawler(CrawlerMixin):
 
             # Links such as http://exampe.com/path#
             # are useless and can create
-            # useless repetition
+            # useless repetition for us
             if link.endswith('#'):
                 continue
 
-            # If the link is similar to the originally
-            # visited url, skip it - This is a security measure
+            # If the link is similar to the initially
+            # visited url, skip it. NOTE: This is essentially
+            # a  security measure
             if link_object.netloc != self._start_url_object.netloc:
                 continue
 
             # If the url contains a fragment, it is the same
-            # as visiting the root page for instance:
+            # as visiting the root page, for example:
             # example.com/#google is the same as example.com/
             if link_object.fragment:
                 continue
 
             # If we have already visited the home page then
-            # skip all urls that include the '/' path - This
-            # is another security measure
+            # skip all urls that include the '/' path.
+            # NOTE: This is another security measure
             if link_object.path == '/' and self._start_url_object.path == '/':
                 continue
 
-            # Reconstruct a partial urls for example
+            # Reconstruct a partial url for example
             # /google becomes https://example.com/google
             if link_object.path != '/' and link.startswith('/'):
                 link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
+                # link = urlunparse((
+                #     self._start_url_object.scheme, 
+                #     self._start_url_object.netloc, 
+                #     link,
+                #     None,
+                #     None,
+                #     None,
+                #     None
+                # ))
 
             self.urls_to_visit.add(link)
 
         # Finally, run all the filters to exclude
         # urls that the user does not want to visit
+        # from the list of urls. NOTE: This re-initializes
+        # the list of urls to visit 
+        # previous_state = self.urls_to_visit.copy()
         self.urls_to_visit = set(self.run_filters())
-
-        logger.info(f"Found {len(elements)} urls")
+        # excluded_urls = previous_state.difference(self.urls_to_visit)
+        # logger.info(f'Ignored {len(excluded_urls)} urls')
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
@@ -516,6 +531,7 @@ class BaseCrawler(CrawlerMixin):
         # scrapping, use a maximised window since
         # layouts can fundamentally change when
         # using a smaller window
+        logger.info(f'{self.__class__.__name__} ready to crawl website')
         self.driver.maximize_window()
 
         self.debug_mode = debug_mode
@@ -625,6 +641,7 @@ class BaseCrawler(CrawlerMixin):
             time.sleep(wait_time)
 
 
+
 class SinglePageAutomater(CrawlerMixin):
     """Automates user defined actions on a
     single or multiple user provided 
@@ -643,8 +660,10 @@ class SinglePageAutomater(CrawlerMixin):
         # scrapping, use a maximised window since
         # layouts can fundamentally change when
         # using a smaller window
+        logger.info(
+            f'{self.__class__.__name__} ready to automate actions on website')
         self.driver.maximize_window()
-        
+
         self.debug_mode = debug_mode
 
         logger.info('Starting Kryptone automation...')
