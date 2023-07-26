@@ -5,7 +5,7 @@ import re
 import string
 import time
 from collections import defaultdict
-from urllib.parse import urlparse, urljoin, urlunparse
+from urllib.parse import urlparse, urlunparse, unquote
 
 import pytz
 import requests
@@ -327,7 +327,7 @@ class BaseCrawler(CrawlerMixin):
     def urljoin(self, path):
         """Returns the domain of the current
         website"""
-        return urlunparse((
+        result = urlunparse((
             self._start_url_object.scheme,
             self._start_url_object.netloc,
             path,
@@ -335,6 +335,7 @@ class BaseCrawler(CrawlerMixin):
             None,
             None
         ))
+        return unquote(result)
 
     def get_filename(self, length=5, extension=None):
         characters = string.ascii_lowercase + string.digits
