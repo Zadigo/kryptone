@@ -2,7 +2,7 @@ import dataclasses
 import pathlib
 import re
 from functools import cached_property, lru_cache
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 class BaseModel:
@@ -81,7 +81,8 @@ class Product(BaseModel):
         tokens = filter(lambda x: x not in exclude and x != '', tokens)
         tokens = list(map(lambda x: x.replace('-', '_'), tokens))
         tokens.pop(-1)
-        return pathlib.Path('/'.join(tokens))
+        path = unquote('/'.join(tokens))
+        return pathlib.Path(path)
 
     def set_collection_id(self, regex):
         result = re.search(regex, getattr(self, 'url'))
