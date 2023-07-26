@@ -15,9 +15,9 @@ class EcommerceCrawlerMixin:
     to crawling ecommerce websites"""
 
     scroll_step = 30
-    products = deque()
-    product_objects = deque()
-    seen_products = deque()
+    products = []
+    product_objects = []
+    seen_products = []
     
     def add_product(self, data, track_id=False):
         """Add a product to the global product container"""
