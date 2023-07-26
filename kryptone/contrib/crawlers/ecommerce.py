@@ -43,14 +43,16 @@ class EcommerceCrawlerMixin:
                     response = requests.get(url, headers=headers)
 
                     url_object = urlparse(url)
-                    
-                    # Guess the extension of the image that we
-                    # want to save locally
-                    mimetype, _ = mimetypes.guess_type(url_object.path)
-                    extension = mimetypes.guess_extension(mimetype, strict=True)
 
                     if response.status_code == 200:
+                        # Guess the extension of the image that we
+                        # want to save locally
+                        mimetype, _ = mimetypes.guess_type(url_object.path)
+                        extension = mimetypes.guess_extension(mimetype, strict=True)
+
                         await queue.put((extension, response.content))
+                    else:
+                        logger.error(f'Image request error: {url}')
                     await asyncio.sleep(1)
             
             async def save_image():
