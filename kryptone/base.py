@@ -324,6 +324,18 @@ class BaseCrawler(CrawlerMixin):
     start_xml_url = None
     url_filters = []
 
+    def urljoin(self, path):
+        """Returns the domain of the current
+        website"""
+        return urlunparse((
+            self._start_url_object.scheme,
+            self._start_url_object.netloc,
+            path,
+            None,
+            None,
+            None
+        ))
+
     def get_filename(self, length=5, extension=None):
         characters = string.ascii_lowercase + string.digits
         name = ''.join(random.choice(characters) for _ in range(length))
