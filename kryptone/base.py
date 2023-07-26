@@ -244,7 +244,7 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             browser_name=browser_name or self.browser_name
         )
 
-        navigation.connect(collect_images_receiver, sender=self)
+        # navigation.connect(collect_images_receiver, sender=self)
 
         db_signal.connect(backends.airtable_backend, sender=self)
         db_signal.connect(backends.notion_backend, sender=self)
@@ -327,6 +327,7 @@ class BaseCrawler(CrawlerMixin):
     def urljoin(self, path):
         """Returns the domain of the current
         website"""
+        path = str(path).strip()
         result = urlunparse((
             self._start_url_object.scheme,
             self._start_url_object.netloc,
@@ -535,7 +536,7 @@ class BaseCrawler(CrawlerMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None):
+    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None, url_cache=None):
         """Entrypoint to start the spider
 
         >>> instance = BaseCrawler()
@@ -556,6 +557,10 @@ class BaseCrawler(CrawlerMixin):
             logger.info('Starting Kryptone in debug mode...')
         else:
             logger.info('Starting Kryptone...')
+
+        if url_cache is not None:
+            self.urls_to_visit = url_cache.urls_to_visit
+            self.visited_urls = url_cache.visited_urls
 
         if self.start_xml_url is not None:
             start_urls = self.start_from_sitemap_xml(self.start_xml_url)
