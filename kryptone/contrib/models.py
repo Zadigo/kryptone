@@ -4,6 +4,8 @@ import re
 from functools import cached_property, lru_cache
 from urllib.parse import unquote, urlparse
 
+from kryptone.utils.text import remove_accents, remove_punctuation
+
 
 class BaseModel:
     @cached_property
@@ -14,7 +16,8 @@ class BaseModel:
 
     @cached_property
     def url_object(self):
-        return urlparse(getattr(self, 'url', ''))
+        result = unquote(getattr(self, 'url', ''))
+        return urlparse(result)
     
     @cached_property
     def get_url_object(self):
@@ -79,10 +82,14 @@ class Product(BaseModel):
         """
         tokens = self.url_object.path.split('/')
         tokens = filter(lambda x: x not in exclude and x != '', tokens)
-        tokens = list(map(lambda x: x.replace('-', '_'), tokens))
+
+        def clean_token(token):
+            result = token.replace('-', '_')
+            return remove_accents(remove_punctuation(result))
+        tokens = list(map(clean_token, tokens))
+
         tokens.pop(-1)
-        path = unquote('/'.join(tokens))
-        return pathlib.Path(path)
+        return pathlib.Path('/'.join(tokens))
 
     def set_collection_id(self, regex):
         """Set the product's collection ID from the url
