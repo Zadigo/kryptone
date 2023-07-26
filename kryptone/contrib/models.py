@@ -85,10 +85,19 @@ class Product(BaseModel):
         return pathlib.Path(path)
 
     def set_collection_id(self, regex):
-        result = re.search(regex, getattr(self, 'url'))
+        """Set the product's collection ID from the url
+        
+        If the "collection_id" named parameter is present in the regex, 
+        the result of the match will return this specific value otherwise
+        it will be result of the first group
+        
+        >>> set_collection_id(r'\/(?P<collection_id>\d+)')
+        """
+        result = re.search(regex, self.get_url_object.path)
         if result:
-            self.collection_id = result.group(1)
-        return None
+            group_dict = result.groupdict()
+            self.collection_id = group_dict.get('collection_id', result.group(1))
+
 
 
 @dataclasses.dataclass
