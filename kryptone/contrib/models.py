@@ -60,7 +60,7 @@ class Product(BaseModel):
     color: str = None
 
     def __hash__(self):
-        return hash((self.name, self.id_or_reference))
+        return hash((self.name, self.url, self.id_or_reference))
 
     @cached_property
     def get_images_url_objects(self):
