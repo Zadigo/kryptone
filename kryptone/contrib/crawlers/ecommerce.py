@@ -78,6 +78,8 @@ class EcommerceCrawlerMixin:
                         if content is not None:
                             f.write(content)
                         index = index + 1
+                        
+                    logger.info(f'Downloaded image for: {product.name}')
                     # Delay this task slightly more than the
                     # one above to allow requests to populate
                     # the queue on time
