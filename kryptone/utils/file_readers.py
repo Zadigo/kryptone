@@ -81,7 +81,7 @@ class URLCache:
 
     def __repr__(self) -> str:
         statistics = f'urls_to_visit={len(self._urls_to_visit)} '
-        f'_visited_urls={len(self._visited_urls)}'
+        f'visited_urls={len(self._visited_urls)}'
         return f'<URLCache: {statistics}>'
 
     @property
