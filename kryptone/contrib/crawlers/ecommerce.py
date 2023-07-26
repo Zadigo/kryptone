@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from collections import deque
 import requests
 
+from kryptone import logger
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
