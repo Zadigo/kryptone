@@ -41,20 +41,26 @@ class EcommerceCrawlerMixin:
                 while urls_to_use:
                     url = urls_to_use.pop()
                     headers = {'User-Agent': RANDOM_USER_AGENT()}
-                    response = requests.get(url, headers=headers)
-
-                    url_object = urlparse(url)
-
-                    if response.status_code == 200:
-                        # Guess the extension of the image that we
-                        # want to save locally
-                        mimetype, _ = mimetypes.guess_type(url_object.path)
-                        extension = mimetypes.guess_extension(mimetype, strict=True)
-
-                        await queue.put((extension, response.content))
+                    
+                    try:
+                        response = requests.get(url, headers=headers)
+                    except Exception as e:
+                        logger.error(f'Failed to fetch image data: {url}')
+                        logger.error(e)
                     else:
-                        logger.error(f'Image request error: {url}')
-                    await asyncio.sleep(1)
+                        url_object = urlparse(url)
+
+                        if response.status_code == 200:
+                            # Guess the extension of the image that we
+                            # want to save locally
+                            mimetype, _ = mimetypes.guess_type(url_object.path)
+                            extension = mimetypes.guess_extension(mimetype, strict=True)
+
+                            await queue.put((extension, response.content))
+                        else:
+                            logger.error(f'Image request error: {url}')
+                    finally:
+                        await asyncio.sleep(1)
             
             async def save_image():
                 index = 1
@@ -79,7 +85,7 @@ class EcommerceCrawlerMixin:
                             f.write(content)
                         index = index + 1
                         
-                    logger.info(f'Downloaded image for: {product.name}')
+                    logger.info(f"Downloaded image for: '{product.name}'")
                     # Delay this task slightly more than the
                     # one above to allow requests to populate
                     # the queue on time
