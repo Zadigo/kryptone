@@ -118,4 +118,4 @@ def execute_command_inline(argv=None):
         utility.call_command(argv)
     except KeyboardInterrupt:
         from kryptone import logger
-        logger.info('Krytone was stopped')
+        logger.info('Program was stopped manually')

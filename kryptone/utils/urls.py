@@ -1,3 +1,4 @@
+from kryptone import logger
 from urllib.parse import urljoin, urlparse
 from kryptone.utils.file_readers import read_document
 
@@ -65,7 +66,7 @@ class URLFile:
         try:
             data = read_document('urls.txt')
         except:
-            pass 
+            logger.info('No urls were loaded from url cache file')
         else:
             urls = data.split('\n')
             if processor is not None:
@@ -77,3 +78,5 @@ class URLFile:
     
     def __str__(self):
         return self.urls
+
+

@@ -5,7 +5,7 @@ import re
 import string
 import time
 from collections import defaultdict
-from urllib.parse import urlparse, urlunparse, unquote
+from urllib.parse import unquote, urlparse, urlunparse
 
 import pytz
 import requests
@@ -249,6 +249,12 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         db_signal.connect(backends.airtable_backend, sender=self)
         db_signal.connect(backends.notion_backend, sender=self)
         db_signal.connect(backends.google_sheets_backend, sender=self)
+
+        self._start_date = datetime.datetime.now(tz=pytz.timezone('UTC'))
+        self._end_date = None
+
+        self._start_time = time.time()
+        self._end_time = None
 
     @property
     def get_html_page_content(self):
@@ -658,7 +664,6 @@ class BaseCrawler(CrawlerMixin):
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
-
 
 
 class SinglePageAutomater(CrawlerMixin):
