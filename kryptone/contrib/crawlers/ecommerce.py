@@ -10,6 +10,7 @@ from kryptone.conf import settings
 from kryptone.contrib.models import Product
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
+from kryptone.utils.file_readers import write_json_document, read_json_document
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
@@ -20,15 +21,33 @@ class EcommerceCrawlerMixin:
     product_objects = []
     seen_products = []
     
-    def add_product(self, data, track_id=False):
-        """Add a product to the global product container"""
+    def add_product(self, data, track_id=False, collection_id_regex=None):
+        """Adds a product to the global product container"""
         product_object = Product(**data)
+
         if track_id:
             product_object.id = self.products.count() + 1
+
+        if collection_id_regex is not None:
+            product_object.set_collection_id(collection_id_regex)
 
         self.product_objects.append(product_object)
         self.products.append(product_object.as_json())
         return product_object
+    
+    def save_product(self, data, track_id=False, collection_id_regex=None):
+        """Adds an saves a product to the backends"""
+        # Before writing new products, ensure that we have previous
+        # products from a previous scrap and if so, load the previous
+        # products. This would prevent overwriting the previous file
+        if not self.products:
+            previous_products_data = read_json_document('products.json')
+            self.products = previous_products_data if previous_products_data else []
+            logger.info(f"Loaded {len(self.products)} products from 'products.json'")
+
+        new_product = self.add_product(data, track_id=track_id, collection_id_regex=collection_id_regex)
+        write_json_document('products.json', self.products)
+        return new_product
 
     def save_images(self, product, path, filename=None):
         """Asynchronously save images to the project's
