@@ -4,6 +4,7 @@ import kryptone
 from kryptone.checks.core import checks_registry
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
+from kryptone.utils.file_readers import URLCache
 
 
 class Command(ProjectCommand):
@@ -45,18 +46,21 @@ class Command(ProjectCommand):
                 "The spiders for the current project "
                 "were not properly configured"
             ))
-        
-        from kryptone.conf import settings
-        from kryptone.utils.file_readers import read_json_document
 
-        start_urls = read_json_document(settings.PROJECT_PATH / 'cache.json')
+        # from kryptone.conf import settings
+        # from kryptone.utils.file_readers import read_json_document
+
+        # start_urls = read_json_document(settings.PROJECT_PATH / 'cache.json')
+
+        url_cache = URLCache()
+        url_cache.load_from_file()
 
         params = {
-            'start_urls': start_urls,
             'debug_mode': namespace.debug_mode,
             # 'wait_time': namespace.wait_time,
             'run_audit': namespace.run_audit,
-            'language': namespace.language
+            'language': namespace.language,
+            'url_cache': url_cache
         }
 
         if namespace.name is not None:

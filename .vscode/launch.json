@@ -18,7 +18,7 @@
             }
         },
         {
-            "name": "Kryptone: Project",
+            "name": "Kryptone: Test Project",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tests/testproject/manage.py",

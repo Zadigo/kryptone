@@ -3,6 +3,7 @@ import json
 from functools import lru_cache, wraps
 from io import FileIO
 
+from kryptone import logger
 from kryptone.conf import settings
 
 
@@ -81,7 +82,7 @@ class URLCache:
 
     def __repr__(self) -> str:
         statistics = f'urls_to_visit={len(self._urls_to_visit)} '
-        f'_visited_urls={len(self._visited_urls)}'
+        f'visited_urls={len(self._visited_urls)}'
         return f'<URLCache: {statistics}>'
 
     @property
@@ -96,6 +97,7 @@ class URLCache:
         data = read_json_document('cache.json')
         self._urls_to_visit = data['urls_to_visit']
         self._visited_urls = data['visited_urls']
+        logger.info(f'Loaded {len(self._urls_to_visit)} urls')
         self.data = data
 
     def load_from_dict(self, data):

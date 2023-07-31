@@ -6,6 +6,8 @@ import pymemcache
 import redis
 from dotenv import get_key
 
+from kryptone import logger
+
 
 class BaseConnection:
     """Base connection for all connections"""
@@ -31,8 +33,11 @@ class BaseConnection:
         """Creates a new connection"""
         if self.connection_class is None:
             raise ValueError('You need to specify a connection class')
-        return self.connection_class(**self.params)
-
+        try:
+            return self.connection_class(**self.params)
+        except Exception as e:
+            logger.error(f"Connection failed for {self.__class__.__name__}")
+            return False
 
 class RedisConnection(BaseConnection):
     """Base connection to a Redis database"""

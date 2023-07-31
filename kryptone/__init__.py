@@ -18,11 +18,9 @@ class Logger:
         )
         handler.setFormatter(log_format)
 
-        # from kryptone.conf import settings
-        # if settings.PROJECT_PATH is not None:
-        #     file_handler = logging.FileHandler(settings.PROJECT_PATH / 'access.log')
-        #     logger.addHandler(file_handler)
-        #     file_handler.setFormatter(log_format)
+        file_handler = logging.FileHandler('access.log')
+        logger.addHandler(file_handler)
+        file_handler.setFormatter(log_format)
 
         self.instance = logger
 

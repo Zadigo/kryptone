@@ -31,28 +31,68 @@ from bs4 import BeautifulSoup
 #     await asyncio.gather(function1(), function2())
 
 
-async def main(*args):
-    async def some_function():
-        for i in range(100):
-            print('function', i)
-            await asyncio.sleep(5)
+# async def main(*args):
+#     async def some_function():
+#         for i in range(100):
+#             print('function', i)
+#             await asyncio.sleep(5)
 
-    async def other_function():
-        for i in range(100):
-            print('other', i)
+#     async def other_function():
+#         for i in range(100):
+#             print('other', i)
+#             await asyncio.sleep(2)
+
+#     # task1 = asyncio.ensure_future(some_function())
+#     # task2 = asyncio.ensure_future(other_function())
+
+#     tasks = []
+#     for x in [some_function, other_function]:
+#         tasks.append(asyncio.ensure_future(x()))
+
+
+#     # await asyncio.gather(task1, task2)
+#     await asyncio.gather(*tasks)
+
+import requests
+import mimetypes
+from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from urllib.parse import urlparse
+
+
+async def main():
+    queue = asyncio.Queue()
+    image_urls = [
+        'https://www.jennyfer.com/dw/image/v2/AAQC_PRD/on/demandware.static/-/Sites-jennyfer-catalog-master/default/dwa184efb3/images/10042987C060_81_G.jpg?sw=592',
+        'https://www.jennyfer.com/dw/image/v2/AAQC_PRD/on/demandware.static/-/Sites-jennyfer-catalog-master/default/dw4fc8bc61/images/10042987C060_82_G.jpg?sw=592'
+    ]
+
+    async def request_images():
+        while image_urls:
+            url = image_urls.pop()
+            headers = {'User-Agent': RANDOM_USER_AGENT()}
+            response = requests.get(url, headers=headers)
+            if response.ok:
+                url_object = urlparse(url)
+                mimetype, _ = mimetypes.guess_type(url_object.path)
+                extension = mimetypes.guess_extension(mimetype)
+                await queue.put((extension, response.content))
+                print('Got response for:', response)
             await asyncio.sleep(2)
 
-    # task1 = asyncio.ensure_future(some_function())
-    # task2 = asyncio.ensure_future(other_function())
+    async def save_image():
+        index = 1
+        while not queue.empty():
+            extension, content = await queue.get()
+            if content is not None:
+                with open(f'{index}{extension}', mode='wb') as f:
+                    f.write(content)
+                    print('Downloaded image')
+            index = index + 1
+            await asyncio.sleep(4)
 
-    tasks = []
-    for x in [some_function, other_function]:
-        tasks.append(asyncio.ensure_future(x()))
-
-
-    # await asyncio.gather(task1, task2)
-    await asyncio.gather(*tasks)
+    await asyncio.gather(request_images(), save_image())
 
 
 if __name__ == '__main__':
-    asyncio.run(main('http://example.com', 'http://example.com/1'))
+    asyncio.run(main())
+    # asyncio.run(main('http://example.com', 'http://example.com/1'))

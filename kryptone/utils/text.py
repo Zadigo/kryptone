@@ -1,4 +1,8 @@
 import re
+import string
+
+import unidecode
+
 from kryptone.utils.iterators import drop_null
 
 PRICE = re.compile(r'(\d+\,?\d+)')
@@ -74,3 +78,18 @@ class Text:
         text = lowered_text.encode(encoding).decode(encoding)
         normalized_text = text.replace('\n', ' ')
         return normalized_text.strip()
+
+
+def remove_punctuation(text, email_exception=False):
+    """Remove the punctation from a given text. If the text
+    is an email, consider using the email_exception so that the
+    '@' symbol does not get removed"""
+    punctuation = string.punctuation
+    if email_exception:
+        punctuation = punctuation.replace('@', '')
+    return text.translate(str.maketrans('', '', punctuation))
+
+
+def remove_accents(text):
+    """Remove accents from the text"""
+    return unidecode.unidecode(text)
