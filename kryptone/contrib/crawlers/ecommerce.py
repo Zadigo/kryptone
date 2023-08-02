@@ -48,6 +48,13 @@ class EcommerceCrawlerMixin:
         new_product = self.add_product(data, track_id=track_id, collection_id_regex=collection_id_regex)
         write_json_document('products.json', self.products)
         return new_product
+    
+    def bulk_save_products(self, data, track_id=False, collection_id_regex=None):
+        products = []
+        for item in data:
+            product = self.save_product(item, track_id=track_id, collection_id_regex=collection_id_regex)
+            products.append(product)
+        return products
 
     def save_images(self, product, path, filename=None):
         """Asynchronously save images to the project's

@@ -28,7 +28,7 @@ IGNORE_URLS = [
 
 
 def ignore_urls(url):
-    result =  all([x in url for x in IGNORE_URLS])
+    result = all([x in url for x in IGNORE_URLS])
     return False if result else True
 
 
@@ -40,8 +40,8 @@ def only_product_pages(url):
 
 
 class Jennyfer(EcommerceCrawlerMixin, BaseCrawler):
-    start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/'
-    # start_url = 'https://www.jennyfer.com/fr-fr/vetements/jupes/jupe-ete/short-effet-jupe-fluide-noir-a-fleurs--10042987060.html'
+    # start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/'
+    start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/haut-de-maillot-de-bain/haut-de-maillot-de-bain-crepe-noir-10040867060.html'
     url_filters = [ignore_urls, only_product_pages]
 
     def create_dump(self):
@@ -61,14 +61,4 @@ class Jennyfer(EcommerceCrawlerMixin, BaseCrawler):
             pass
 
     def run_actions(self, current_url, **kwargs):
-        # self.scroll_window()
-        product_color_urls = self.driver.execute_script(
-            """
-            // Since the button to change product colors is an input
-            // and not a link, get the link within the input button
-            const elements = Array.from(document.querySelectorAll('input[id^="productColor_productHeader"]'))
-            return elements.map(x => x.attributes['value'].textContent)
-            """
-        )
-        if product_color_urls:
-            self.add_urls(*product_color_urls)
+        pass

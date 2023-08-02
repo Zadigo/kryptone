@@ -100,7 +100,7 @@ class SpiderConfig:
         except Exception as e:
             spider_instance.create_dump()
             raise ExceptionGroup(
-                'Some xceptions occurred while trying to start the project',
+                'Some exceptions occurred while trying to start the project',
                 [
                     Exception(e)
                 ]

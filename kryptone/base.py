@@ -623,8 +623,7 @@ class BaseCrawler(CrawlerMixin):
             self._backup_urls()
 
             if run_audit:
-                language = language or settings.WEBSITE_LANGUAGE
-                self.audit_page(current_url, language=language)
+                self.audit_page(current_url)
                 write_json_document('audit.json', self.page_audits)
 
                 vocabulary = self.global_audit(language=language)

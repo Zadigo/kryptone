@@ -28,6 +28,9 @@ class Logger:
     def create(cls, name):
         instance = cls(name=name)
         return instance
+    
+    def warning(self, message, *args, **kwargs):
+        self.instance.warning(message, *args, **kwargs)
 
     def info(self, message, *args, **kwargs):
         self.instance.info(message, *args, **kwargs)
