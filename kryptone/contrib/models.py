@@ -57,6 +57,7 @@ class Product(BaseModel):
     id_or_reference: str = None
     id: int = None
     images:str = dataclasses.field(default_factory=[])
+    composition: str = None
     color: str = None
 
     def __hash__(self):

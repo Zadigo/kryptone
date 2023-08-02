@@ -288,6 +288,11 @@ class SEOMixin(TextMixin):
             new_item[key] = int(value)
         return new_item
     
+    @property
+    def get_transformed_raw_page_text(self):
+        text = self.driver.find_element(By.TAG_NAME, 'body').text
+        return self.fit(text)
+    
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
