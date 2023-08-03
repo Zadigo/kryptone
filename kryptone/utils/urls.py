@@ -63,7 +63,8 @@ class URL:
     
     @property
     def is_file(self):
-        file_extensions = read_document('kryptone/kryptone/data/file_extensions.txt', as_list=True)
+        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
+        file_extensions = read_document(path, as_list=True)
         extension = self.as_path.suffix
         
         if extension == '':
@@ -92,19 +93,25 @@ class URL:
     
     def compare(self, url_to_compare):
         """Checks that the given url has the same path
-        as the url to compare"""
+        as the url to compare
+        
+        >>> instance = URL('http://example.com/a')
+        ... instance.compare('http://example.com/a')
+        """
         if isinstance(url_to_compare, str):
-            url_to_compare = self.create(url_to_compare)
+            url_to_compare = self.create(url_to_compare)            
 
         logic = [
-            self.url_object.path == url_to_compare.url_object.path
+            self.url_object.path == url_to_compare.url_object.path,
+            url_to_compare.url_object.path == '/' and self.url_object.path == '',
+            self.url_object.path == '/' and url_to_compare.url_object.path == ''
         ]
 
-        if url_to_compare.url_object.path == '/' and self.url_object.path == '':
-            logic.append(True)
+        # if url_to_compare.url_object.path == '/' and self.url_object.path == '':
+        #     logic.append(True)
 
-        if self.url_object.path == '/' and url_to_compare.url_object.path == '':
-            logic.append(True)
+        # if self.url_object.path == '/' and url_to_compare.url_object.path == '':
+        #     logic.append(True)
         
         return any(logic)
     
@@ -201,13 +208,13 @@ class URLPassesTest:
 
     def __init__(self, *paths, name=None):
         self.name = name
-        self.url = None
         self.paths = set(paths)
 
     def __call__(self, url):
         result = []
+        url_object = urlparse(url)
         for path in self.paths:
-            if path in self.url.url_object.path:
+            if path in url_object.path:
                 result.append(True)
             else:
                 result.append(False)
@@ -215,8 +222,3 @@ class URLPassesTest:
             logger.warning(f'Url fails test: {self.name}: {url}')
             return False
         return True
-
-    def prepare(self, url):
-        self.url = URL(url)
-        if self.name is None:
-            self.name = f'<URLPassesTest: [{len(self.paths)}]>'
