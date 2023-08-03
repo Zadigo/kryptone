@@ -9,20 +9,6 @@ from kryptone.registry import registry
 class Command(ProjectCommand):
     def add_arguments(self, parser):
         parser.add_argument(
-            '-a',
-            '--run-audit',
-            help='Audit the website',
-            type=bool,
-            default=False
-        )
-        parser.add_argument(
-            '-d',
-            '--debug-mode',
-            help='Run the crawler in debug mode',
-            default=False,
-            type=bool
-        )
-        parser.add_argument(
             '-l',
             '--language',
             help='Specify the website language',
@@ -42,13 +28,6 @@ class Command(ProjectCommand):
             help='A list of starting urls to use',
             action='append'
         )
-        # parser.add_argument(
-        #     '-w',
-        #     '--wait-time',
-        #     help='The amount of time the crawler should wait before going to the next pages',
-        #     default=25,
-        #     type=int
-        # )
 
     def execute(self, namespace):
         kryptone.setup()
@@ -62,9 +41,7 @@ class Command(ProjectCommand):
 
         params = {
             'start_urls': namespace.start_urls,
-            'debug_mode': namespace.debug_mode,
             # 'wait_time': namespace.wait_time,
-            'run_audit': namespace.run_audit,
             'language': namespace.language
         }
 

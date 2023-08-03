@@ -37,7 +37,7 @@ class URL:
         return obj in self.raw_url
 
     def __hash__(self):
-        return hash([self.raw_url, self.url_object.path])
+        return hash((self.raw_url, self.url_object.path))
     
     def __len__(self):
         return len(self.raw_url)
@@ -77,6 +77,12 @@ class URL:
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
+    
+    @property
+    def get_extension(self):
+        if self.is_file:
+            return self.as_path.suffix
+        return None
 
     @property
     def url_stem(self):
@@ -202,24 +208,38 @@ class URLPassesTest:
     
     >>> class Spider(BaseCrawler):
             url_passes_tests = [
-                URLPassesTest('/example')
+                URLPassesTest(
+                    'simple_test',
+                    paths=[
+                        '/example'
+                    ]
+                )
             ]
     """
 
-    def __init__(self, *paths, name=None):
+    def __init__(self, name, *, paths=[], ignore_files=[]):
         self.name = name
         self.paths = set(paths)
         self.failed_paths = []
+        self.ignore_files = ignore_files
 
     def __call__(self, url):
         result = []
-        url_object = urlparse(url)
+
+        if isinstance(url, str):
+            url = URL(url)
+        
         for path in self.paths:
-            if path in url_object.path:
+            if path in url.url_object.path:
                 self.failed_paths.append(path)
                 result.append(True)
             else:
                 result.append(False)
+            
+            # if url.is_file and self.ignore_files:
+            #     if url.get_extension in self.ignore_files:
+            #         result.append(False)
+        
         if any(result):
             logger.warning(f'Url fails test: {self.name}: {url}')
             return False

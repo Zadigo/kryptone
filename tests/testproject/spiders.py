@@ -1,9 +1,11 @@
-import time
 import re
-from selenium.webdriver.common.by import By
-from kryptone.contrib.crawlers.ecommerce import EcommerceCrawlerMixin
+import time
 
-from kryptone.base import BaseCrawler
+from selenium.webdriver.common.by import By
+from kryptone.utils.urls import URLPassesTest
+
+from kryptone.base import SiteCrawler
+from kryptone.contrib.crawlers.ecommerce import EcommerceCrawlerMixin
 
 IGNORE_URLS = [
     'faq-faq',
@@ -27,22 +29,17 @@ IGNORE_URLS = [
 ]
 
 
-def ignore_urls(url):
-    result = all([x in url for x in IGNORE_URLS])
-    return False if result else True
-
-
-def only_product_pages(url):
-    is_match = re.search(r'\/[a-z\-]+\-\-\d+', url)
-    if is_match:
-        return True
-    return False
-
-
-class Jennyfer(EcommerceCrawlerMixin, BaseCrawler):
+class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
     # start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/'
     start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/haut-de-maillot-de-bain/haut-de-maillot-de-bain-crepe-noir-10040867060.html'
-    url_filters = [ignore_urls, only_product_pages]
+
+    class Meta:
+        url_passes_tests = [
+            URLPassesTest(
+                'base_pages',
+                paths=IGNORE_URLS
+            )
+        ]
 
     def create_dump(self):
         print('Dumping data')
@@ -51,14 +48,15 @@ class Jennyfer(EcommerceCrawlerMixin, BaseCrawler):
         time.sleep(2)
         self.click_consent_button(element_id='onetrust-accept-btn-handler')
 
-        try:
-            download_app_button = self.driver.find_element(
-                By.CSS_SELECTOR,
-                'svg[class="qlf-close-button__svg"]'
-            )
-            download_app_button.click()
-        except:
-            pass
+        # try:
+        #     download_app_button = self.driver.find_element(
+        #         By.CSS_SELECTOR,
+        #         'svg[class="qlf-close-button__svg"]'
+        #     )
+        #     download_app_button.click()
+        # except:
+        #     pass
 
     def run_actions(self, current_url, **kwargs):
-        pass
+        print(current_url)
+        self.scroll_window(stop_at=5000)
