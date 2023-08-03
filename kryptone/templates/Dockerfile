@@ -10,18 +10,18 @@ RUN apt-get install -y python3 python3-pip
 # Install Selenium dependencies
 RUN apt-get install -y chromium-chromedriver
 
-RUN ln -s /usr/lib/chromium-browser/chromedriver
+# RUN ln -s /usr/lib/chromium-browser/chromedriver
+
+# RUN apt-get install curl
 
 RUN ln -s /usr/bin/chromedriver
 
 WORKDIR /app
 
 # Clone the Kryptone framework
-RUN git clone 
+RUN curl -sL https://github.com/Zadigo/kryptone/archive/refs/tags/v1.0.0.tar.gz
 
-COPY requirements.txt .
-
-RUN pip install -r requirements.txt
+RUN pip install -r kryptone-1.0.0/requirements.txt
 
 # Add the directory to the PYTHONPATH
 ENV PYTHONPATH="${PYTHONPATH}:/app"
@@ -32,4 +32,4 @@ COPY . /app
 
 EXPOSE 80 443 5589
 
-CMD [ "pyton", "manage.py", "start" ]
+CMD [ "python", "manage.py", "start" ]
