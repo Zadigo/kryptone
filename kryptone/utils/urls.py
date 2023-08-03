@@ -209,12 +209,14 @@ class URLPassesTest:
     def __init__(self, *paths, name=None):
         self.name = name
         self.paths = set(paths)
+        self.failed_paths = []
 
     def __call__(self, url):
         result = []
         url_object = urlparse(url)
         for path in self.paths:
             if path in url_object.path:
+                self.failed_paths.append(path)
                 result.append(True)
             else:
                 result.append(False)
