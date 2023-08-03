@@ -187,3 +187,36 @@ class TestUrl:
     
     def __bool__(self):
         return self.test_result
+
+
+class URLPassesTest:
+    """Checks if an url is able to pass a
+    a given test
+    
+    >>> class Spider(BaseCrawler):
+            url_passes_tests = [
+                URLPassesTest('/example')
+            ]
+    """
+
+    def __init__(self, *paths, name=None):
+        self.name = name
+        self.url = None
+        self.paths = set(paths)
+
+    def __call__(self, url):
+        result = []
+        for path in self.paths:
+            if path in self.url.url_object.path:
+                result.append(True)
+            else:
+                result.append(False)
+        if any(result):
+            logger.warning(f'Url fails test: {self.name}: {url}')
+            return False
+        return True
+
+    def prepare(self, url):
+        self.url = URL(url)
+        if self.name is None:
+            self.name = f'<URLPassesTest: [{len(self.paths)}]>'
