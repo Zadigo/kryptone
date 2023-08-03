@@ -1,24 +1,25 @@
+import pathlib
 import re
-from kryptone import logger
 from urllib.parse import urljoin, urlparse
+
+import requests
+
+from kryptone import logger
+from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
-import requests
-import pathlib
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.conf import settings
 
 
 class URL:
-    """Represents an url"""
+    """Represents an url
+    
+    >>> instance URL('http://example.com')
+    """
 
     def __init__(self, url_string):
         self.raw_url = url_string
         self.url_object = urlparse(self.raw_url)
-
-    @property
-    def is_path(self):
-        return self.raw_url.startswith('/')
 
     def __repr__(self):
         return f'<URL: {self.raw_url}>'
@@ -36,7 +37,14 @@ class URL:
         return obj in self.raw_url
 
     def __hash__(self):
-        return hash([self.raw_url])
+        return hash([self.raw_url, self.url_object.path])
+    
+    def __len__(self):
+        return len(self.raw_url)
+    
+    @property
+    def is_path(self):
+        return self.raw_url.startswith('/')
 
     @property
     def is_valid(self):
@@ -78,9 +86,7 @@ class URL:
         return incoming_url_object.netloc == self.url_object.netloc
     
     def get_status(self):
-        headers = {
-            'User-Agent': RANDOM_USER_AGENT()
-        }
+        headers = {'User-Agent': RANDOM_USER_AGENT()}
         response = requests.get(self.raw_url, headers=headers)
         return response.ok, response.status_code
     
@@ -103,20 +109,45 @@ class URL:
         return any(logic)
     
     def capture(self, regex):
-        result = re.match(regex, self.raw_url)
+        """Captures a value in the given url
+        
+        >>> instance = URL('http://example.com/a')
+        ... result = instance.capture(r'\/a')
+        ... result.group(1)
+        ... "/a'
+        """
+        result = re.search(regex, self.raw_url)
         if result:
             return result
         return False
     
     def test_path(self, regex):
+        """Test if the url's path passes test
+        
+        >>> instance = URL('http://example.com/a')
+        ... instance.test_path(r'\/a')
+        ... True
+        """
         result = re.search(regex, self.raw_url)
         if result:
             return True
         return False
     
-    def decompose_path(self):
+    def decompose_path(self, exclude=[]):
+        """Decomposes an url's path
+        
+        >>> instance = URL('http://example.com/a/b')
+        ... instance.decompose_path(exclude=[])
+        ... ["a", "b"]
+        """
         result = self.url_object.path.split('/')
-        return list(drop_while(lambda x: x == '', result))
+        def clean_values(value):
+            if value == '':
+                return True
+            if exclude and value in exclude:
+                return True
+            return False
+        return list(drop_while(clean_values, result))
 
 
 class URLFile:
@@ -140,7 +171,12 @@ class URLFile:
 
 
 class TestUrl:
-    """Test two different urls"""
+    """Test two different urls by checking path
+    similarity
+    
+    >>> TestUrl('https://example.com', 'http://example.com/')
+    ... True
+    """
     def __init__(self, current_url, url_to_test):
         self.current_url = URL(current_url)
         self.url_to_test = URL(url_to_test)
