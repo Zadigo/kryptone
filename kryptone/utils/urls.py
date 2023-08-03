@@ -3,7 +3,6 @@ import re
 from urllib.parse import urljoin, urlparse
 
 import requests
-
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
@@ -111,14 +110,7 @@ class URL:
             self.url_object.path == url_to_compare.url_object.path,
             url_to_compare.url_object.path == '/' and self.url_object.path == '',
             self.url_object.path == '/' and url_to_compare.url_object.path == ''
-        ]
-
-        # if url_to_compare.url_object.path == '/' and self.url_object.path == '':
-        #     logic.append(True)
-
-        # if self.url_object.path == '/' and url_to_compare.url_object.path == '':
-        #     logic.append(True)
-        
+        ]        
         return any(logic)
     
     def capture(self, regex):
@@ -191,8 +183,14 @@ class TestUrl:
     ... True
     """
     def __init__(self, current_url, url_to_test):
-        self.current_url = URL(current_url)
-        self.url_to_test = URL(url_to_test)
+        if isinstance(current_url, str):
+            current_url = URL(current_url)
+
+        if isinstance(url_to_test, str):
+            url_to_test = URL(url_to_test)
+
+        self.current_url = current_url
+        self.url_to_test = url_to_test
         self.test_result = self.current_url.compare(url_to_test)
 
     def __repr__(self):
