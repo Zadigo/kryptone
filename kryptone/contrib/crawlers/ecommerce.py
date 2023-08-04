@@ -43,6 +43,8 @@ class EcommerceCrawlerMixin:
         product = self.model(**data)
 
         if avoid_duplicates:
+            # Creates the product but does not add it to the
+            # general product list
             if self.product_exists(data, using=duplicate_key):
                 return False, product
         
