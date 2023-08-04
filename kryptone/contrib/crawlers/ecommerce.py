@@ -24,18 +24,28 @@ class EcommerceCrawlerMixin:
     seen_products = []
     model = Product
 
+    def seen_products(self, using='id_or_reference'):
+        """Returns a list of all products that were seen"""
+        return set(map(lambda x: x[using], self.product_objects))
+    
     def product_exists(self, product, using='id_or_reference'):
-        """Check if a product already exists in the container"""
-        values = map(lambda x: x[using], self.product_objects)
-        return product[using] in values
+        """Checks if a product was already seen in the database"""
+        if not isinstance(product, (dict, self.model)):
+            raise ValueError(f'Value should be an instance of dict or {self.model}')
+        return product[using] in self.seen_products(using=using)
 
-    def add_product(self, data, track_id=False, collection_id_regex=None):
+    def add_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds a product to the internal product container
         
         >>> instance.add_product([{...}], track_id=False)
+        ... (True, Product)
         """
         product = self.model(**data)
 
+        if avoid_duplicates:
+            if self.product_exists(data, using=duplicate_key):
+                return False, product
+        
         if track_id:
             product.id = self.products.count() + 1
 
@@ -44,10 +54,14 @@ class EcommerceCrawlerMixin:
 
         self.product_objects.append(product)
         self.products.append(product.as_json())
-        return product
+        return True, product
 
-    def save_product(self, data, track_id=False, collection_id_regex=None):
-        """Adds an saves a product to the backends"""
+    def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
+        """Adds an saves a product to the backends
+        
+        >>> instance.save_product([{...}], track_id=False)
+        ... (True, Product)
+        """
         # Before writing new products, ensure that we have previous
         # products from a previous scrap and if so, load the previous
         # products. This would prevent overwriting the previous file
@@ -59,7 +73,12 @@ class EcommerceCrawlerMixin:
             logger.info(message)
 
         new_product = self.add_product(
-            data, track_id=track_id, collection_id_regex=collection_id_regex)
+            data, 
+            track_id=track_id, 
+            collection_id_regex=collection_id_regex,
+            avoid_duplicates=avoid_duplicates,
+            duplicate_key=duplicate_key
+        )
         write_json_document('products.json', self.products)
         return new_product
 
