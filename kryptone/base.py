@@ -27,6 +27,7 @@ from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
+                                         read_csv_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
@@ -536,6 +537,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
+        self.list_of_seen_urls = set(read_csv_document('seen_urls.csv', flatten=True))
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):

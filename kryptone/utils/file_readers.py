@@ -1,3 +1,4 @@
+import itertools
 import csv
 import json
 from functools import lru_cache, wraps
@@ -6,6 +7,7 @@ from io import FileIO
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
+
 
 def tokenize(func):
     @lru_cache(maxsize=100)
@@ -56,12 +58,23 @@ def write_json_document(filename, data):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
     with open(path, mode='w+', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False, cls=DefaultJsonEncoder)
+        json.dump(data, f, indent=4, ensure_ascii=False,
+                  cls=DefaultJsonEncoder)
+
+
+def read_csv_document(filename, flatten=False):
+    """Reads and returns the data of a csv document"""
+    path = get_media_folder(filename)
+    with open(path, mode='r', encoding='utf-8') as f:
+        data = list(csv.reader(f))
+        if flatten:
+            return list(itertools.chain(*data))
+        return data
 
 
 def write_csv_document(filename, data, adapt_data=False):
     """Writes data to a CSV file
-    
+
     >>> write_csv_document('example.csv', [[1], [2]])
 
     If you send in a simple array [1, 2], use `adapt_data`
