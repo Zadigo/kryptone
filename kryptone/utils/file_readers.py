@@ -56,7 +56,7 @@ def write_json_document(filename, data):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
     with open(path, mode='w+', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+        json.dump(data, f, indent=4, ensure_ascii=False, cls=DefaultJsonEncoder)
 
 
 def write_csv_document(filename, data, adapt_data=False):
