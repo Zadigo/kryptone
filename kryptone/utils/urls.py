@@ -1,8 +1,10 @@
 import pathlib
 import re
+from functools import lru_cache
 from urllib.parse import urljoin, urlparse
 
 import requests
+
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
@@ -246,6 +248,13 @@ class URLPassesTest:
             return False
         return True
 
+    @lru_cache(maxsize=10)
+    def default_ignored_files(self):
+        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
+        sorted_values = sorted(read_document(path, as_list=True))
+        return list(drop_while(lambda x: x == '', sorted_values))
+
+
 
 class UrlPassesRegexTest:
     """Checks if an url is able to pass a
@@ -268,3 +277,7 @@ class UrlPassesRegexTest:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
+
+u = URLPassesTest('e')
+r = u.default_ignored_files()
+print(r)
