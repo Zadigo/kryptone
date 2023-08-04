@@ -494,7 +494,6 @@ class BaseCrawler(metaclass=Crawler):
 
 class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
-    start_xml_url = None
 
     def __init__(self, browser_name=None):
         self._start_url_object = None
@@ -606,16 +605,21 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.urls_to_visit = url_cache.urls_to_visit
             self.visited_urls = url_cache.visited_urls
 
+        if self.start_url is None:
+            raise ValueError('A starting url should be provided to the spider')
+
         # If the urls_to_visit already populated,
         # makes no sense to use the start_url but
         # directly just go to an url already
         # present in the list
         if not self.urls_to_visit:
-            if self.start_xml_url is not None:
-                start_urls = self.start_from_sitemap_xml(self.start_xml_url)
-            elif self.start_url is not None:
+            # Start spider from .xml page
+            is_xml_page = self.start_url.endswith('.xml')
+            if not is_xml_page:
                 self.add_urls(self.start_url)
-                self._start_url_object = urlparse(self.start_url)
+            else:
+                start_urls = self.start_from_sitemap_xml(self.start_url)
+        self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.add_urls(*start_urls)
