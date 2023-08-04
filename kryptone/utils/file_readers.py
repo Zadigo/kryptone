@@ -5,7 +5,7 @@ from io import FileIO
 
 from kryptone import logger
 from kryptone.conf import settings
-
+from kryptone.utils.encoders import DefaultJsonEncoder
 
 def tokenize(func):
     @lru_cache(maxsize=100)
