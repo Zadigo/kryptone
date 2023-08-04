@@ -178,7 +178,8 @@ class BaseCrawler(metaclass=Crawler):
         """Indicates the level of completion
         for the current crawl session"""
         result = len(self.visited_urls) / len(self.urls_to_visit)
-        return round(result, 0)
+        percentage = round(result, 1)
+        logger.info(f'Crawl completed at {percentage * 100}%')
 
     @property
     def name(self):
