@@ -19,15 +19,15 @@ class BaseModel:
     @cached_property
     def url_object(self):
         result = unquote(getattr(self, 'url', ''))
-        return urlparse(result)
+        return urlparse(str(result))
     
     @cached_property
     def get_url_object(self):
-        return urlparse(self.url)
+        return urlparse(str(self.url))
     
     @cached_property
     def url_stem(self):
-        return pathlib.Path(self.url).stem
+        return pathlib.Path(str(self.url)).stem
     
     def __getitem__(self, key):
         return getattr(self, key)
