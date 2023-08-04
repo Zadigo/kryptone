@@ -606,11 +606,16 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.urls_to_visit = url_cache.urls_to_visit
             self.visited_urls = url_cache.visited_urls
 
-        if self.start_xml_url is not None:
-            start_urls = self.start_from_sitemap_xml(self.start_xml_url)
-        elif self.start_url is not None:
-            self.add_urls(self.start_url)
-            self._start_url_object = urlparse(self.start_url)
+        # If the urls_to_visit already populated,
+        # makes no sense to use the start_url but
+        # directly just go to an url already
+        # present in the list
+        if not self.urls_to_visit:
+            if self.start_xml_url is not None:
+                start_urls = self.start_from_sitemap_xml(self.start_xml_url)
+            elif self.start_url is not None:
+                self.add_urls(self.start_url)
+                self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.add_urls(*start_urls)
