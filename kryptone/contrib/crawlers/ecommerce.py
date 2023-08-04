@@ -54,6 +54,7 @@ class EcommerceCrawlerMixin:
         if not self.products:
             previous_products_data = read_json_document('products.json')
             self.products = previous_products_data if previous_products_data else []
+            self.product_objects = list(map(lambda x: self.model(**x), previous_products_data))
             message = f"Loaded {len(self.products)} products from 'products.json'"
             logger.info(message)
 
