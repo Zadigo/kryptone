@@ -304,6 +304,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             self.urls_to_visit.add(new_url)
+        logger.info(f'{len(urls_or_paths)} added')
 
     def get_page_urls(self, same_domain=True):
         """Returns all the urls present on the
