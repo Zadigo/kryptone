@@ -277,7 +277,4 @@ class UrlPassesRegexTest:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
-
-u = URLPassesTest('e')
-r = u.default_ignored_files()
-print(r)
+    
