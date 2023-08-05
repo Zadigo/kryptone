@@ -62,7 +62,12 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
 
 
 def get_selenium_browser_instance(browser_name=None):
-    """Creates a new selenium browser instance"""
+    """Creates a new selenium browser instance
+    
+    >>> browser = get_selenium_browser_instance()
+    ... browser.get('...')
+    ... browser.quit()
+    """
     browser_name = browser_name or settings.WEBDRIVER
     browser = Chrome if browser_name == 'Chrome' else Edge
     manager_instance = ChromeDriverManager if browser_name == 'Chrome' else EdgeChromiumDriverManager
@@ -77,6 +82,8 @@ def get_selenium_browser_instance(browser_name=None):
 
 
 class CrawlerOptions:
+    """Stores the main options for the crawler"""
+    
     def __init__(self, spider, name):
         self.spider = spider
         self.spider_name = name.lower()
