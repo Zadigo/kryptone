@@ -181,14 +181,6 @@ class BaseCrawler(metaclass=Crawler):
         return self.driver.find_elements(By.TAG_NAME, 'a')
 
     @property
-    def completion_percentage(self):
-        """Indicates the level of completion
-        for the current crawl session"""
-        result = len(self.visited_urls) / len(self.urls_to_visit)
-        percentage = round(result, 1)
-        logger.info(f'Crawl completed at {percentage * 100}%')
-
-    @property
     def name(self):
         return 'site_crawler'
 
@@ -477,6 +469,13 @@ class BaseCrawler(metaclass=Crawler):
         completed_time = round(time.time() - self._start_time, 1)
         days = 0 if days < 0 else days
         return self.performance_audit(days, completed_time)
+    
+    def calculate_completion_percentage(self):
+        """Indicates the level of completion
+        for the current crawl session"""
+        result = len(self.visited_urls) / len(self.urls_to_visit)
+        percentage = round(result, 1)
+        logger.info(f'Crawl completed at {percentage * 100}%')
 
     def get_current_date(self):
         timezone = pytz.timezone(self.timezone)
@@ -720,7 +719,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 wait_time = random.randrange(start, stop)
 
             logger.info(f"Waiting {wait_time}s")
+
             performance = self.calculate_performance()
+            self.calculate_completion_percentage()
+           
             time.sleep(wait_time)
 
 
