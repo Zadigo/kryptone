@@ -523,6 +523,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             'Performance', ['days', 'duration']
         )
 
+        # self.date_history = {}
+
+    # def update_date_history(self):
+    #     current_date = datetime.datetime.now(tz=pytz.timezone('UTC')).date()
+    #     self.date_history[current_date] = self.date_history[current_date] + 1
+
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
         and visited urls, resume a previous
