@@ -1,16 +1,18 @@
-import pathlib
 import asyncio
 import mimetypes
-from urllib.parse import urlparse
+import pathlib
+import re
 from collections import deque
+from urllib.parse import urlparse
+
 import requests
 
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
+from kryptone.utils.file_readers import read_json_document, write_json_document
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
-from kryptone.utils.file_readers import write_json_document, read_json_document
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
@@ -20,34 +22,76 @@ class EcommerceCrawlerMixin:
     products = []
     product_objects = []
     seen_products = []
-    
-    def add_product(self, data, track_id=False, collection_id_regex=None):
-        """Adds a product to the global product container"""
-        product_object = Product(**data)
+    model = Product
 
+    def seen_products(self, using='id_or_reference'):
+        """Returns a list of all products that were seen"""
+        return set(map(lambda x: x[using], self.product_objects))
+    
+    def product_exists(self, product, using='id_or_reference'):
+        """Checks if a product was already seen in the database"""
+        if not isinstance(product, (dict, self.model)):
+            raise ValueError(f'Value should be an instance of dict or {self.model}')
+        return product[using] in self.seen_products(using=using)
+
+    def add_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
+        """Adds a product to the internal product container
+        
+        >>> instance.add_product([{...}], track_id=False)
+        ... (True, Product)
+        """
+        product = self.model(**data)
+
+        if avoid_duplicates:
+            # Creates the product but does not add it to the
+            # general product list
+            if self.product_exists(data, using=duplicate_key):
+                return False, product
+        
         if track_id:
-            product_object.id = self.products.count() + 1
+            product.id = self.products.count() + 1
 
         if collection_id_regex is not None:
-            product_object.set_collection_id(collection_id_regex)
+            product.set_collection_id(collection_id_regex)
 
-        self.product_objects.append(product_object)
-        self.products.append(product_object.as_json())
-        return product_object
-    
-    def save_product(self, data, track_id=False, collection_id_regex=None):
-        """Adds an saves a product to the backends"""
+        self.product_objects.append(product)
+        self.products.append(product.as_json())
+        return True, product
+
+    def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
+        """Adds an saves a product to the backends
+        
+        >>> instance.save_product([{...}], track_id=False)
+        ... (True, Product)
+        """
         # Before writing new products, ensure that we have previous
         # products from a previous scrap and if so, load the previous
         # products. This would prevent overwriting the previous file
         if not self.products:
             previous_products_data = read_json_document('products.json')
             self.products = previous_products_data if previous_products_data else []
-            logger.info(f"Loaded {len(self.products)} products from 'products.json'")
+            self.product_objects = list(map(lambda x: self.model(**x), previous_products_data))
+            message = f"Loaded {len(self.products)} products from 'products.json'"
+            logger.info(message)
 
-        new_product = self.add_product(data, track_id=track_id, collection_id_regex=collection_id_regex)
+        new_product = self.add_product(
+            data, 
+            track_id=track_id, 
+            collection_id_regex=collection_id_regex,
+            avoid_duplicates=avoid_duplicates,
+            duplicate_key=duplicate_key
+        )
         write_json_document('products.json', self.products)
         return new_product
+
+    def bulk_save_products(self, data, track_id=False, collection_id_regex=None):
+        """Adds multiple products at once"""
+        products = []
+        for item in data:
+            product = self.save_product(
+                item, track_id=track_id, collection_id_regex=collection_id_regex)
+            products.append(product)
+        return products
 
     def save_images(self, product, path, filename=None):
         """Asynchronously save images to the project's
@@ -60,7 +104,7 @@ class EcommerceCrawlerMixin:
                 while urls_to_use:
                     url = urls_to_use.pop()
                     headers = {'User-Agent': RANDOM_USER_AGENT()}
-                    
+
                     try:
                         response = requests.get(url, headers=headers)
                     except Exception as e:
@@ -73,14 +117,15 @@ class EcommerceCrawlerMixin:
                             # Guess the extension of the image that we
                             # want to save locally
                             mimetype, _ = mimetypes.guess_type(url_object.path)
-                            extension = mimetypes.guess_extension(mimetype, strict=True)
+                            extension = mimetypes.guess_extension(
+                                mimetype, strict=True)
 
                             await queue.put((extension, response.content))
                         else:
                             logger.error(f'Image request error: {url}')
                     finally:
                         await asyncio.sleep(1)
-            
+
             async def save_image():
                 index = 1
                 while not queue.empty():
@@ -98,12 +143,13 @@ class EcommerceCrawlerMixin:
                     if not directory_path.exists():
                         directory_path.mkdir(parents=True)
 
-                    final_path = directory_path.joinpath(f'{name}_{index}{extension}')
+                    final_path = directory_path.joinpath(
+                        f'{name}_{index}{extension}')
                     with open(final_path, mode='wb') as f:
                         if content is not None:
                             f.write(content)
                         index = index + 1
-                        
+
                     logger.info(f"Downloaded image for: '{product.name}'")
                     # Delay this task slightly more than the
                     # one above to allow requests to populate
@@ -111,7 +157,7 @@ class EcommerceCrawlerMixin:
                     await asyncio.sleep(3)
 
             await asyncio.gather(request_image(), save_image())
-        
+
         asyncio.run(main())
 
     # def scroll_page(self):

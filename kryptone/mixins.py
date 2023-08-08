@@ -1,5 +1,7 @@
+from urllib.parse import urlparse
 import itertools
 import re
+import json
 import string
 from collections import Counter, defaultdict
 from functools import lru_cache, cached_property
@@ -9,7 +11,7 @@ from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document, read_documents
-from kryptone.utils.iterators import drop_null, drop_while
+from kryptone.utils.iterators import drop_null, drop_while, keep_while
 
 EMAIL_REGEX = r'\S+\@\S+'
 
@@ -121,19 +123,23 @@ class TextMixin:
         return counter.most_common()[:-5:-1]
 
     def _run_processors(self, tokens, processors):
-        for processor in processors:
-            if not callable(processor):
-                continue
+        if processors:
+            new_tokens = []
+            for processor in processors:
+                if not callable(processor):
+                    continue
 
-            for token in tokens:
-                result = processor(token)
-                # Processors should return a boolean.
-                # On fail, just return the token as is
-                if not isinstance(result, bool):
-                    yield token
+                for token in tokens:
+                    result = processor(token)
+                    # Processors should return a boolean.
+                    # On fail, just return the token as is
+                    if not isinstance(result, bool):
+                       new_tokens.append(token)
 
-                if result:
-                    yield token
+                    if result:
+                        new_tokens.append(token)
+        else:
+            return tokens
 
     def normalize_spaces(self, text):
         return ' '.join(self._tokenize(text))
@@ -157,9 +163,9 @@ class TextMixin:
     def fit_transform(self, text=None, language='en', use_multipass=False, text_processors=[]):
         """Fit a document and then transform it into
         a usable element for text analysis"""
-        text = self.fit(text)
-        if text is not None:
-            self.page_documents.append(text)
+        fitted_text = self.fit(text)
+        if fitted_text is not None:
+            self.page_documents.append(fitted_text)
 
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
@@ -188,10 +194,10 @@ class TextMixin:
             words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
 
             tokenized_text = self._tokenize(result2)
-            simplified_text = drop_while(
+            simplified_text = list(drop_while(
                 lambda x: x in words_to_remove,
                 tokenized_text
-            )
+            ))
 
             # 3. Run custom text processors
             simplified_text = self._run_processors(
@@ -217,10 +223,6 @@ class SEOMixin(TextMixin):
     error_pages = set()
 
     @property
-    def get_page_images(self):
-        return self.driver.find_elements(By.TAG_NAME, 'img')
-
-    @property
     def get_page_title(self):
         try:
             script = "return document.querySelector('title').innerText"
@@ -228,7 +230,7 @@ class SEOMixin(TextMixin):
         except:
             return ''
         else:
-            return text
+            return self.fit(text)
 
     @property
     def get_page_description(self):
@@ -240,7 +242,7 @@ class SEOMixin(TextMixin):
         except:
             return ''
         else:
-            return text
+            return self.fit(text)
 
     @property
     def get_page_keywords(self):
@@ -271,16 +273,10 @@ class SEOMixin(TextMixin):
         return len(self.get_page_title) <= 150
 
     @property
-    def get_transformed_raw_page_text(self):
-        text = self.driver.find_element(By.TAG_NAME, 'body').text
-        return self.fit(text)
-
-    @property
     def get_page_text(self):
         """Returns a fitted and transformed
         version of the document's text"""
-        text = self.driver.find_element(By.TAG_NAME, 'body').text
-        return self.fit_transform(text)
+        return self.driver.find_element(By.TAG_NAME, 'body').text
 
     @staticmethod
     def normalize_integers(items):
@@ -291,6 +287,50 @@ class SEOMixin(TextMixin):
         for key, value in items.items():
             new_item[key] = int(value)
         return new_item
+    
+    @property
+    def get_transformed_raw_page_text(self):
+        text = self.driver.find_element(By.TAG_NAME, 'body').text
+        return self.fit(text)
+    
+    def audit_images(self, audit):
+        """Checks that the images of the current
+        page has ALT attributes to them"""
+        image_alts = []
+        images = self.driver.find_elements(By.TAG_NAME, 'img')
+        for image in images:
+            image_alt = self.fit(image.get_attribute('alt'))
+            image_alts.append(image_alt)
+        empty_alts = list(keep_while(lambda x: x == '', image_alts))
+
+        image_alts = set(image_alts)
+        percentage_count = (len(empty_alts) / len(image_alts)) * 100
+        percentage_invalid_images = round(percentage_count, 2)
+
+        audit['pct_images_with_no_alt'] = percentage_invalid_images
+        audit['image_alts'] = list(image_alts)
+        return percentage_invalid_images, image_alts    
+    
+    def audit_structured_data(self, audit):
+        has_structured_data = False
+        structured_data_type = None
+        content = self.driver.execute_script(
+            """
+            try {
+                return document.querySelector('script[type*="ld+json"]').innerText
+            } catch (e) {
+                return false
+            }
+            """
+        )
+        if content:
+            content = json.loads(content)
+            has_structured_data = True
+            structured_data_type = content['@type']
+
+        audit['has_structured_data'] = has_structured_data
+        audit['structured_data_type'] = structured_data_type
+        return has_structured_data, structured_data_type
 
     def get_page_status_code(self):
         pass
@@ -304,7 +344,11 @@ class SEOMixin(TextMixin):
     def vectorize_page(self, text):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
-        matrix = vectorizer.fit_transform(self.fit_transform(text))
+        transformed_text = self.fit_transform(
+            text, 
+            language=settings.WEBSITE_LANGUAGE
+        )
+        matrix = vectorizer.fit_transform(transformed_text)
         return matrix, vectorizer
 
     def global_audit(self):
@@ -316,8 +360,11 @@ class SEOMixin(TextMixin):
     def audit_page(self, current_url):
         """Audit the current page by analyzing different
         key metrics from the title, the description etc."""
+        url_object = urlparse(current_url)
+        
         matrix, vectorizer = self.vectorize_page(self.get_page_text)
         vocabulary = self.normalize_integers(vectorizer.vocabulary_)
+
         audit = {
             'title': self.get_page_title,
             'title_length': self.get_text_length(self.get_page_title),
@@ -328,8 +375,13 @@ class SEOMixin(TextMixin):
             'url': current_url,
             'page_content_length': len(self.get_page_text),
             'word_count_analysis': vocabulary,
-            'status_code': None
+            'status_code': None,
+            'is_https': url_object.scheme == 'https'
         }
+        
+        self.audit_structured_data(audit)
+        self.audit_images(audit)
+
         self.page_audits[current_url] = audit
         return audit
 

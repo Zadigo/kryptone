@@ -22,7 +22,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tests/testproject/manage.py",
-            "args": ["start"],
+            "args": ["start", "--run-audit=true"],
             "console": "integratedTerminal",
             "justMyCode": true,
             "presentation": {
@@ -35,7 +35,7 @@
             "name": "Kryptone: Local Project",
             "type": "python",
             "request": "launch",
-            "program": "../kiabi/manage.py",
+            "program": "../lefties/manage.py",
             "args": [
                 "start",
             ],
@@ -44,7 +44,20 @@
             "presentation": {
                 "hidden": false,
                 "group": "Kryptone",
-                "order": 2
+                "order": 3
+            }
+        },
+        {
+            "name": "Kryptone: Blackbox",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/blackbox.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "presentation": {
+                "hidden": false,
+                "group": "Kryptone",
+                "order": 4
             }
         }
     ]

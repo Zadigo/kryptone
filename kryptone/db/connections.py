@@ -12,7 +12,7 @@ def redis_connection(host='redis', port=6379):
     try:
         instance.ping()
     except:
-        logger.info('Redis connection failed')
+        logger.warning('Redis connection failed')
         return False
     else:
         return instance
@@ -26,7 +26,7 @@ def memcache_connection(host='memcache', port=11211):
     try:
         instance._connect()
     except:
-        logger.info('PyMemcache connection failed')
+        logger.warning('PyMemcache connection failed')
         return False
     else:
         return instance

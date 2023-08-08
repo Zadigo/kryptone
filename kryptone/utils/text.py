@@ -1,13 +1,18 @@
 import re
 import string
-
+import secrets
 import unidecode
 
 from kryptone.utils.iterators import drop_null
 
+# ^(\d+[,.]?\d+)
 PRICE = re.compile(r'(\d+\,?\d+)')
 
 PRICE_EURO = re.compile(r'\d+\€\d+')
+
+
+def random_string(n=10):
+    return secrets.token_hex(nbytes=n)
 
 
 def parse_price(text):

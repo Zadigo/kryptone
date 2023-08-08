@@ -63,11 +63,8 @@ STORAGE_BACKENDS = {
     },
     'google_sheets': {
         'type': 'online',
-        'credentials': {
-            'KEY': None,
-            'item_name': None,
-            'item_id': None
-        }
+        'sheet_name': None,
+        'credentials': 'creds.json'
     },
     'notion': {
         'type': 'online',

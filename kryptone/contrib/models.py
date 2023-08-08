@@ -1,6 +1,7 @@
 import dataclasses
 import pathlib
 import re
+from dataclasses import field
 from functools import cached_property, lru_cache
 from urllib.parse import unquote, urlparse
 
@@ -8,6 +9,7 @@ from kryptone.utils.text import remove_accents, remove_punctuation
 
 
 class BaseModel:
+    """Base class for all models"""
     @cached_property
     def fields(self):
         """Get the fields present on the model"""
@@ -17,15 +19,18 @@ class BaseModel:
     @cached_property
     def url_object(self):
         result = unquote(getattr(self, 'url', ''))
-        return urlparse(result)
+        return urlparse(str(result))
     
     @cached_property
     def get_url_object(self):
-        return urlparse(self.url)
+        return urlparse(str(self.url))
     
     @cached_property
     def url_stem(self):
-        return pathlib.Path(self.url).stem
+        return pathlib.Path(str(self.url)).stem
+    
+    def __getitem__(self, key):
+        return getattr(self, key)
     
     def as_json(self):
         """Return the object as dictionnary"""
@@ -57,6 +62,7 @@ class Product(BaseModel):
     id_or_reference: str = None
     id: int = None
     images:str = dataclasses.field(default_factory=[])
+    composition: str = None
     color: str = None
 
     def __hash__(self):
@@ -106,7 +112,6 @@ class Product(BaseModel):
             self.collection_id = group_dict.get('collection_id', result.group(1))
 
 
-
 @dataclasses.dataclass
 class GoogleBusiness(BaseModel):
     name: str
@@ -114,7 +119,7 @@ class GoogleBusiness(BaseModel):
     address: str
     rating: str
     number_of_reviews: int
-    comments: str
+    comments: str = field(default_factory=list)
 
     def as_csv(self):
         rows = []

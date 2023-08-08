@@ -2,9 +2,10 @@ import datetime
 import json
 import random
 import re
+import bisect
 import string
 import time
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
 
 import pytz
@@ -26,19 +27,25 @@ from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
+                                         read_csv_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URLFile
+from kryptone.utils.urls import URL, URLFile, URLPassesTest
+
+WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+
+DEFAULT_META_OPTIONS = {
+    'domains', 'audit_page', 'url_passes_tests',
+    'debug_mode', 'site_language', 'default_scroll_step',
+    'gather_emails'
+}
+
 
 # post_init = Signal()
 navigation = Signal()
 db_signal = Signal()
-
-# cache = Cache()
-
-WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
 
 def collect_images_receiver(sender, current_url=None, **kwargs):
@@ -55,7 +62,12 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
 
 
 def get_selenium_browser_instance(browser_name=None):
-    """Creates a new selenium browser instance"""
+    """Creates a new selenium browser instance
+    
+    >>> browser = get_selenium_browser_instance()
+    ... browser.get('...')
+    ... browser.quit()
+    """
     browser_name = browser_name or settings.WEBDRIVER
     browser = Chrome if browser_name == 'Chrome' else Edge
     manager_instance = ChromeDriverManager if browser_name == 'Chrome' else EdgeChromiumDriverManager
@@ -69,192 +81,92 @@ def get_selenium_browser_instance(browser_name=None):
     return browser(service=service, options=options)
 
 
-class ActionsMixin:
-    # Default speed at which the robot
-    # should scroll a given page
-    default_scroll_step = 80
+class CrawlerOptions:
+    """Stores the main options for the crawler"""
+    
+    def __init__(self, spider, name):
+        self.spider = spider
+        self.spider_name = name.lower()
+        self.verbose_name = name.title()
+        self.initial_spider_meta = None
 
-    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
-        """Scrolls the entire window by incremeting the current
-        scroll position by a given number of pixels"""
-        can_scroll = True
-        new_scroll_pixels = 1000
+    def __repr__(self):
+        return f'<{self.__class__.__name__} for {self.verbose_name}>'
 
-        while can_scroll:
-            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
+    def add_meta_options(self, options):
+        for name, value in options:
+            if name not in DEFAULT_META_OPTIONS:
+                raise ValueError(
+                    "Meta for model '{name}' received "
+                    "and illegal option '{option}'".format(
+                        name=self.verbose_name,
+                        option=name
+                    )
+                )
+            setattr(self, name, value)
 
-            self.driver.execute_script(scroll_script)
-            # Scrolls until we get a result that determines that we
-            # have actually scrolled to the bottom of the page
-            has_reached_bottom = self.driver.execute_script(
-                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
-            )
-            if has_reached_bottom:
-                can_scroll = False
+    def prepare(self):
+        for option in DEFAULT_META_OPTIONS:
+            if not hasattr(self, option):
+                if option in ['domains', 'url_passes_tests']:
+                    setattr(self, option, [])
 
-            current_position = self.driver.execute_script(
-                """return window.scrollY""")
-            if stop_at is not None and current_position > stop_at:
-                can_scroll = False
+                if option in ['audit_page', 'gather_emails', 'debug_mode', 'debug_mode']:
+                    setattr(self, option, False)
 
-            new_scroll_pixels = new_scroll_pixels + increment
-            time.sleep(wait_time)
+                if option == 'site_language':
+                    setattr(self, option, None)
 
-    def save_to_local_storage(self, name, data):
-        """Saves datat to the browsers local storage
-        for the current automation session"""
-        data = json.dumps(data)
-        script = f"""
-        localStorage.setItem('{name}', JSON.stringify({data}))
-        """
-        self.driver.execute_script(script)
-
-    def click_consent_button(self, element_id=None, element_class=None):
-        """Click the consent to cookies button which often
-        tends to appear on websites"""
-        try:
-            element = None
-            if element_id is not None:
-                element = self.driver.find_element(By.ID, element_id)
-
-            if element_class is not None:
-                element = self.driver.find_element(By.CLASS_NAME, element_id)
-            element.click()
-        except:
-            logger.info('Consent button not found')
-
-    def evaluate_xpath(self, path):
-        return self.driver.execute_script(
-            f"""
-            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-            return result.singleNodeValue
-            """
-        )
-
-    # TODO:
-    # def scroll_page(self, wait_time=8):
-    #     can_scroll = True
-
-    #     scroll_script = """
-    #     const elementHeight = document.body.scrollHeight
-    #     let currentPosition = window.scrollY
-
-    #     // Indicates the scrolling speed
-    #     const scrollStep = Math.ceil(elementHeight / {scroll_step})
-
-    #     currentPosition += scrollStep
-    #     window.scroll(0, currentPosition)
-
-    #     return [ currentPosition, elementHeight ]
-    #     """
-    #     scroll_script = scroll_script.format(
-    #         scroll_step=self.default_scroll_step
-    #     )
-
-    #     max_tries = 10
-    #     bottom_of_page_tries = 0
-    #     scroll_height_tries = 0
-    #     previous_position = 0
-    #     previous_scroll_height = 0
-
-    #     while can_scroll:
-    #         current_position, scroll_height = self.driver.execute_script(scroll_script)
-
-    #         # If we have reached the bottom of the page, try to
-    #         # scroll for a maximum amount of tries before stopping
-    #         # in order to ensure all data was loaded
-    #         if previous_position > 0 and current_position >= scroll_height:
-    #             bottom_of_page_tries = bottom_of_page_tries + 1
-
-    #             if bottom_of_page_tries > max_tries:
-    #                 can_scroll = False
-
-    #         # FIXME: There are cases when the curent_position > scroll_height
-    #         # but there's still more content to be loaded which means that
-    #         # technically, the document height isn't always equal to the
-    #         # to the current position and my never reach it.
-    #         # Sleep in order to allow page to refresh correctly and evenually
-    #         # get more data to load
-    #         if previous_scroll_height > 0 and scroll_height == previous_scroll_height:
-    #             scroll_height_tries = scroll_height_tries + 1
-
-    #             # If we were able to refresh the new document
-    #             # height keep scrolling
-    #             if scroll_height != previous_scroll_height:
-    #                 scroll_height_tries = 0
-    #                 bottom_of_page_tries = 0
-    #                 time.sleep(2)
-
-    #             if scroll_height_tries > max_tries:
-    #                 can_scroll = False
-
-    #         # Trigger when the scroll position is equal
-    #         # to the total scrollable size of the page
-    #         if current_position == scroll_height:
-    #             can_scroll = False
-
-    #         previous_position = current_position
-    #         previous_scroll_height = scroll_height
-
-    #         # Sleep a couple of seconds because sometimes
-    #         # webpages will load content once we hit a given
-    #         # scroll position
-    #         time.sleep(wait_time)
-    #         print('scrolling', current_position, scroll_height,
-    #               'bottom_of_page_tries', bottom_of_page_tries, 'scroll_height_tries', scroll_height_tries)
-
-    def _test_scroll_page(self, xpath=None, css_selector=None):
-        """Scrolls a specific portion on the page"""
-        if css_selector:
-            selector = """const mainWrapper = document.querySelector('{condition}')"""
-            selector = selector.format(condition=css_selector)
-        else:
-            selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
-            selector = selector.format(condition=xpath)
-
-        body = """
-        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
-
-        const elementHeight = elementToScroll.scrollHeight
-        let currentPosition = elementToScroll.scrollTop
-
-        // Indicates the scrolling speed
-        const scrollStep = Math.ceil(elementHeight / {scroll_step})
-
-        currentPosition += scrollStep
-        elementToScroll.scroll(0, currentPosition)
-
-        return [ currentPosition, elementHeight ]
-        """.format(scroll_step=self.default_scroll_step)
-
-        script = css_selector + '\n' + body
-        return script
+                if option == 'default_scroll_step':
+                    setattr(self, 'default_scroll_step', 80)
 
 
-class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
+class Crawler(type):
+    def __new__(cls, name, bases, attrs):
+        super_new = super().__new__
+
+        parents = [b for b in bases if isinstance(b, Crawler)]
+        if not parents:
+            return super_new(cls, name, bases, attrs)
+
+        new_class = super_new(cls, name, bases, attrs)
+
+        if name == 'SiteCrawler':
+            return new_class
+
+        meta_attributes = attrs.pop('Meta', None)
+        meta = CrawlerOptions(new_class, name)
+        meta.initial_spider_meta = meta_attributes
+        setattr(new_class, '_meta', meta)
+
+        if meta_attributes is not None:
+            meta_dict = meta_attributes.__dict__
+
+            declared_options = []
+            for key, value in meta_dict.items():
+                if key.startswith('__'):
+                    continue
+                declared_options.append((key, value))
+            meta.add_meta_options(declared_options)
+
+        new_class.prepare()
+        return new_class
+
+    def prepare(cls):
+        cls._meta.prepare()
+
+
+class BaseCrawler(metaclass=Crawler):
     urls_to_visit = set()
     visited_urls = set()
+    list_of_seen_urls = set()
     browser_name = None
     debug_mode = False
     timezone = 'UTC'
+    default_scroll_step = 80
 
-    def __init__(self, browser_name=None):
-        self._start_url_object = None
-        self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
-        )
-
-        # navigation.connect(collect_images_receiver, sender=self)
-
-        db_signal.connect(backends.airtable_backend, sender=self)
-        db_signal.connect(backends.notion_backend, sender=self)
-        db_signal.connect(backends.google_sheets_backend, sender=self)
-
-        self._start_date = datetime.datetime.now(tz=pytz.timezone('UTC'))
-        self._end_date = None
-
-        self._start_time = time.time()
-        self._end_time = None
+    def __repr__(self):
+        return f'<{self.__class__.__name__}>'
 
     @property
     def get_html_page_content(self):
@@ -269,15 +181,24 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
         return self.driver.find_elements(By.TAG_NAME, 'a')
 
     @property
-    def completion_percentage(self):
-        """Indicates the level of completion
-        for the current crawl session"""
-        result = len(self.visited_urls) / len(self.urls_to_visit)
-        return round(result, 0)
+    def name(self):
+        return 'site_crawler'
 
     @property
-    def name(self):
-        return 'crawler'
+    def get_html_page_content(self):
+        """Returns HTML elements of the
+        current page"""
+        return self.driver.page_source
+
+    @property
+    def get_page_link_elements(self):
+        """Returns all the selenium `<a></a>` anchor tags
+        of the current page"""
+        return self.driver.find_elements(By.TAG_NAME, 'a')
+
+    @property
+    def get_title_element(self):
+        return self.driver.find_element(By.TAG_NAME, 'title')
 
     def _backup_urls(self):
         """Backs up the urls both in memory
@@ -296,39 +217,16 @@ class CrawlerMixin(ActionsMixin, SEOMixin, EmailMixin):
             f'{settings.CACHE_FILE_NAME}.json',
             urls_data
         )
-        db_signal.send(
-            self,
-            data_type='urls',
-            urls_data=urls_data
-        )
-        
-    def get_current_date(self):
-        timezone = pytz.timezone(self.timezone)
-        return datetime.datetime.now(tz=timezone)
 
-
-    def post_visit_actions(self, **kwargs):
-        """Actions to run on the page just after
-        the crawler has visited a page e.g. clicking
-        on cookie button banner"""
-        pass
-
-    def run_actions(self, current_url, **kwargs):
-        """Additional custom actions to execute on the page
-        once all the default steps are completed"""
-        pass
-
-    def create_dump(self):
-        """Dumps the collected results to a file.
-        This functions is called only when an exception
-        occurs during the crawling process
-        """
-
-
-class BaseCrawler(CrawlerMixin):
-    start_url = None
-    start_xml_url = None
-    url_filters = []
+        sorted_urls = []
+        for url in self.list_of_seen_urls:
+            bisect.insort(sorted_urls, url)
+        write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+        # db_signal.send(
+        #     self,
+        #     data_type='urls',
+        #     urls_data=urls_data
+        # )
 
     def urljoin(self, path):
         """Returns the domain of the current
@@ -344,7 +242,7 @@ class BaseCrawler(CrawlerMixin):
         ))
         return unquote(result)
 
-    def get_filename(self, length=5, extension=None):
+    def create_filename(self, length=5, extension=None):
         characters = string.ascii_lowercase + string.digits
         name = ''.join(random.choice(characters) for _ in range(length))
         if extension is not None:
@@ -363,17 +261,21 @@ class BaseCrawler(CrawlerMixin):
         """Excludes urls in the list of urls to visit based
         on the return value of the function in `url_filters`
         """
-        if self.url_filters:
-            urls_to_filter = []
-            for instance in self.url_filters:
-                if not urls_to_filter:
-                    urls_to_filter = list(filter(instance, self.urls_to_visit))
-                else:
-                    urls_to_filter = list(filter(instance, urls_to_filter))
+        if self._meta.url_passes_tests:
+            results = defaultdict(list)
+            for url in self.urls_to_visit:
+                truth_array = results[url]
+                for instance in self._meta.url_passes_tests:
+                    truth_array.append(instance(url))
 
+            filtered_urls = []
+            for url, truth_array in results.items():
+                if not all(truth_array):
+                    continue
+                filtered_urls.append(url)
             message = f"Url filter completed"
             logger.info(message)
-            return urls_to_filter
+            return filtered_urls
         # Ensure that we return the original
         # urls to visit if there are no filters
         # or this might return nothing
@@ -403,8 +305,9 @@ class BaseCrawler(CrawlerMixin):
                 continue
 
             self.urls_to_visit.add(new_url)
+        logger.info(f'{len(urls_or_paths)} added')
 
-    def get_page_urls(self, same_domain=True):
+    def get_page_urls(self):
         """Returns all the urls present on the
         actual given page"""
         elements = self.get_page_link_elements
@@ -456,27 +359,175 @@ class BaseCrawler(CrawlerMixin):
             # Reconstruct a partial url for example
             # /google becomes https://example.com/google
             if link_object.path != '/' and link.startswith('/'):
-                link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
-                # link = urlunparse((
-                #     self._start_url_object.scheme, 
-                #     self._start_url_object.netloc, 
-                #     link,
-                #     None,
-                #     None,
-                #     None,
-                #     None
-                # ))
+                # link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
+                link = urlunparse((
+                    self._start_url_object.scheme,
+                    self._start_url_object.netloc,
+                    link,
+                    None,
+                    None,
+                    None
+                ))
 
             self.urls_to_visit.add(link)
+
+            # For statistics, we'll keep track of all the
+            # urls that we have gathered during crawl
+            self.list_of_seen_urls.add(link)
 
         # Finally, run all the filters to exclude
         # urls that the user does not want to visit
         # from the list of urls. NOTE: This re-initializes
-        # the list of urls to visit 
+        # the list of urls to visit
         # previous_state = self.urls_to_visit.copy()
         self.urls_to_visit = set(self.run_filters())
         # excluded_urls = previous_state.difference(self.urls_to_visit)
         # logger.info(f'Ignored {len(excluded_urls)} urls')
+
+    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
+        """Scrolls the entire window by incremeting the current
+        scroll position by a given number of pixels"""
+        can_scroll = True
+        new_scroll_pixels = 1000
+
+        while can_scroll:
+            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
+
+            self.driver.execute_script(scroll_script)
+            # Scrolls until we get a result that determines that we
+            # have actually scrolled to the bottom of the page
+            has_reached_bottom = self.driver.execute_script(
+                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
+            )
+            if has_reached_bottom:
+                can_scroll = False
+
+            current_position = self.driver.execute_script(
+                """return window.scrollY"""
+            )
+            if stop_at is not None and current_position > stop_at:
+                can_scroll = False
+
+            new_scroll_pixels = new_scroll_pixels + increment
+            time.sleep(wait_time)
+
+    def click_consent_button(self, element_id=None, element_class=None):
+        """Click the consent to cookies button which often
+        tends to appear on websites"""
+        try:
+            element = None
+            if element_id is not None:
+                element = self.driver.find_element(By.ID, element_id)
+
+            if element_class is not None:
+                element = self.driver.find_element(By.CLASS_NAME, element_id)
+            element.click()
+        except:
+            logger.info('Consent button not found')
+
+    def evaluate_xpath(self, path):
+        return self.driver.execute_script(
+            f"""
+            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+            return result.singleNodeValue
+            """
+        )
+
+    def scroll_page_section(self, xpath=None, css_selector=None):
+        """Scrolls a specific portion on the page"""
+        if css_selector:
+            selector = """const mainWrapper = document.querySelector('{condition}')"""
+            selector = selector.format(condition=css_selector)
+        else:
+            selector = self.evaluate_xpath(xpath)
+            # selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
+            # selector = selector.format(condition=xpath)
+
+        body = """
+        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+
+        const elementHeight = elementToScroll.scrollHeight
+        let currentPosition = elementToScroll.scrollTop
+
+        // Indicates the scrolling speed
+        const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+        currentPosition += scrollStep
+        elementToScroll.scroll(0, currentPosition)
+
+        return [ currentPosition, elementHeight ]
+        """.format(scroll_step=self.default_scroll_step)
+
+        script = css_selector + '\n' + body
+        return script
+
+    def calculate_performance(self):
+        """Returns the amount of time for which the
+        spider has been running"""
+        self._end_date = self.get_current_date()
+        days = (self._start_date - self._end_date).days
+        completed_time = round(time.time() - self._start_time, 1)
+        days = 0 if days < 0 else days
+        return self.performance_audit(days, completed_time)
+    
+    def calculate_completion_percentage(self):
+        """Indicates the level of completion
+        for the current crawl session"""
+        total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
+        result = len(self.visited_urls) / total_urls
+        percentage = round(result, 1)
+        logger.info(f'{percentage * 100}% of total urls visited')
+
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
+
+    def post_visit_actions(self, **kwargs):
+        """Actions to run on the page just after
+        the crawler has visited a page e.g. clicking
+        on cookie button banner"""
+        pass
+
+    def run_actions(self, current_url, **kwargs):
+        """Additional custom actions to execute on the page
+        once all the default steps are completed"""
+        pass
+
+    def create_dump(self):
+        """Dumps the collected results to a file.
+        This functions is called only when an exception
+        occurs during the crawling process
+        """
+
+
+class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
+    start_url = None
+
+    def __init__(self, browser_name=None):
+        self._start_url_object = None
+        self.driver = get_selenium_browser_instance(
+            browser_name=browser_name or self.browser_name
+        )
+
+        # navigation.connect(collect_images_receiver, sender=self)
+
+        # db_signal.connect(backends.airtable_backend, sender=self)
+        # db_signal.connect(backends.notion_backend, sender=self)
+        # db_signal.connect(backends.google_sheets_backend, sender=self)
+
+        self._start_date = self.get_current_date()
+
+        self._start_time = time.time()
+        self._end_time = None
+        self.performance_audit = namedtuple(
+            'Performance', ['days', 'duration']
+        )
+
+        # self.date_history = {}
+
+    # def update_date_history(self):
+    #     current_date = datetime.datetime.now(tz=pytz.timezone('UTC')).date()
+    #     self.date_history[current_date] = self.date_history[current_date] + 1
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
@@ -485,7 +536,8 @@ class BaseCrawler(CrawlerMixin):
 
             * Redis is checked as the primary database for a cache
             * Memcache is checked afterwards if no connection
-            * Finally, the file cache is used as a final resort """
+            * Finally, the file cache is used as a final resort
+        """
         redis = redis_connection()
         if redis:
             data = redis.get('cache')
@@ -498,6 +550,7 @@ class BaseCrawler(CrawlerMixin):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
+        self.list_of_seen_urls = set(read_csv_document('seen_urls.csv', flatten=True))
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -542,7 +595,7 @@ class BaseCrawler(CrawlerMixin):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], debug_mode=False, wait_time=None, run_audit=False, language=None, url_cache=None):
+    def start(self, start_urls=[], url_cache=None, **kwargs):
         """Entrypoint to start the spider
 
         >>> instance = BaseCrawler()
@@ -555,11 +608,9 @@ class BaseCrawler(CrawlerMixin):
         logger.info(f'{self.__class__.__name__} ready to crawl website')
         self.driver.maximize_window()
 
-        self.debug_mode = debug_mode
+        wait_time = settings.WAIT_TIME
 
-        wait_time = wait_time or settings.WAIT_TIME
-
-        if self.debug_mode:
+        if self._meta.debug_mode:
             logger.info('Starting Kryptone in debug mode...')
         else:
             logger.info('Starting Kryptone...')
@@ -568,14 +619,24 @@ class BaseCrawler(CrawlerMixin):
             self.urls_to_visit = url_cache.urls_to_visit
             self.visited_urls = url_cache.visited_urls
 
-        if self.start_xml_url is not None:
-            start_urls = self.start_from_sitemap_xml(self.start_xml_url)
-        elif self.start_url is not None:
-            self.urls_to_visit.add(self.start_url)
-            self._start_url_object = urlparse(self.start_url)
+        if self.start_url is None:
+            raise ValueError('A starting url should be provided to the spider')
+
+        # If the urls_to_visit already populated,
+        # makes no sense to use the start_url but
+        # directly just go to an url already
+        # present in the list
+        if not self.urls_to_visit:
+            # Start spider from .xml page
+            is_xml_page = self.start_url.endswith('.xml')
+            if not is_xml_page:
+                self.add_urls(self.start_url)
+            else:
+                start_urls = self.start_from_sitemap_xml(self.start_url)
+        self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
-            self.urls_to_visit.update(set(start_urls))
+            self.add_urls(*start_urls)
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
@@ -609,11 +670,11 @@ class BaseCrawler(CrawlerMixin):
 
             # Post navigation signal
             # TEST: This has to be tested
-            navigation.send(
-                self,
-                current_url=current_url,
-                images_list_filter=['jpg', 'jpeg', 'webp']
-            )
+            # navigation.send(
+            #     self,
+            #     current_url=current_url,
+            #     images_list_filter=['jpg', 'jpeg', 'webp']
+            # )
 
             self.visited_urls.add(current_url)
 
@@ -622,12 +683,12 @@ class BaseCrawler(CrawlerMixin):
             self.get_page_urls()
             self._backup_urls()
 
-            if run_audit:
-                language = language or settings.WEBSITE_LANGUAGE
-                self.audit_page(current_url, language=language)
+            if self._meta.audit_page:
+                self.audit_page(current_url)
                 write_json_document('audit.json', self.page_audits)
 
-                vocabulary = self.global_audit(language=language)
+                vocabulary = self.global_audit(
+                    language=self._meta.site_language)
                 write_json_document('global_audit.json', vocabulary)
 
                 # cache.set_value('page_audit', self.page_audits)
@@ -639,34 +700,39 @@ class BaseCrawler(CrawlerMixin):
                 )
 
                 logger.info('Audit complete...')
-
-            self.emails(
-                self.get_transformed_raw_page_text,
-                elements=self.get_page_link_elements
-            )
-            # Format each email as [[...], ...] in order to comply
-            # with the way that the csv writer outputs the rows
-            emails = list(map(lambda x: [x], self.emails_container))
-            write_csv_document('emails.csv', emails)
-            db_signal.send(
-                self,
-                emails=self.emails_container
-            )
+            
+            if self._meta.gather_emails:
+                self.emails(
+                    self.get_transformed_raw_page_text,
+                    elements=self.get_page_link_elements
+                )
+                # Format each email as [[...], ...] in order to comply
+                # with the way that the csv writer outputs the rows
+                emails = list(map(lambda x: [x], self.emails_container))
+                write_csv_document('emails.csv', emails)
+                db_signal.send(
+                    self,
+                    emails=self.emails_container
+                )
 
             # Run custom user actions once
             # everything is completed
-            self.run_actions(current_url)
+            url_instance = URL(current_url)
+            self.run_actions(url_instance)
+
+            performance = self.calculate_performance()
+            self.calculate_completion_percentage()
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
                 stop = settings.WAIT_TIME_RANGE[1]
                 wait_time = random.randrange(start, stop)
-
+           
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
 
-class SinglePageAutomater(CrawlerMixin):
+class SinglePageAutomater(BaseCrawler):
     """Automates user defined actions on a
     single or multiple user provided 
     pages as oppposed to crawing the
@@ -676,7 +742,7 @@ class SinglePageAutomater(CrawlerMixin):
 
     @property
     def name(self):
-        return 'automation'
+        return 'automater'
 
     def start(self, start_urls=[], wait_time=None, debug_mode=False):
         """Entrypoint to start the web scrapper"""
@@ -685,7 +751,8 @@ class SinglePageAutomater(CrawlerMixin):
         # layouts can fundamentally change when
         # using a smaller window
         logger.info(
-            f'{self.__class__.__name__} ready to automate actions on website')
+            f'{self.__class__.__name__} ready to automate actions on website'
+        )
         self.driver.maximize_window()
 
         self.debug_mode = debug_mode
@@ -719,7 +786,7 @@ class SinglePageAutomater(CrawlerMixin):
 
             # Post navigation signal
             # TEST: This has to be tested
-            navigation.send(self, current_url=current_url)
+            # navigation.send(self, current_url=current_url)
 
             self.visited_urls.add(current_url)
             self._backup_urls()
@@ -733,11 +800,11 @@ class SinglePageAutomater(CrawlerMixin):
             # Run custom user actions once
             # everything is completed
             self.run_actions(current_url)
-            db_signal.send(
-                self,
-                current_url=current_url,
-                emails=self.emails_container
-            )
+            # db_signal.send(
+            #     self,
+            #     current_url=current_url,
+            #     emails=self.emails_container
+            # )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]

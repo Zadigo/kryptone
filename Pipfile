@@ -13,6 +13,7 @@ airtable = "*"
 quart = "*"
 quart-cors = "*"
 webdriver-manager = "*"
+gspread = "*"
 unidecode = "*"
 
 [dev-packages]
