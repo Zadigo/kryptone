@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from kryptone import logger
@@ -64,3 +65,18 @@ class BaseTestSpider(MockupSpider):
 
     def handle_2(self, current_url, route=None):
         pass
+
+
+# class AsyncBaseTestSpider(MockupSpider):
+#     def __init__(self):
+#         self.driver = None
+
+#     async def start(self):
+#         async def loop():
+#             while self.urls_to_visit:
+#                 pass
+
+#         async def some_function():
+#             pass
+
+#         asyncio.gather(loop(), )
