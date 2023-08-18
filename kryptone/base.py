@@ -1,8 +1,8 @@
+import bisect
 import datetime
 import json
 import random
 import re
-import bisect
 import string
 import time
 from collections import defaultdict, namedtuple
@@ -26,8 +26,7 @@ from kryptone.db import backends
 from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
-from kryptone.utils.file_readers import (read_json_document,
-                                         read_csv_document,
+from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
