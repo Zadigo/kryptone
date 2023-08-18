@@ -105,19 +105,20 @@ class CrawlerOptions:
             setattr(self, name, value)
 
     def prepare(self):
-        for option in DEFAULT_META_OPTIONS:
-            if not hasattr(self, option):
-                if option in ['domains', 'url_passes_tests']:
-                    setattr(self, option, [])
+        pass
+        # for option in DEFAULT_META_OPTIONS:
+        #     if not hasattr(self, option):
+        #         if option in ['domains', 'url_passes_tests']:
+        #             setattr(self, option, [])
 
-                if option in ['audit_page', 'gather_emails', 'debug_mode', 'debug_mode']:
-                    setattr(self, option, False)
+        #         if option in ['audit_page', 'gather_emails', 'debug_mode']:
+        #             setattr(self, option, False)
 
-                if option == 'site_language':
-                    setattr(self, option, None)
+        #         if option == 'site_language':
+        #             setattr(self, option, None)
 
-                if option == 'default_scroll_step':
-                    setattr(self, 'default_scroll_step', 80)
+        #         if option == 'default_scroll_step':
+        #             setattr(self, 'default_scroll_step', 80)
 
 
 class Crawler(type):
