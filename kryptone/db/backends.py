@@ -1,16 +1,15 @@
-import functools
 
 import airtable
-import redis
 import requests
-
+import gspread
 from kryptone.conf import settings
-from kryptone.db.connections import memcache_connection, redis_connection
+from kryptone.db.connections import redis_connection
 
 AIRTABLE_ID_CACHE = set()
 
 
 def airtable_backend(sender, **kwargs):
+    """Use Airtable as a storage backend"""
     if 'airtable' in settings.ACTIVE_STORAGE_BACKENDS:
         config = settings.STORAGE_BACKENDS.get('airtable', None)
         if config is None:
@@ -31,10 +30,12 @@ def airtable_backend(sender, **kwargs):
 
                 record[key.title()] = value
             records.append(record)
+        AIRTABLE_ID_CACHE.clear()
         return table.batch_insert(records)
 
 
 def notion_backend(sender, **kwargs):
+    """Use Notion as a storage backend"""
     if 'notion' in settings.ACTIVE_STORAGE_BACKENDS:
         config = settings.STORAGE_BACKENDS.get('notion', None)
         if config is None:
@@ -56,10 +57,27 @@ def notion_backend(sender, **kwargs):
 
 
 def google_sheets_backend(sender, **kwargs):
-    pass
+    """Use Google Sheets as a storage backend"""
+    if 'google sheets' in settings.ACTIVE_STORAGE_BACKENDS:
+        google_sheet_settings = settings.STORAGE_BACKENDS['google_sheets']
+        worksheet = gspread.service_account(filename=google_sheet_settings['credentials'])
+
+        #connect to your sheet (between "" = the name of your G Sheet, keep it short)
+        sheet = worksheet.open(google_sheet_settings['sheet_name']).sheet1
+
+        #get the values from cells a2 and b2
+        name = sheet.acell("a2").value
+        website = sheet.acell("b2").value
+        print(name, website)
+
+        #write values in cells a3 and b3
+        sheet.update("a3", "Chat GPT")
+        sheet.update("b3", "openai.com")
 
 
 def redis_backend(sender, **kwargs):
-    instance = redis_connection()
-    if instance:
-        pass
+    """Use Redis as a storage backend"""
+    if 'redis' in settings.ACTIVE_STORAGE_BACKENDS:
+        instance = redis_connection()
+        if instance:
+            instance.hset('cache', None)

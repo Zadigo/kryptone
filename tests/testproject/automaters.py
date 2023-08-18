@@ -1,4 +1,4 @@
-from kryptone.app import SinglePageAutomater
+from kryptone.base import SinglePageAutomater
 
 
 class Bakeries(SinglePageAutomater):

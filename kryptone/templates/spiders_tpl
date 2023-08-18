@@ -1,20 +1,26 @@
 """
 This is the main module for creating
-spiders that will crawl a whole website.
+a spider that will crawl an entire website.
 
-Define an entrypoint from which the spider
-should start an will gather urls on each
-page to keep going forward.
+    1. Define a start url from which the spider
+       should start gathering additional urls to crawl
+    
+    2. Define a set of actions that the spider should do
+       on each visited page. You can also define actions that
+       will be executed just after the spider has visited a page
+       for example clicking on button in a cookies modal
+
+    3. Register you spider in SPIDERS and run python manage.py start
 """
 
-from kryptone.app import BaseCrawler
+from kryptone.base import SiteCrawler
 
 
-class MyFirstCrawler(BaseCrawler):
+class MyFirstCrawler(SiteCrawler):
     start_url = None
 
     def post_visit_actions(self, **kwargs):
         pass
-    
+
     def run_actions(self, current_url, **kwargs):
         pass

@@ -1,4 +1,6 @@
+import asyncio
 import inspect
+import threading
 import os
 from collections import OrderedDict
 from functools import lru_cache
@@ -14,6 +16,8 @@ from kryptone.utils.urls import URLFile
 # pre_init_spider = Signal()
 
 SPIDERS_MODULE = 'spiders'
+
+AUTOMATERS_MODULE = 'automaters'
 
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
@@ -55,9 +59,19 @@ class SpiderConfig:
         return f"<{self.__class__.__name__} for {self.name}>"
 
     @classmethod
-    def create(cls, name, module):
+    def create(cls, name, module, dotted_path=None):
         instance = cls(name, module)
+        instance.dotted_path = dotted_path
         return instance
+
+    def get_spider_instance(self):
+        if self.spider_class is None:
+            raise ValueError(
+                f"Could not start spider '{self.name}' in "
+                f"project: {self.dotted_path} because the spider class "
+                "was None"
+            )
+        return self.spider_class()
 
     def check_ready(self):
         """Marks the spider as configured and
@@ -69,27 +83,24 @@ class SpiderConfig:
         """Runs the spider by calling the spider class
         which in return calls "start" method on the
         spider via the __init__ method"""
-        if self.spider_class is None:
-            raise ValueError(
-                f'Could not start spider in project: {self.dotted_path}'
-            )
-        spider_instance = self.spider_class()
-
-        # TODO: Import the browser that we are
-        # going to use with Selenium
-        python_path = settings.WEBDRIVER['driver']
-        module, klass = python_path.rsplit('.', maxsplit=1)
-        selenium_module = import_module(module)
-        browser = getattr(selenium_module, klass, None)
+        spider_instance = self.get_spider_instance()
 
         try:
             spider_instance.start(**kwargs)
+            # thread = threading.Thread(
+            #     target=spider_instance.start,
+            #     name=self.name,
+            #     kwargs=kwargs,
+            #     daemon=True
+            # )
+            # thread.start()
+            # thread.join()
         except KeyboardInterrupt:
             spider_instance.create_dump()
         except Exception as e:
             spider_instance.create_dump()
             raise ExceptionGroup(
-                'Multiple exceptions occurred',
+                'Some exceptions occurred while trying to start the project',
                 [
                     Exception(e)
                 ]
@@ -156,7 +167,7 @@ class MasterRegistry:
                 f"Could not load the project's related module: '{dotted_path}'"
             )
 
-        from kryptone.app import BaseCrawler, SinglePageAutomater
+        from kryptone.base import BaseCrawler, SinglePageAutomater
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -175,42 +186,57 @@ class MasterRegistry:
                 ]
             )
 
+        try:
+            automaters_module = import_module(
+                f'{dotted_path}.{AUTOMATERS_MODULE}')
+        except Exception as e:
+            raise ExceptionGroup(
+                "Project loading fail",
+                [
+                    Exception(e.args),
+                    ImportError(
+                        "Failed to load the project's automaters submodule")
+                ]
+            )
+
         # Check that there are class objects that can be used
         # and are subclasses of the main Spider class object
-        elements = inspect.getmembers(
+        spiders = inspect.getmembers(
             spiders_module,
             predicate=inspect.isclass
         )
 
-        valid_spiders = filter(lambda x: issubclass(
-            x[1], (BaseCrawler, SinglePageAutomater)), elements)
+        automaters = inspect.getmembers(
+            automaters_module,
+            predicate=inspect.isclass
+        )
+
+        elements = spiders + automaters
+
+        valid_spiders = filter(
+            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)),
+            elements
+        )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
-        # try:
-        #     # Load the urls.py file which might contain
-        #     # initial urls to use for the crawling
-        #     urls_module = import_module(f'{dotted_path}.urls')
-        # except ImportError:
-        #     pass
-        # else:
-        #     initial_start_urls = []
-        #     start_urls = getattr(urls_module, 'start_urls', [])
-        #     for item in start_urls:
-        #         if isinstance(item, URLFile):
-        #             initial_start_urls.extend(list(item))
-
-        #         if isinstance(item, str):
-        #             initial_start_urls.append(item)
-
         for name in valid_spider_names:
-            if name in settings.SPIDERS or name in settings.AUTOMATERS:
-                instance = SpiderConfig.create(name, spiders_module)
+            if name in settings.SPIDERS:
+                instance = SpiderConfig.create(
+                    name,
+                    spiders_module,
+                    dotted_path=dotted_path
+                )
                 instance.registry = self
-                # instance.initial_start_urls = initial_start_urls
+                self.spiders[name] = instance
 
-                if name in settings.AUTOMATERS:
-                    instance.is_automater = True
-
+            if name in settings.AUTOMATERS:
+                instance = SpiderConfig.create(
+                    name,
+                    automaters_module,
+                    dotted_path=dotted_path
+                )
+                instance.is_automater = True
+                instance.registry = self
                 self.spiders[name] = instance
 
         for config in self.spiders.values():
@@ -227,9 +253,14 @@ class MasterRegistry:
 
     def run_all_automaters(self, **kwargs):
         if not self.has_spiders:
-            logger.info(("There are no registered spiders in your project. If you created spiders, "
-                         "register them within the SPIDERS variable of your "
-                         "settings.py file."), Warning, stacklevel=0)
+            logger.info(
+                (
+                    "There are no registered spiders in your project. If you created spiders, "
+                    "register them within the SPIDERS variable of your "
+                    "settings.py file."
+                ),
+                Warning, stacklevel=0
+            )
         else:
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
@@ -240,17 +271,26 @@ class MasterRegistry:
                 try:
                     config.run(**kwargs)
                 except Exception:
-                    logger.critical((f"Could not start {config}. "
-                                     "Did you use the correct class name?"), stack_info=True)
+                    logger.critical((
+                        f"Could not start {config}. "
+                        "Did you use the correct class name?"), stack_info=True
+                    )
                     raise
 
     def run_all_spiders(self, **kwargs):
         if not self.has_spiders:
-            message = ("There are no registered spiders in your project. If you created spiders, "
-                       "register them within the SPIDERS variable of your "
-                       "settings.py file.")
+            message = (
+                "There are no registered spiders in your project. If you created spiders, "
+                "register them within the SPIDERS variable of your "
+                "settings.py file."
+            )
             logger.info(message, Warning, stacklevel=0)
         else:
+            # TODO: This runs synchronously which means
+            # that each spider will be executed one after
+            # another. Consider doing this section asynchronously
+            # and in concurrence. Each spider should run one along
+            # the other without blocking one or the other
             for config in self.get_spiders():
                 # pre_init_spider.send(self, spider=config)
                 try:
@@ -265,14 +305,40 @@ class MasterRegistry:
                         ]
                     )
 
+            # async def spider_executor(config, **params):
+            #     try:
+            #         self.has_running_spiders = True
+            #         config.run(**params)
+            #     except:
+            #         message = f"Could not start {config}. Did you use the correct class name?"
+            #         raise ExceptionGroup(
+            #             message,
+            #             [
+            #                 Exception(e)
+            #             ]
+            #         )
+
+            # async def main(**params):
+            #     tasks = []
+            #     for config in self.get_spiders():
+            #         task = await asyncio.ensure_future(
+            #             spider_executor(config, **params)
+            #         )
+            #         tasks.append(task)
+            #     await asyncio.gather(*tasks)
+
+            # asyncio.run(main(**kwargs))
+
     def get_spider(self, spider_name):
         self.check_spiders_ready()
         try:
             return self.spiders[spider_name]
         except KeyError:
-            message = (f"The spider with the name '{spider_name}' does not "
-                       f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
-                       f"If you forgot to register '{spider_name}', check your settings file.")
+            message = (
+                f"The spider with the name '{spider_name}' does not "
+                f"exist in the registry. Available spiders are {', '.join(self.spiders.keys())}. "
+                f"If you forgot to register '{spider_name}', check your settings file."
+            )
             raise ExceptionGroup(
                 message,
                 [

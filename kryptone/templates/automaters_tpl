@@ -6,9 +6,21 @@ page or multiple user selected pages.
 The difference between an automater and a spider
 is that the spider will crawl the whole website
 regardless of the page.
+
+    1. Define a start url from which the spider
+       should start gathering additional urls to crawl
+    
+    2. Define a set of actions that the spider should do
+       on each visited page. You can also define actions that
+       will be executed just after the spider has visited a page
+       for example clicking on button in a cookies modal
+
+    3. Register you spider in SPIDERS and run python manage.py start
 """
 
-from kryptone.app import SinglePageAutomater
+
+from kryptone.base import SinglePageAutomater
+
 
 class MyAutomater(SinglePageAutomater):
     start_urls = []

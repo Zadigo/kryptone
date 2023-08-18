@@ -9,11 +9,11 @@ services:
     build: .
     container_name: app_kryptone
     ports:
-      - 5589:5589
+      - 5589:80
     networks:
       - kryptone_network
     volumes:
-      - .:/kryptone
+      - .:/app
       
   redis:
     image: redis
@@ -23,7 +23,7 @@ services:
       - 6379:6000
     restart: always
     healthcheck:
-      test: ["redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 30s
       retries: 5

@@ -7,13 +7,14 @@ name = "pypi"
 redis = "*"
 nltk = "*"
 selenium = "*"
-sklearn = "*"
 requests = "*"
 beautifulsoup4 = "*"
 airtable = "*"
-pymemcache = "*"
-python-dotenv = "*"
 quart = "*"
+quart-cors = "*"
+webdriver-manager = "*"
+gspread = "*"
+unidecode = "*"
 
 [dev-packages]
 
