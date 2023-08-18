@@ -678,7 +678,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.visited_urls.add(current_url)
 
             # We can either crawl all the website
-            # or just specific page
+            # or just specific page TODO: Check performance issues here
             self.get_page_urls()
             self._backup_urls()
 
