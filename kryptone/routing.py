@@ -66,7 +66,15 @@ class Route:
         return self, wrapper
 
 
-route = Route()
+# FIXME: This creates an instance pointing to the
+# same class with this technique, in other words,
+# multiple routes will just be the same base class
+# just with different wrapper functions
+# route = Route()
+
+def route(function_name, *, path=None, regex=None, name=None):
+    instance = Route.new()
+    return instance(function_name, path=path, regex=regex, name=name)
 
 
 class Router:
@@ -117,8 +125,11 @@ class Router:
     def resolve(self, current_url, spider_instance):
         """handles the routing for each matched urls to
         the corresponding function on the class"""
+        resolution_states = []
         for route in self.routes.values():
             state = route(current_url, spider_instance)
+            resolution_states.append(state)
+        return resolution_states
 
 
 # class Spider:
