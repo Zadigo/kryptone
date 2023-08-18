@@ -2,10 +2,11 @@ import re
 import time
 
 from selenium.webdriver.common.by import By
-from kryptone.utils.urls import URLPassesTest
 
 from kryptone.base import SiteCrawler
 from kryptone.contrib.crawlers.ecommerce import EcommerceCrawlerMixin
+from kryptone.routing import Router, route
+from kryptone.utils.urls import URLPassesTest
 
 IGNORE_URLS = [
     'faq-faq',
@@ -30,10 +31,21 @@ IGNORE_URLS = [
 
 
 class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
-    # start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/'
     start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/haut-de-maillot-de-bain/haut-de-maillot-de-bain-crepe-noir-10040867060.html'
 
     class Meta:
+        router = Router([
+            route(
+                'handle_products',
+                regex=r'\/vetements\/',
+                name='products_page'
+            ),
+            route(
+                'handle_product',
+                regex=r'\/[a-z\d-]+\-\d+\.html$',
+                name='product_page'
+            )
+        ])
         url_passes_tests = [
             URLPassesTest(
                 'base_pages',
@@ -58,5 +70,11 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
         #     pass
 
     def run_actions(self, current_url, **kwargs):
-        print(current_url)
+        print('Global actions')
+
+    def handle_product(self, current_url, route=None, **kwargs):
+        print('handle product')
+
+    def handle_products(self, current_url, route=None, **kwargs):
         self.scroll_window(stop_at=5000)
+        print('handle products')

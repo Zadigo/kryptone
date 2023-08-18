@@ -195,7 +195,11 @@ This means that everytime the list of urls are updated, the `cache.json` file is
 
 ### Redis
 
-If a connection exists, temporary elements are stored in the Redis database backend. The backend is not exposed to the internet and should not be exposed if sensitive data will be persisted.
+If a connection exists, temporary elements are stored in the Redis database backend. The backend is not to be exposed to the internet and should not be exposed if sensitive data will be persisted.
+
+### Memcache
+
+Is used in the same logic as Redis.
 
 ## Signals
 
@@ -250,7 +254,7 @@ def custom_receiver(url):
 
 ## Monitoring
 
-Your spiders can be monitered in through multiple ways. The custom monitoring method used by Kryptone is emailing. If an emailing system is present in your project, Kryptone will use this for any detected failure. Exceptions are bubbled up so you can have a precise idea of what exactly went wrong in your project.
+Your spiders can be monitered in multiple ways. The custom monitoring method used by Kryptone is emailing. If an emailing system is present in your project, Kryptone will use this for any detected failure. Exceptions are bubbled up so you can have a precise idea of what exactly went wrong in your project.
 
 ## Settings
 

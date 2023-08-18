@@ -57,10 +57,12 @@ class TestUrlTesting(unittest.TestCase):
 class TestURLPassesTest(unittest.TestCase):
     def test_result(self):
         instance = URLPassesTest(
-            '/Customer/Wishlist',
-            '/fr-ma/corporate/contact-us',
-            'new-member',
-            name='Random test'
+            'base_pages',
+            paths=[
+                '/Customer/Wishlist',
+                '/fr-ma/corporate/contact-us',
+                'new-member'
+            ]
         )
         self.assertFalse(
             instance('https://www.defacto.com/fr-ma/statik/new-member')

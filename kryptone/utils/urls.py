@@ -206,7 +206,7 @@ class TestUrl:
 
 
 class URLPassesTest:
-    """Checks if an url is able to pass a
+    """Checks if an url is able to pass
     a given test
 
     >>> class Spider(BaseCrawler):

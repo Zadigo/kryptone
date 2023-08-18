@@ -13,10 +13,10 @@ a spider that will crawl an entire website.
     3. Register you spider in SPIDERS and run python manage.py start
 """
 
-from kryptone.base import BaseCrawler
+from kryptone.base import SiteCrawler
 
 
-class MyFirstCrawler(BaseCrawler):
+class MyFirstCrawler(SiteCrawler):
     start_url = None
 
     def post_visit_actions(self, **kwargs):
