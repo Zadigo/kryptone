@@ -474,7 +474,7 @@ class BaseCrawler(metaclass=Crawler):
         for the current crawl session"""
         total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
         result = len(self.visited_urls) / total_urls
-        percentage = round(result, 1)
+        percentage = round(result, 5)
         logger.info(f'{percentage * 100}% of total urls visited')
 
     def get_current_date(self):
