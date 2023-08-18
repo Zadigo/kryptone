@@ -38,7 +38,7 @@ WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails'
+    'gather_emails', 'router'
 }
 
 
@@ -89,6 +89,15 @@ class CrawlerOptions:
         self.verbose_name = name.title()
         self.initial_spider_meta = None
 
+        self.domains = []
+        self.audit_page = False
+        self.url_passes_tests = None
+        self.debug_mode = False
+        self.site_language = 'en'
+        self.default_scroll_step = 80
+        self.gather_emails = False
+        self.router = None
+
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
 
@@ -97,7 +106,7 @@ class CrawlerOptions:
             if name not in DEFAULT_META_OPTIONS:
                 raise ValueError(
                     "Meta for model '{name}' received "
-                    "and illegal option '{option}'".format(
+                    "an illegal option '{option}'".format(
                         name=self.verbose_name,
                         option=name
                     )
@@ -719,6 +728,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # everything is completed
             url_instance = URL(current_url)
             self.run_actions(url_instance)
+            
+            # Run routing actions aka, base on given
+            # url path, route to a function that
+            # would execute said task
+            if self._meta.router is not None:
+                self._meta.router.resolve(current_url, self)
 
             performance = self.calculate_performance()
             self.calculate_completion_percentage()
