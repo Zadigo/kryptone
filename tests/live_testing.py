@@ -1,5 +1,8 @@
 import time
 from kryptone.mixins import SEOMixin
+from kryptone.conf import settings
+
+settings.WEBSITE_LANGUAGE = 'fr'
 
 class BaseLiveTestSpider(SEOMixin):
     def __init__(self):
