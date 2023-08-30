@@ -293,6 +293,18 @@ class SEOMixin(TextMixin):
         text = self.driver.find_element(By.TAG_NAME, 'body').text
         return self.fit(text)
     
+    @cached_property
+    def page_speed_script(self):
+        path = settings.GLOBAL_KRYPTONE_PATH.joinpath(
+            'data', 'js', 'page_speed.js'
+        )
+        with open(path, encoding='utf-8') as f:
+            content = f.read()
+        return content
+    
+    def get_page_speed(self, audit):
+        result = self.driver.execute_script(self.page_speed_script)
+        audit['timing'] = result
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
