@@ -696,8 +696,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 self.audit_page(current_url)
                 write_json_document('audit.json', self.page_audits)
 
-                vocabulary = self.global_audit(
-                    language=self._meta.site_language)
+                vocabulary = self.global_audit()
                 write_json_document('global_audit.json', vocabulary)
 
                 # cache.set_value('page_audit', self.page_audits)
