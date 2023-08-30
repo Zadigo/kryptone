@@ -310,18 +310,23 @@ class SEOMixin(TextMixin):
         page has ALT attributes to them"""
         image_alts = []
         images = self.driver.find_elements(By.TAG_NAME, 'img')
-        for image in images:
-            image_alt = self.fit(image.get_attribute('alt'))
-            image_alts.append(image_alt)
-        empty_alts = list(keep_while(lambda x: x == '', image_alts))
+        if images:
+            for image in images:
+                image_alt = self.fit(image.get_attribute('alt'))
+                image_alts.append(image_alt)
+            empty_alts = list(keep_while(lambda x: x == '', image_alts))
 
-        image_alts = set(image_alts)
-        percentage_count = (len(empty_alts) / len(image_alts)) * 100
-        percentage_invalid_images = round(percentage_count, 2)
+            unique_image_alts = set(image_alts)
+            percentage_count = (len(empty_alts) / len(image_alts)) * 100
+            percentage_invalid_images = round(percentage_count, 2)
 
-        audit['pct_images_with_no_alt'] = percentage_invalid_images
-        audit['image_alts'] = list(image_alts)
-        return percentage_invalid_images, image_alts    
+            audit['pct_images_with_no_alt'] = percentage_invalid_images
+            audit['image_alts'] = list(unique_image_alts)
+            return percentage_invalid_images, unique_image_alts
+        else:
+            audit['pct_images_with_no_alt'] = 0
+            audit['image_alts'] = []
+            return 0, set()
     
     def audit_structured_data(self, audit):
         has_structured_data = False
