@@ -17,8 +17,7 @@ EMAIL_REGEX = r'\S+\@\S+'
 
 
 class TextMixin:
-    """A mixin for analyzing 
-    working with text"""
+    """A mixin for analyzing text"""
 
     page_documents = []
     fitted_page_documents = []
@@ -216,8 +215,7 @@ class TextMixin:
 
 
 class SEOMixin(TextMixin):
-    """A mixin for auditing a 
-    web page"""
+    """A mixin for auditing a web page"""
 
     page_audits = defaultdict(dict)
     error_pages = set()
@@ -305,6 +303,10 @@ class SEOMixin(TextMixin):
     def get_page_speed(self, audit):
         result = self.driver.execute_script(self.page_speed_script)
         audit['timing'] = result
+
+    def get_page_status_code(self):
+        pass
+    
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
@@ -329,6 +331,12 @@ class SEOMixin(TextMixin):
             return 0, set()
     
     def audit_structured_data(self, audit):
+        """
+        Checks if the website has structured data
+
+        >>> self.audit_structured_data({})
+        ... True, {}
+        """
         has_structured_data = False
         structured_data_type = None
         content = self.driver.execute_script(
@@ -349,9 +357,6 @@ class SEOMixin(TextMixin):
         audit['structured_data_type'] = structured_data_type
         return has_structured_data, structured_data_type
 
-    def get_page_status_code(self):
-        pass
-
     def vectorize_documents(self):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
@@ -369,7 +374,7 @@ class SEOMixin(TextMixin):
         return matrix, vectorizer
 
     def global_audit(self):
-        """Returns a global audit of the website"""
+        """Returns the global audit for the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
         return self.normalize_integers(vectorizer.vocabulary_)
