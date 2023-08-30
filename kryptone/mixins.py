@@ -164,8 +164,8 @@ class TextMixin:
         """Fit a document and then transform it into
         a usable element for text analysis"""
         fitted_text = self.fit(text)
-        if fitted_text is not None:
-            self.page_documents.append(fitted_text)
+        # if fitted_text is not None:
+        #     self.page_documents.append(fitted_text)
 
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
