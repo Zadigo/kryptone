@@ -398,6 +398,7 @@ class SEOMixin(TextMixin):
         
         self.audit_structured_data(audit)
         self.audit_images(audit)
+        self.get_page_speed(audit)
 
         self.page_audits[current_url] = audit
         return audit
