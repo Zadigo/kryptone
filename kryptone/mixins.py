@@ -151,6 +151,7 @@ class TextMixin:
         if text is None:
             return None
 
+        text = re.sub('\W', ' ', text)
         normalized_text = self.simple_clean_text(text)
         final_text = self.normalize_spaces(
             self._remove_punctuation(normalized_text)
