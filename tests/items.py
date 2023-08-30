@@ -5,6 +5,7 @@ from kryptone import logger
 from kryptone.utils.urls import URL
 
 
+
 class MockupSpider:
     """Mockup spider used for testing
     the logic behing the main spider"""
