@@ -26,6 +26,7 @@ from kryptone.db import backends
 from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
+from kryptone.utils import file_readers
 from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_csv_document,
                                          write_json_document)
@@ -696,8 +697,19 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 self.audit_page(current_url)
                 write_json_document('audit.json', self.page_audits)
 
+                # Write vocabulary as JSON
                 vocabulary = self.global_audit()
                 write_json_document('global_audit.json', vocabulary)
+
+                # Write vocabulary as CSV
+                rows = []
+                for key, value in vocabulary.items():
+                    rows.append([key, value])
+                write_csv_document('global_audit.csv', rows)
+
+                # Save the website's text
+                website_text = ' '.join(self.fitted_page_documents)
+                file_readers.write_text_document('website.txt', website_text)
 
                 # cache.set_value('page_audit', self.page_audits)
                 # cache.set_value('global_audit', vocabulary)
