@@ -34,18 +34,19 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
     start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/haut-de-maillot-de-bain/haut-de-maillot-de-bain-crepe-noir-10040867060.html'
 
     class Meta:
-        router = Router([
-            route(
-                'handle_products',
-                regex=r'\/vetements\/',
-                name='products_page'
-            ),
-            route(
-                'handle_product',
-                regex=r'\/[a-z\d-]+\-\d+\.html$',
-                name='product_page'
-            )
-        ])
+        crawl = False
+        # router = Router([
+        #     route(
+        #         'handle_products',
+        #         regex=r'\/vetements\/',
+        #         name='products_page'
+        #     ),
+        #     route(
+        #         'handle_product',
+        #         regex=r'\/[a-z\d-]+\-\d+\.html$',
+        #         name='product_page'
+        #     )
+        # ])
         url_passes_tests = [
             URLPassesTest(
                 'base_pages',
@@ -77,4 +78,3 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
 
     def handle_products(self, current_url, route=None, **kwargs):
         self.scroll_window(stop_at=5000)
-        print('handle products')
