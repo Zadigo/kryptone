@@ -56,7 +56,8 @@ def clean_text(text):
 class Text:
     """Represents a text string"""
 
-    def __init__(self, text):
+    def __init__(self, text, title=False):
+        self.title = title
         text = self.simple_clean(text)
         self.tokens = list(drop_null(text.split(' ')))
         self.text = ' '.join(self.tokens)
@@ -74,15 +75,17 @@ class Text:
         for token in self.tokens:
             yield token
 
-    @staticmethod
-    def simple_clean(text, encoding='utf-8'):
+    def simple_clean(self, text, encoding='utf-8'):
         """Applies simple cleaning techniques on the
         text by removing newlines, lowering the characters
         and removing extra spaces"""
         lowered_text = str(text).lower().strip()
         text = lowered_text.encode(encoding).decode(encoding)
         normalized_text = text.replace('\n', ' ')
-        return normalized_text.strip()
+        text = normalized_text.strip()
+        if self.title:
+            return text.title()
+        return text
 
 
 def remove_punctuation(text, email_exception=False):
