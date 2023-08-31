@@ -10,7 +10,6 @@ from pathlib import Path
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.signals import Signal
-from kryptone.utils.urls import URLFile
 
 # registry_populated = Signal()
 # pre_init_spider = Signal()
