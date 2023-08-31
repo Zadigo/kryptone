@@ -1,10 +1,14 @@
 from urllib.parse import quote, urlencode
+from kryptone.base import SiteCrawler
 
 
-class GoogleSearchMixin:
+class GoogleSearchMixin(SiteCrawler):
     start_url = "https://www.google.com/search?q=site%3Alinkedin.com%2Fin+Undiz"
     # start_url = 'https://www.google.com/search'
     # query = 'site:linkedin.com/in Undiz'
+
+    class Meta:
+        crawl = False
 
     def get_start_url(self):
         query = quote(self.query)

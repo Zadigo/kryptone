@@ -185,19 +185,6 @@ class MasterRegistry:
                 ]
             )
 
-        try:
-            automaters_module = import_module(
-                f'{dotted_path}.{AUTOMATERS_MODULE}')
-        except Exception as e:
-            raise ExceptionGroup(
-                "Project loading fail",
-                [
-                    Exception(e.args),
-                    ImportError(
-                        "Failed to load the project's automaters submodule")
-                ]
-            )
-
         # Check that there are class objects that can be used
         # and are subclasses of the main Spider class object
         spiders = inspect.getmembers(
@@ -205,16 +192,9 @@ class MasterRegistry:
             predicate=inspect.isclass
         )
 
-        automaters = inspect.getmembers(
-            automaters_module,
-            predicate=inspect.isclass
-        )
-
-        elements = spiders + automaters
-
         valid_spiders = filter(
             lambda x: issubclass(x[1], BaseCrawler),
-            elements
+            spiders
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
