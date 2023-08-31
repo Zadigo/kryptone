@@ -165,6 +165,12 @@ class BaseCrawler(metaclass=Crawler):
     timezone = 'UTC'
     default_scroll_step = 80
 
+    def __init__(self, browser_name=None):
+        self._start_url_object = None
+        self.driver = get_selenium_browser_instance(
+            browser_name=browser_name or self.browser_name
+        )
+
     def __repr__(self):
         return f'<{self.__class__.__name__}>'
 
@@ -724,7 +730,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             time.sleep(wait_time)
 
 
-class SinglePageAutomater(BaseCrawler):
+class SinglePageAutomater(EmailMixin, BaseCrawler):
     """Automates user defined actions on a
     single or multiple user provided 
     pages as oppposed to crawing the
@@ -779,19 +785,22 @@ class SinglePageAutomater(BaseCrawler):
             # Post navigation signal
             # TEST: This has to be tested
             # navigation.send(self, current_url=current_url)
+            
 
             self.visited_urls.add(current_url)
-            self._backup_urls()
+            # self._backup_urls()
 
-            self.emails(
-                self.get_transformed_raw_page_text,
-                elements=self.get_page_link_elements
-            )
-            write_csv_document('emails.csv', self.emails_container)
+            if self._meta.gather_emails:
+                self.emails(
+                    self.get_transformed_raw_page_text,
+                    elements=self.get_page_link_elements
+                )
+                write_csv_document('emails.csv', self.emails_container)
 
             # Run custom user actions once
             # everything is completed
-            self.run_actions(current_url)
+            url_instance = URL(current_url)
+            self.run_actions(url_instance)
             # db_signal.send(
             #     self,
             #     current_url=current_url,
