@@ -19,19 +19,23 @@ RUN ln -s /usr/lib/chromium-browser/chromedriver
 # RAISES ERROR
 # RUN ln -s /usr/bin/chromedriver
 
+# Download the Kryptone released package
+RUN curl -L https://github.com/Zadigo/kryptone/archive/refs/tags/${package}.tar.gz > kryptone.tar.gz
+
+# Add the directory to the PYTHONPATH
+RUN echo ~/.bashrc << "PYTHONPATH=$PYTHONPATH:/kryptone"
+
 WORKDIR /app
 
 COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-# Download the Kryptone released package
-RUN curl -L https://github.com/Zadigo/kryptone/archive/refs/tags/${package}.tar.gz > kryptone.tar.gz
+RUN echo ~/.bashrc << "PYTHONPATH=$PYTHONPATH:/app"
 
-# Add the directory to the PYTHONPATH
-ENV PYTHONPATH "${PYTHONPATH}:/app"
+RUN source ~/.bashrc
 
-ENV PYTHONPATH "${PYTHONPATH}:/kryptone/kryptone"
+RUN echo $PYTHONPATH
 
 COPY . /app
 
