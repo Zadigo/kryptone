@@ -606,7 +606,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], url_cache=None, **kwargs):
+    def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
 
         >>> instance = BaseCrawler()
@@ -626,9 +626,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
-        if url_cache is not None:
-            self.urls_to_visit = url_cache.urls_to_visit
-            self.visited_urls = url_cache.visited_urls
+        if isinstance(start_urls, URLCache):
+            self.urls_to_visit = start_urls.urls_to_visit
+            self.visited_urls = start_urls.visited_urls
 
         if self.start_url is None:
             raise ValueError('A starting url should be provided to the spider')
