@@ -4,6 +4,7 @@ import json
 import random
 import re
 import time
+from dataclasses import field
 from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
@@ -11,8 +12,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
-from kryptone.base import BaseCrawler, SinglePageAutomater
+from kryptone.base import SiteCrawler
 from kryptone.conf import settings
+from kryptone.contrib.models import GoogleBusiness
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
@@ -56,7 +58,7 @@ class GoogleMapsMixin:
                     writer.writerow(row)
 
 
-class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
+class GoogleMaps(GoogleMapsMixin, SiteCrawler):
     final_result = []
 
     def create_dump(self):
@@ -402,6 +404,9 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
 
 
 class GoogleMapsPlace(GoogleMaps):
+    class Meta:
+        crawl = False
+
     def run_actions(self, current_url, **kwargs):
         current_time = time.time()
         business_information = GoogleBusiness()
