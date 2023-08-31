@@ -16,7 +16,6 @@ from kryptone.conf import settings
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
-from kryptone.utils.urls import URLFile
 
 
 @dataclasses.dataclass

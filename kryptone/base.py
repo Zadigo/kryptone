@@ -32,7 +32,8 @@ from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLFile, URLPassesTest
+from kryptone.utils.urls import URL, URLPassesTest
+from kryptone.utils.file_readers import URLCache
 
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
