@@ -177,6 +177,18 @@ class BaseCrawler(metaclass=Crawler):
     timezone = 'UTC'
     default_scroll_step = 80
 
+    def __init__(self, browser_name=None):
+        self._start_url_object = None
+        self.driver = get_selenium_browser_instance(
+            browser_name=browser_name or self.browser_name
+        )
+
+        # navigation.connect(collect_images_receiver, sender=self)
+
+        # db_signal.connect(backends.airtable_backend, sender=self)
+        # db_signal.connect(backends.notion_backend, sender=self)
+        # db_signal.connect(backends.google_sheets_backend, sender=self)
+
     def __repr__(self):
         return f'<{self.__class__.__name__}>'
 
@@ -516,17 +528,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
 
     def __init__(self, browser_name=None):
-        self._start_url_object = None
-        self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
-        )
-
-        # navigation.connect(collect_images_receiver, sender=self)
-
-        # db_signal.connect(backends.airtable_backend, sender=self)
-        # db_signal.connect(backends.notion_backend, sender=self)
-        # db_signal.connect(backends.google_sheets_backend, sender=self)
-
+        super().__init__(browser_name=browser_name)
         self._start_date = self.get_current_date()
 
         self._start_time = time.time()
