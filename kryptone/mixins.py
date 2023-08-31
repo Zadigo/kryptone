@@ -145,18 +145,18 @@ class TextMixin:
 
     def fit(self, text):
         """Normalize the document by removing newlines,
-        useless spaces, punctuations and null values. 
-        The fit method fits the text before running
-        in depth text transformation"""
+        useless spaces, special characters, punctuations 
+        and null values. The fit method fits the text 
+        before running in depth text transformation"""
         if text is None:
             return None
 
+        text = re.sub('\W', ' ', text)
         normalized_text = self.simple_clean_text(text)
         final_text = self.normalize_spaces(
             self._remove_punctuation(normalized_text)
         )
         self.page_documents.append(final_text)
-
         return final_text
 
     def fit_transform(self, text=None, language='en', use_multipass=False, text_processors=[]):
@@ -177,33 +177,34 @@ class TextMixin:
             stemmer = SnowballStemmer('english')
 
         for document in self.page_documents:
+            # 1. Remove stop words
             if use_multipass:
                 result1 = self._remove_stop_words_multipass(document)
             else:
-                result1 = self._remove_stop_words(document)
+                result1 = self._remove_stop_words(document, language=language)
 
-            # 1. Remove special carachters
-            result2 = re.sub('\W', ' ', result1)
+            # 2. Remove special carachters
+            # result2 = re.sub('\W', ' ', result1)
 
-            # 2. Remove rare and common words
-            rare_words = self._rare_words(result2)
-            common_words = self._common_words(result2)
+            # 3. Remove rare and common words
+            rare_words = self._rare_words(result1)
+            common_words = self._common_words(result1)
 
             words_to_remove = rare_words + common_words
             words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
 
-            tokenized_text = self._tokenize(result2)
+            tokenized_text = self._tokenize(result1)
             simplified_text = list(drop_while(
                 lambda x: x in words_to_remove,
                 tokenized_text
             ))
 
-            # 3. Run custom text processors
+            # 4. Run custom text processors
             simplified_text = self._run_processors(
                 simplified_text, text_processors
             )
 
-            # 4. Use stemmer
+            # 5. Use stemmer
             stemmed_words = [
                 stemmer.stem(word=word)
                 for word in simplified_text
@@ -377,7 +378,8 @@ class SEOMixin(TextMixin):
         """Returns the global audit for the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
-        return self.normalize_integers(vectorizer.vocabulary_)
+        vocabulary = vectorizer.vocabulary_
+        return self.normalize_integers(vocabulary)
 
     def audit_page(self, current_url):
         """Audit the current page by analyzing different

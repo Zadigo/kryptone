@@ -55,7 +55,7 @@ Once the spider visits a page, two types of actions can be performed on the page
 
 #### Post visit actions
 
-A post visit action is action that is executed immediately after the robot has visited a specific page. For instance, clicking a cookie consent page can be considered a post visit action.
+A post visit action is an action that is executed immediately after the robot has visited a specific page. For instance, clicking a cookie consent button on a banner can be considered a post visit action.
 
 ```python
 from kryptone.base import BaseCrawler
@@ -69,7 +69,7 @@ class MyWebscrapper(BaseCrawler):
 
 #### User actions
 
-These actions are executed once all urls are gathered on the page and before the robot is ready to move to a different page.
+These actions are executed once all urls are gathered on the page and before the robot is ready to move to a different one. It will execute logic within this method on every page.
 
 ```python
 from kryptone.base import BaseCrawler
@@ -77,35 +77,63 @@ from kryptone.base import BaseCrawler
 class MyWebscrapper(BaseCrawler):
     start_url = 'http://example.com'
 
-    def run_actions(self, **kwargs):
+    def run_actions(self, current_url, **kwargs):
         # Do something here
         pass
 ```
 
+__What does current url stand for__
+
+`current_url` is an instance of `URL` in `kryptone.utils.URL` which implements a set of additional methods on the url string.
+
+* `is_path` checks that the url is a path
+* `is_valid` checks that the url starts with _http_
+* `has_fragment` checks that the url contains a fragment
+* `create` will create a new url instance
+* `is_file` checks that the url points to a file
+* `as_path` returns the url as a `pathlib.Path`
+* `get_extension` returns the urls extension (e.g. pdf) if present
+* `is_same_domain` compares two urls and determines if they are from the same domain
+* `get_status` sends a request to determine validity
+* `compare` compares two urls
+* `capture` captures an element in the url using regex
+* `test_path` tests if the url's path passes a regex test
+* `decompose_path` decompose the path into a list
+
 ### Filtering urls
 
-Urls gathered on the page can be filtered. This process is executed just before they are add to `urls_to_visit` container.
+Urls gathered on the page can be filtered. This process is executed just before they are added to `urls_to_visit` container.
 
-This is very useful in situations where we want to ignore certain pages that would be useless for crawling.
-
-Your filtering functions should always return a boolean. They are also executed consecutively in the order in which they were implemented.
-
-If a filter fails by not returning a boolean, the url is considered to be valid.
+This is very useful in situations where we want to ignore certain pages that would be useless for crawling. Filtereing urls is done with `URLPassesTest` and `UrlPassesRegexTest`.
 
 For instance , let's say we want to avoid any url that contains `/shirts/`:
 
 ```python
 from kryptone.base import BaseCrawler
-
-def avoid_shirts(url):
-    if '/shirts/' in url:
-        return False
-    return True
-
+from kryptone.utils.urls import URLPassesTest
 
 class MyScrapper(BaseCrawler):
     start_url = 'http://example.com'
-    url_filters = [avoid_shirts]
+    
+    class Meta:
+        url_passes_tests = [
+            URLPassesTest('base_pages', paths=[
+                '/shirts/'
+            ])
+        ]
+```
+
+```python
+from kryptone.base import BaseCrawler
+from kryptone.utils.urls import URLPassesTest
+
+class MyScrapper(BaseCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        url_passes_tests = [
+            UrlPassesRegexTest('base_pages', regex=r'^\/shirts\/')
+        ]
 ```
 
 __Understanding how urls are gathered__
@@ -250,6 +278,19 @@ class MyScrapper(BaseCrawler):
 @function_to_receiver(my_signal)
 def custom_receiver(url):
     pass
+```
+
+## Utilities
+
+### TestUrl
+
+This class takes two urls and determines if they are similar.
+
+```python
+
+result = TestUrl('http://example.com', 'http://example.com')
+
+> True
 ```
 
 ## Monitoring

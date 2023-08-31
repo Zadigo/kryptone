@@ -99,6 +99,16 @@ def write_csv_document(filename, data, adapt_data=False):
         writer.writerows(data)
 
 
+def write_text_document(filename, data, encoding='utf-8'):
+    """Writes text to a txt file
+
+    >>> write_csv_document('example.txt', 'some text')
+    """
+    path = get_media_folder(filename)
+    with open(path, mode='w', encoding=encoding) as f:
+        f.write(data)
+
+
 class URLCache:
     def __init__(self):
         self.data = {}
