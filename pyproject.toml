@@ -1,0 +1,8 @@
+packages = [
+  {include = "kryptone"},
+  {include = "py.typed"}
+]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"

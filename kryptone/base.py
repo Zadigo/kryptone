@@ -187,14 +187,6 @@ class BaseCrawler(metaclass=Crawler):
         return self.driver.find_elements(By.TAG_NAME, 'a')
 
     @property
-    def completion_percentage(self):
-        """Indicates the level of completion
-        for the current crawl session"""
-        result = len(self.visited_urls) / len(self.urls_to_visit)
-        percentage = round(result, 1)
-        logger.info(f'Crawl completed at {percentage * 100}%')
-
-    @property
     def name(self):
         return 'site_crawler'
 
@@ -483,6 +475,14 @@ class BaseCrawler(metaclass=Crawler):
         completed_time = round(time.time() - self._start_time, 1)
         days = 0 if days < 0 else days
         return self.performance_audit(days, completed_time)
+    
+    def calculate_completion_percentage(self):
+        """Indicates the level of completion
+        for the current crawl session"""
+        total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
+        result = len(self.visited_urls) / total_urls
+        percentage = round(result, 1)
+        logger.info(f'{percentage * 100}% of total urls visited')
 
     def get_current_date(self):
         timezone = pytz.timezone(self.timezone)
@@ -528,6 +528,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self.performance_audit = namedtuple(
             'Performance', ['days', 'duration']
         )
+
+        # self.date_history = {}
+
+    # def update_date_history(self):
+    #     current_date = datetime.datetime.now(tz=pytz.timezone('UTC')).date()
+    #     self.date_history[current_date] = self.date_history[current_date] + 1
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit 
@@ -720,13 +726,15 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             url_instance = URL(current_url)
             self.run_actions(url_instance)
 
+            performance = self.calculate_performance()
+            self.calculate_completion_percentage()
+
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
                 stop = settings.WAIT_TIME_RANGE[1]
                 wait_time = random.randrange(start, stop)
-
+           
             logger.info(f"Waiting {wait_time}s")
-            performance = self.calculate_performance()
             time.sleep(wait_time)
 
 

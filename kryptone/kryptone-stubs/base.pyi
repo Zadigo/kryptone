@@ -1,16 +1,16 @@
-from kryptone.utils.file_readers import URLCache
-from typing import NamedTuple
-import time
-from typing import Literal, NoReturn, Union, List
-from urllib.parse import ParseResult
 import datetime
+import time
+from typing import List, NamedTuple, NoReturn, Union
+from urllib.parse import ParseResult
+
 from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.remote.webelement import WebElement
+
 from kryptone.mixins import EmailMixin, SEOMixin
+from kryptone.utils.file_readers import URLCache
 from kryptone.utils.urls import URL
 
 WEBDRIVER_ENVIRONMENT_PATH: str = 'KRYPTONE_WEBDRIVER'
-
 
 def get_selenium_browser_instance(
     browser_name: str = ...
@@ -29,8 +29,8 @@ class CrawlerOptions:
 
 
 class Crawler(type):
-    def __new__(cls, name: str, bases: tuple, attrs: dict): ...
-    def prepare(cls) -> NoReturn: ...
+    def __new__(cls, name: str, bases: tuple, attrs: dict) -> type: ...
+    def prepare(cls: type) -> NoReturn: ...
 
 
 class BaseCrawler(metaclass=Crawler):
@@ -41,6 +41,9 @@ class BaseCrawler(metaclass=Crawler):
     debug_mode: bool = ...
     timezone: str = 'UTC'
     default_scroll_step:  int = 80
+
+    class Meta:
+        ...
 
     def __repr__(self) -> str: ...
     @property
