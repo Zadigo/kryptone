@@ -2,6 +2,7 @@ from kryptone.base import SiteCrawler
 from kryptone.utils.urls import URLPassesTest
 from kryptone.contrib.crawlers.ecommerce import EcommerceCrawlerMixin
 
+
 class TestSomething(EcommerceCrawlerMixin, SiteCrawler):
     start_url = 'https://www.etam.com/culottes-et-bas-strings/string-en-microfibre-et-dentelle-653945770.html'
 
@@ -29,7 +30,7 @@ class TestSomething(EcommerceCrawlerMixin, SiteCrawler):
             pass
 
 
-if __name__ == '__main__':
-    t = TestSomething(browser_name='Edge')
-    # t.start()
-    t.start()
+# if __name__ == '__main__':
+#     t = TestSomething(browser_name='Edge')
+#     # t.start()
+#     t.start()

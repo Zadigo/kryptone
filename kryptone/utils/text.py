@@ -79,6 +79,7 @@ class Text:
         """Applies simple cleaning techniques on the
         text by removing newlines, lowering the characters
         and removing extra spaces"""
+        result2 = re.sub('\W', ' ', text)
         lowered_text = str(text).lower().strip()
         text = lowered_text.encode(encoding).decode(encoding)
         normalized_text = text.replace('\n', ' ')

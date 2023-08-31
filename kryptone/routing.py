@@ -1,9 +1,18 @@
 from collections import OrderedDict
 
+from kryptone import logger
 from kryptone.utils.urls import URL
 
 
 class Route:
+    """Represents the route to use for a path that matches
+    the current route
+
+    >>> router = Router([
+    ...    route('logic_for_first_url', regex='\/products', name='products')
+    ... ])
+    """
+
     def __init__(self):
         self.path = None
         self.regex = None
@@ -37,28 +46,46 @@ class Route:
             if result:
                 func = getattr(spider_instance, function_name, False)
                 if not func:
-                    raise ValueError('The Router requires for you to '
-                                     'have a matching function on your spider')
+                    # Silently fail if we got no corresponding
+                    # functions on the spider class
+                    logger.warning(
+                        f'Routing failed for: {current_url}. '
+                        'No corresponding function found'
+                    )
+                    return False
+                
                 func(current_url, route=self)
                 if result:
+                    logger.debug(
+                        f"Routing sucessful for {current_url} "
+                        f"to '{self.function_name}'"
+                    )
                     self.matched_urls.append(current_url)
                 return result
             return result
         return self, wrapper
 
 
-route = Route()
+# FIXME: This creates an instance pointing to the
+# same class with this technique, in other words,
+# multiple routes will just be the same base class
+# just with different wrapper functions
+# route = Route()
+
+def route(function_name, *, path=None, regex=None, name=None):
+    instance = Route.new()
+    return instance(function_name, path=path, regex=regex, name=name)
 
 
 class Router:
     """Call specific functions depending or whether the current
     visited url matches one of the routes.
-    
+
     Let's say we have `http://example.com/product` and
     `http://example.com/products` and that we need to apply two
     different logics to these urls. That's where the Router comes
     in handy
-    
+
     >>> class MySpider:
     ...     start_url = 'http://example.com'
     ...     
@@ -74,6 +101,7 @@ class Router:
     ...     def logic_for_second_url(self, current_url, route=None, **kwargs):
     ...         pass
     """
+
     routes = OrderedDict()
 
     def __init__(self, routes):
@@ -89,6 +117,19 @@ class Router:
 
     def __repr__(self):
         return f'<Router: {list(self.routes.keys())}>'
+
+    @property
+    def has_routes(self):
+        return len(self.routes.keys()) > 0
+
+    def resolve(self, current_url, spider_instance):
+        """handles the routing for each matched urls to
+        the corresponding function on the class"""
+        resolution_states = []
+        for route in self.routes.values():
+            state = route(current_url, spider_instance)
+            resolution_states.append(state)
+        return resolution_states
 
 
 # class Spider:

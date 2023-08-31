@@ -1,8 +1,8 @@
+import bisect
 import datetime
 import json
 import random
 import re
-import bisect
 import string
 import time
 from collections import defaultdict, namedtuple
@@ -26,8 +26,7 @@ from kryptone.db import backends
 from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
-from kryptone.utils.file_readers import (read_json_document,
-                                         read_csv_document,
+from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
@@ -39,7 +38,7 @@ WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails'
+    'gather_emails', 'router'
 }
 
 
@@ -63,7 +62,7 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
 
 def get_selenium_browser_instance(browser_name=None):
     """Creates a new selenium browser instance
-    
+
     >>> browser = get_selenium_browser_instance()
     ... browser.get('...')
     ... browser.quit()
@@ -83,12 +82,21 @@ def get_selenium_browser_instance(browser_name=None):
 
 class CrawlerOptions:
     """Stores the main options for the crawler"""
-    
+
     def __init__(self, spider, name):
         self.spider = spider
         self.spider_name = name.lower()
         self.verbose_name = name.title()
         self.initial_spider_meta = None
+
+        self.domains = []
+        self.audit_page = False
+        self.url_passes_tests = None
+        self.debug_mode = False
+        self.site_language = 'en'
+        self.default_scroll_step = 80
+        self.gather_emails = False
+        self.router = None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -98,7 +106,7 @@ class CrawlerOptions:
             if name not in DEFAULT_META_OPTIONS:
                 raise ValueError(
                     "Meta for model '{name}' received "
-                    "and illegal option '{option}'".format(
+                    "an illegal option '{option}'".format(
                         name=self.verbose_name,
                         option=name
                     )
@@ -106,19 +114,20 @@ class CrawlerOptions:
             setattr(self, name, value)
 
     def prepare(self):
-        for option in DEFAULT_META_OPTIONS:
-            if not hasattr(self, option):
-                if option in ['domains', 'url_passes_tests']:
-                    setattr(self, option, [])
+        pass
+        # for option in DEFAULT_META_OPTIONS:
+        #     if not hasattr(self, option):
+        #         if option in ['domains', 'url_passes_tests']:
+        #             setattr(self, option, [])
 
-                if option in ['audit_page', 'gather_emails', 'debug_mode', 'debug_mode']:
-                    setattr(self, option, False)
+        #         if option in ['audit_page', 'gather_emails', 'debug_mode']:
+        #             setattr(self, option, False)
 
-                if option == 'site_language':
-                    setattr(self, option, None)
+        #         if option == 'site_language':
+        #             setattr(self, option, None)
 
-                if option == 'default_scroll_step':
-                    setattr(self, 'default_scroll_step', 80)
+        #         if option == 'default_scroll_step':
+        #             setattr(self, 'default_scroll_step', 80)
 
 
 class Crawler(type):
@@ -475,13 +484,13 @@ class BaseCrawler(metaclass=Crawler):
         completed_time = round(time.time() - self._start_time, 1)
         days = 0 if days < 0 else days
         return self.performance_audit(days, completed_time)
-    
+
     def calculate_completion_percentage(self):
         """Indicates the level of completion
         for the current crawl session"""
         total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
         result = len(self.visited_urls) / total_urls
-        percentage = round(result, 1)
+        percentage = round(result, 5)
         logger.info(f'{percentage * 100}% of total urls visited')
 
     def get_current_date(self):
@@ -529,14 +538,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             'Performance', ['days', 'duration']
         )
 
-        # self.date_history = {}
+        self.statistics = {}
 
-    # def update_date_history(self):
-    #     current_date = datetime.datetime.now(tz=pytz.timezone('UTC')).date()
-    #     self.date_history[current_date] = self.date_history[current_date] + 1
+    def update_statistics(self):
+        current_date = self.get_current_date().date()
+        self.date_history[current_date] = self.date_history[current_date] + 1
 
     def resume(self, **kwargs):
-        """From a previous list of urls to visit 
+        """From a previous list of urls to visit
         and visited urls, resume a previous
         crawling session.
 
@@ -685,7 +694,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.visited_urls.add(current_url)
 
             # We can either crawl all the website
-            # or just specific page
+            # or just specific page TODO: Check performance issues here
             self.get_page_urls()
             self._backup_urls()
 
@@ -693,8 +702,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 self.audit_page(current_url)
                 write_json_document('audit.json', self.page_audits)
 
-                vocabulary = self.global_audit(
-                    language=self._meta.site_language)
+                vocabulary = self.global_audit()
                 write_json_document('global_audit.json', vocabulary)
 
                 # cache.set_value('page_audit', self.page_audits)
@@ -706,7 +714,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 )
 
                 logger.info('Audit complete...')
-            
+
             if self._meta.gather_emails:
                 self.emails(
                     self.get_transformed_raw_page_text,
@@ -726,6 +734,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             url_instance = URL(current_url)
             self.run_actions(url_instance)
 
+            # Run routing actions aka, base on given
+            # url path, route to a function that
+            # would execute said task
+            if self._meta.router is not None:
+                self._meta.router.resolve(current_url, self)
+
             performance = self.calculate_performance()
             self.calculate_completion_percentage()
 
@@ -733,14 +747,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 start = settings.WAIT_TIME_RANGE[0]
                 stop = settings.WAIT_TIME_RANGE[1]
                 wait_time = random.randrange(start, stop)
-           
+
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
 
 class SinglePageAutomater(EmailMixin, BaseCrawler):
     """Automates user defined actions on a
-    single or multiple user provided 
+    single or multiple user provided
     pages as oppposed to crawing the
     whole website"""
 

@@ -3,7 +3,7 @@ import string
 import requests
 from bs4 import BeautifulSoup
 
-from kryptone.mixins import EmailMixin, TextMixin
+from kryptone.mixins import EmailMixin, SEOMixin, TextMixin
 
 with open('tests/pages/etam.html', encoding='utf-8') as f:
     soup = BeautifulSoup(f, 'html.parser')
@@ -55,6 +55,14 @@ class TestTextMixin(unittest.TestCase):
         for token in tokens:
             with self.subTest(token=token):
                 self.assertNotEqual(token, self.mixin._stop_words())
+
+
+class TestSEOMixin(unittest.TestCase):
+    def setUp(self):
+        self.mixin = SEOMixin()
+
+    def test_integrity(self):
+        self.mixin.audit_page()
 
 
 # class TestEmailMixin(unittest.TestCase):

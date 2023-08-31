@@ -19,7 +19,7 @@ regardless of the page.
 """
 
 
-from kryptone.app import SinglePageAutomater
+from kryptone.base import SinglePageAutomater
 
 
 class MyAutomater(SinglePageAutomater):

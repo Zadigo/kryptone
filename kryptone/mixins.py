@@ -17,8 +17,7 @@ EMAIL_REGEX = r'\S+\@\S+'
 
 
 class TextMixin:
-    """A mixin for analyzing 
-    working with text"""
+    """A mixin for analyzing text"""
 
     page_documents = []
     fitted_page_documents = []
@@ -164,8 +163,8 @@ class TextMixin:
         """Fit a document and then transform it into
         a usable element for text analysis"""
         fitted_text = self.fit(text)
-        if fitted_text is not None:
-            self.page_documents.append(fitted_text)
+        # if fitted_text is not None:
+        #     self.page_documents.append(fitted_text)
 
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
@@ -216,8 +215,7 @@ class TextMixin:
 
 
 class SEOMixin(TextMixin):
-    """A mixin for auditing a 
-    web page"""
+    """A mixin for auditing a web page"""
 
     page_audits = defaultdict(dict)
     error_pages = set()
@@ -293,25 +291,52 @@ class SEOMixin(TextMixin):
         text = self.driver.find_element(By.TAG_NAME, 'body').text
         return self.fit(text)
     
+    @cached_property
+    def page_speed_script(self):
+        path = settings.GLOBAL_KRYPTONE_PATH.joinpath(
+            'data', 'js', 'page_speed.js'
+        )
+        with open(path, encoding='utf-8') as f:
+            content = f.read()
+        return content
+    
+    def get_page_speed(self, audit):
+        result = self.driver.execute_script(self.page_speed_script)
+        audit['timing'] = result
+
+    def get_page_status_code(self):
+        pass
+    
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
         image_alts = []
         images = self.driver.find_elements(By.TAG_NAME, 'img')
-        for image in images:
-            image_alt = self.fit(image.get_attribute('alt'))
-            image_alts.append(image_alt)
-        empty_alts = list(keep_while(lambda x: x == '', image_alts))
+        if images:
+            for image in images:
+                image_alt = self.fit(image.get_attribute('alt'))
+                image_alts.append(image_alt)
+            empty_alts = list(keep_while(lambda x: x == '', image_alts))
 
-        image_alts = set(image_alts)
-        percentage_count = (len(empty_alts) / len(image_alts)) * 100
-        percentage_invalid_images = round(percentage_count, 2)
+            unique_image_alts = set(image_alts)
+            percentage_count = (len(empty_alts) / len(image_alts)) * 100
+            percentage_invalid_images = round(percentage_count, 2)
 
-        audit['pct_images_with_no_alt'] = percentage_invalid_images
-        audit['image_alts'] = list(image_alts)
-        return percentage_invalid_images, image_alts    
+            audit['pct_images_with_no_alt'] = percentage_invalid_images
+            audit['image_alts'] = list(unique_image_alts)
+            return percentage_invalid_images, unique_image_alts
+        else:
+            audit['pct_images_with_no_alt'] = 0
+            audit['image_alts'] = []
+            return 0, set()
     
     def audit_structured_data(self, audit):
+        """
+        Checks if the website has structured data
+
+        >>> self.audit_structured_data({})
+        ... True, {}
+        """
         has_structured_data = False
         structured_data_type = None
         content = self.driver.execute_script(
@@ -332,9 +357,6 @@ class SEOMixin(TextMixin):
         audit['structured_data_type'] = structured_data_type
         return has_structured_data, structured_data_type
 
-    def get_page_status_code(self):
-        pass
-
     def vectorize_documents(self):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
@@ -352,7 +374,7 @@ class SEOMixin(TextMixin):
         return matrix, vectorizer
 
     def global_audit(self):
-        """Returns a global audit of the website"""
+        """Returns the global audit for the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
         return self.normalize_integers(vectorizer.vocabulary_)
@@ -381,6 +403,7 @@ class SEOMixin(TextMixin):
         
         self.audit_structured_data(audit)
         self.audit_images(audit)
+        self.get_page_speed(audit)
 
         self.page_audits[current_url] = audit
         return audit
