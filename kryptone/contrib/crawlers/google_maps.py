@@ -18,35 +18,6 @@ from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
 
 
-@dataclasses.dataclass
-class GoogleBusiness:
-    name: str = None
-    url: str = None
-    address: str = None
-    rating: str = None
-    number_of_reviews: int = None
-    comments: str = None
-
-    @property
-    def as_json(self):
-        return {
-            'name': self.name,
-            'url': self.url,
-            'address': self.address,
-            'rating': self.rating,
-            'number_of_reviews': self.number_of_reviews,
-            'comments': self.comments
-        }
-
-    def as_csv(self):
-        rows = []
-        for comment in self.comments:
-            row = [self.name, self.url, self.address, self.rating,
-                   self.number_of_reviews, comment['period'], comment['text']]
-            rows.append(row)
-        return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
-
-
 def generate_search_url(search):
     """Generates a Google Maps search url"""
     url = "https://www.google.com/maps/search/"
