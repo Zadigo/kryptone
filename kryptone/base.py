@@ -32,14 +32,15 @@ from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLFile, URLPassesTest
+from kryptone.utils.urls import URL, URLPassesTest
+from kryptone.utils.file_readers import URLCache
 
 WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router'
+    'gather_emails', 'router', 'crawl'
 }
 
 
@@ -98,6 +99,7 @@ class CrawlerOptions:
         self.default_scroll_step = 80
         self.gather_emails = False
         self.router = None
+        self.crawl = True
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -174,6 +176,18 @@ class BaseCrawler(metaclass=Crawler):
     debug_mode = False
     timezone = 'UTC'
     default_scroll_step = 80
+
+    def __init__(self, browser_name=None):
+        self._start_url_object = None
+        self.driver = get_selenium_browser_instance(
+            browser_name=browser_name or self.browser_name
+        )
+
+        # navigation.connect(collect_images_receiver, sender=self)
+
+        # db_signal.connect(backends.airtable_backend, sender=self)
+        # db_signal.connect(backends.notion_backend, sender=self)
+        # db_signal.connect(backends.google_sheets_backend, sender=self)
 
     def __repr__(self):
         return f'<{self.__class__.__name__}>'
@@ -514,17 +528,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
 
     def __init__(self, browser_name=None):
-        self._start_url_object = None
-        self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
-        )
-
-        # navigation.connect(collect_images_receiver, sender=self)
-
-        # db_signal.connect(backends.airtable_backend, sender=self)
-        # db_signal.connect(backends.notion_backend, sender=self)
-        # db_signal.connect(backends.google_sheets_backend, sender=self)
-
+        super().__init__(browser_name=browser_name)
         self._start_date = self.get_current_date()
 
         self._start_time = time.time()
@@ -605,7 +609,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], url_cache=None, **kwargs):
+    def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
 
         >>> instance = BaseCrawler()
@@ -625,21 +629,22 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
-        if url_cache is not None:
-            self.urls_to_visit = url_cache.urls_to_visit
-            self.visited_urls = url_cache.visited_urls
+        if isinstance(start_urls, URLCache):
+            self.urls_to_visit = start_urls.urls_to_visit
+            self.visited_urls = start_urls.visited_urls
 
         if self.start_url is None:
             raise ValueError('A starting url should be provided to the spider')
 
-        # If the urls_to_visit already populated,
-        # makes no sense to use the start_url but
-        # directly just go to an url already
-        # present in the list
+        # If we have no urls to visit in
+        # the array, try to eventually 
+        # populate the list with existing ones
         if not self.urls_to_visit:
             # Start spider from .xml page
             is_xml_page = self.start_url.endswith('.xml')
             if not is_xml_page:
+                # Add the start_url to the list of
+                # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
             else:
                 start_urls = self.start_from_sitemap_xml(self.start_url)
@@ -687,11 +692,11 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # )
 
             self.visited_urls.add(current_url)
-
-            # We can either crawl all the website
-            # or just specific page TODO: Check performance issues here
-            self.get_page_urls()
-            self._backup_urls()
+            
+            # TODO: Check performance issues here
+            if self._meta.crawl:
+                self.get_page_urls()
+                self._backup_urls()
 
             if self._meta.audit_page:
                 self.audit_page(current_url)
@@ -746,8 +751,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             if self._meta.router is not None:
                 self._meta.router.resolve(current_url, self)
 
-            performance = self.calculate_performance()
-            self.calculate_completion_percentage()
+            if self._meta.crawl:
+                performance = self.calculate_performance()
+                self.calculate_completion_percentage()
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
@@ -756,86 +762,3 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
-
-
-class SinglePageAutomater(BaseCrawler):
-    """Automates user defined actions on a
-    single or multiple user provided
-    pages as oppposed to crawing the
-    whole website"""
-
-    start_urls = []
-
-    @property
-    def name(self):
-        return 'automater'
-
-    def start(self, start_urls=[], wait_time=None, debug_mode=False):
-        """Entrypoint to start the web scrapper"""
-        # To ensure efficient navigation and/or
-        # scrapping, use a maximised window since
-        # layouts can fundamentally change when
-        # using a smaller window
-        logger.info(
-            f'{self.__class__.__name__} ready to automate actions on website'
-        )
-        self.driver.maximize_window()
-
-        self.debug_mode = debug_mode
-
-        logger.info('Starting Kryptone automation...')
-
-        if isinstance(self.start_urls, URLFile):
-            self.start_urls = list(self.start_urls)
-
-        self.start_urls.extend(start_urls)
-        start_urls = self.start_urls
-
-        if start_urls:
-            self.urls_to_visit.update(set(start_urls))
-
-        while self.urls_to_visit:
-            current_url = self.urls_to_visit.pop()
-            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
-
-            if current_url is None:
-                continue
-
-            logger.info(f'Going to url: {current_url}')
-            self.driver.get(current_url)
-
-            # Always wait for the body section of
-            # the page to be located  or visible
-            wait = WebDriverWait(self.driver, 8)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
-            self.post_visit_actions(current_url=current_url)
-
-            # Post navigation signal
-            # TEST: This has to be tested
-            # navigation.send(self, current_url=current_url)
-
-            self.visited_urls.add(current_url)
-            self._backup_urls()
-
-            self.emails(
-                self.get_transformed_raw_page_text,
-                elements=self.get_page_link_elements
-            )
-            write_csv_document('emails.csv', self.emails_container)
-
-            # Run custom user actions once
-            # everything is completed
-            self.run_actions(current_url)
-            # db_signal.send(
-            #     self,
-            #     current_url=current_url,
-            #     emails=self.emails_container
-            # )
-
-            if settings.WAIT_TIME_RANGE:
-                start = settings.WAIT_TIME_RANGE[0]
-                stop = settings.WAIT_TIME_RANGE[1]
-                wait_time = random.randrange(start, stop)
-
-            logger.info(f"Waiting {wait_time}s")
-            time.sleep(wait_time or 15)

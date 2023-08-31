@@ -2,7 +2,7 @@ import pathlib
 
 
 # Absolute path to the local project
-PROJECT_PATH = None
+PROJECT_PATH = pathlib.Path(__file__).parent.absolute()
 
 
 # Register spiders to crawl

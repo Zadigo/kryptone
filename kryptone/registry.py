@@ -10,7 +10,6 @@ from pathlib import Path
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.signals import Signal
-from kryptone.utils.urls import URLFile
 
 # registry_populated = Signal()
 # pre_init_spider = Signal()
@@ -167,7 +166,7 @@ class MasterRegistry:
                 f"Could not load the project's related module: '{dotted_path}'"
             )
 
-        from kryptone.base import BaseCrawler, SinglePageAutomater
+        from kryptone.base import BaseCrawler
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -214,7 +213,7 @@ class MasterRegistry:
         elements = spiders + automaters
 
         valid_spiders = filter(
-            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)),
+            lambda x: issubclass(x[1], BaseCrawler),
             elements
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
@@ -226,16 +225,6 @@ class MasterRegistry:
                     spiders_module,
                     dotted_path=dotted_path
                 )
-                instance.registry = self
-                self.spiders[name] = instance
-
-            if name in settings.AUTOMATERS:
-                instance = SpiderConfig.create(
-                    name,
-                    automaters_module,
-                    dotted_path=dotted_path
-                )
-                instance.is_automater = True
                 instance.registry = self
                 self.spiders[name] = instance
 

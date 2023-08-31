@@ -158,27 +158,6 @@ class URL:
         return list(drop_while(clean_values, result))
 
 
-class URLFile:
-    urls = []
-
-    def __init__(self, processor=None):
-        try:
-            data = read_document('urls.txt')
-        except:
-            logger.info('No urls were loaded from url cache file')
-        else:
-            urls = data.split('\n')
-            if processor is not None:
-                for url in urls:
-                    self.urls.append(processor(url))
-
-    def __iter__(self):
-        return iter(self.urls)
-
-    def __str__(self):
-        return self.urls
-
-
 class TestUrl:
     """Test two different urls by checking path
     similarity
@@ -255,7 +234,6 @@ class URLPassesTest:
         return list(drop_while(lambda x: x == '', sorted_values))
 
 
-
 class UrlPassesRegexTest:
     """Checks if an url is able to pass a
     a given test
@@ -268,6 +246,7 @@ class UrlPassesRegexTest:
                 )
             ]
     """
+
     def __init__(self, name, *, regex=None):
         self.name = name
         self.regex = re.compile(regex)
@@ -277,4 +256,3 @@ class UrlPassesRegexTest:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
-    

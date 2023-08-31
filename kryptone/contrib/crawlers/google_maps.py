@@ -4,6 +4,7 @@ import json
 import random
 import re
 import time
+from dataclasses import field
 from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
@@ -11,41 +12,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
-from kryptone.base import BaseCrawler, SinglePageAutomater
+from kryptone.base import SiteCrawler
 from kryptone.conf import settings
+from kryptone.contrib.models import GoogleBusiness
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
 from kryptone.utils.text import clean_text, parse_price
-from kryptone.utils.urls import URLFile
-
-
-@dataclasses.dataclass
-class GoogleBusiness:
-    name: str = None
-    url: str = None
-    address: str = None
-    rating: str = None
-    number_of_reviews: int = None
-    comments: str = None
-
-    @property
-    def as_json(self):
-        return {
-            'name': self.name,
-            'url': self.url,
-            'address': self.address,
-            'rating': self.rating,
-            'number_of_reviews': self.number_of_reviews,
-            'comments': self.comments
-        }
-
-    def as_csv(self):
-        rows = []
-        for comment in self.comments:
-            row = [self.name, self.url, self.address, self.rating,
-                   self.number_of_reviews, comment['period'], comment['text']]
-            rows.append(row)
-        return rows.insert(0, ['name', 'url', 'address', 'rating', 'number_of_reviews', 'comment_period', 'comment_text'])
 
 
 def generate_search_url(search):
@@ -86,7 +58,7 @@ class GoogleMapsMixin:
                     writer.writerow(row)
 
 
-class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
+class GoogleMaps(GoogleMapsMixin, SiteCrawler):
     final_result = []
 
     def create_dump(self):
@@ -432,6 +404,9 @@ class GoogleMaps(GoogleMapsMixin, SinglePageAutomater):
 
 
 class GoogleMapsPlace(GoogleMaps):
+    class Meta:
+        crawl = False
+
     def run_actions(self, current_url, **kwargs):
         current_time = time.time()
         business_information = GoogleBusiness()
