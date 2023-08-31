@@ -101,6 +101,6 @@ async def main(*urls):
 #     await asyncio.gather(request_images(), save_image())
 
 
-if __name__ == '__main__':
-    asyncio.run(main('http://example.com/1', 'http://example.com/2'))
-    # asyncio.run(main('http://example.com', 'http://example.com/1'))
+# if __name__ == '__main__':
+#     asyncio.run(main('http://example.com/1', 'http://example.com/2'))
+#     # asyncio.run(main('http://example.com', 'http://example.com/1'))
