@@ -40,7 +40,7 @@ WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router'
+    'gather_emails', 'router', 'crawl'
 }
 
 
@@ -99,6 +99,7 @@ class CrawlerOptions:
         self.default_scroll_step = 80
         self.gather_emails = False
         self.router = None
+        self.crawl = True
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -689,11 +690,11 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # )
 
             self.visited_urls.add(current_url)
-
-            # We can either crawl all the website
-            # or just specific page TODO: Check performance issues here
-            self.get_page_urls()
-            self._backup_urls()
+            
+            # TODO: Check performance issues here
+            if self._meta.crawl:
+                self.get_page_urls()
+                self._backup_urls()
 
             if self._meta.audit_page:
                 self.audit_page(current_url)
@@ -748,8 +749,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             if self._meta.router is not None:
                 self._meta.router.resolve(current_url, self)
 
-            performance = self.calculate_performance()
-            self.calculate_completion_percentage()
+            if self._meta.crawl:
+                performance = self.calculate_performance()
+                self.calculate_completion_percentage()
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
