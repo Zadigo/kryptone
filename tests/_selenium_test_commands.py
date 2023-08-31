@@ -114,6 +114,6 @@
 #     time.sleep(5)
 #     driver.quit()
 
-# # if __name__ == '__main__':
-# #     url = "https://www.google.com/maps/place/Bouddha+Wok/@50.6476347,3.1369403,14z/data=!4m8!3m7!1s0x47c329ea06cfabf9:0xb29eca5dde00934d!8m2!3d50.6518006!4d3.1253004!9m1!1b1!16s%2Fg%2F113h5ky3s?entry=ttu"
-# #     asyncio.run(main(url))
+# if __name__ == '__main__':
+#     url = "https://www.google.com/maps/place/Bouddha+Wok/@50.6476347,3.1369403,14z/data=!4m8!3m7!1s0x47c329ea06cfabf9:0xb29eca5dde00934d!8m2!3d50.6518006!4d3.1253004!9m1!1b1!16s%2Fg%2F113h5ky3s?entry=ttu"
+#     asyncio.run(main(url))
