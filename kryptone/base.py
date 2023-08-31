@@ -633,14 +633,15 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         if self.start_url is None:
             raise ValueError('A starting url should be provided to the spider')
 
-        # If the urls_to_visit already populated,
-        # makes no sense to use the start_url but
-        # directly just go to an url already
-        # present in the list
+        # If we have no urls to visit in
+        # the array, try to eventually 
+        # populate the list with existing ones
         if not self.urls_to_visit:
             # Start spider from .xml page
             is_xml_page = self.start_url.endswith('.xml')
             if not is_xml_page:
+                # Add the start_url to the list of
+                # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
             else:
                 start_urls = self.start_from_sitemap_xml(self.start_url)
