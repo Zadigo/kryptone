@@ -11,5 +11,5 @@ class BaseLiveTestSpider(SEOMixin):
         self.driver.quit()
 
 
-live = BaseLiveTestSpider()
-live.audit_page(live.driver.current_url)
+# live = BaseLiveTestSpider()
+# live.audit_page(live.driver.current_url)
