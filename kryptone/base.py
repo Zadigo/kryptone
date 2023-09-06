@@ -4,6 +4,7 @@ import json
 import random
 import re
 import string
+import asyncio
 import time
 from collections import defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
@@ -564,7 +565,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
-        self.list_of_seen_urls = set(read_csv_document('seen_urls.csv', flatten=True))
+        self.list_of_seen_urls = set(
+            read_csv_document('seen_urls.csv', flatten=True))
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -637,7 +639,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             raise ValueError('A starting url should be provided to the spider')
 
         # If we have no urls to visit in
-        # the array, try to eventually 
+        # the array, try to eventually
         # populate the list with existing ones
         if not self.urls_to_visit:
             # Start spider from .xml page
@@ -692,7 +694,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # )
 
             self.visited_urls.add(current_url)
-            
+
             # TODO: Check performance issues here
             if self._meta.crawl:
                 self.get_page_urls()
@@ -746,7 +748,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             try:
                 self.run_actions(url_instance)
             except TypeError:
-                raise TypeError("run_actions should accept arguments") 
+                raise TypeError("run_actions should accept arguments")
             except Exception:
                 ExceptionGroup('An exception occured while trying to run user actions', [
                     exceptions.SpiderExecutionError()
@@ -769,3 +771,45 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
+
+
+class AsyncWebCrawler(SiteCrawler):
+    async def astart(self, start_urls=[], **kwargs):
+        current_url = None
+        urls_queue = asyncio.Queue()
+
+        wait_time = settings.WAIT_TIME
+
+        async def url_collector():
+            while True:
+                if current_url is None:
+                    self.get_page_urls()
+                    current_url = self.driver.current_url
+                    for url in self.urls_to_visit:
+                        await urls_queue.put(url)
+                    continue
+
+                if current_url != self.driver.current_url:
+                    self.get_page_urls()
+
+                    for url in self.urls_to_visit:
+                        await urls_queue.put(url)
+
+                await asyncio.sleep(1)
+
+        async def web_scrapper():
+            while not urls_queue.empty():
+                current_url = await urls_queue.get()
+                self.driver.get(current_url)
+
+                if settings.WAIT_TIME_RANGE:
+                    start = settings.WAIT_TIME_RANGE[0]
+                    stop = settings.WAIT_TIME_RANGE[1]
+                    wait_time = random.randrange(start, stop)
+                asyncio.sleep(wait_time)
+
+        asyncio.gather(web_scrapper(), url_collector())
+
+
+crawler = AsyncWebCrawler(browser_name='Edge')
+asyncio.run(crawler.astart(start_urls=['http://example.com']))
