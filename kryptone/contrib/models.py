@@ -133,3 +133,9 @@ class GoogleBusiness(BaseModel):
             rows.append(row)
         header = [*self.fields, 'comment_period', 'comment_text']
         return rows.insert(0, header)
+
+
+@dataclasses.dataclass
+class GoogleSearch:
+    title: str
+    url: str
