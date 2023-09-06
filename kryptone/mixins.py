@@ -219,6 +219,7 @@ class SEOMixin(TextMixin):
     """A mixin for auditing a web page"""
 
     page_audits = defaultdict(dict)
+    raw_texts = []
     error_pages = set()
 
     @property
@@ -367,8 +368,9 @@ class SEOMixin(TextMixin):
     def vectorize_page(self, text):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
+        self.raw_texts.append(text)
         transformed_text = self.fit_transform(
-            text, 
+            text=text, 
             language=settings.WEBSITE_LANGUAGE
         )
         matrix = vectorizer.fit_transform(transformed_text)
