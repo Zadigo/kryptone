@@ -173,5 +173,5 @@ def start(start_urls=[], url_cache=None, **kwargs):
         time.sleep(wait_time)
 
 
-if __name__ == '__main__':
-    start()
+# if __name__ == '__main__':
+#     start()
