@@ -42,7 +42,7 @@ DEFAULT_META_OPTIONS = {
 }
 
 
-# post_init = Signal()
+post_init = Signal()
 navigation = Signal()
 db_signal = Signal()
 
