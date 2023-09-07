@@ -15,6 +15,11 @@ def random_string(n=10):
     return secrets.token_hex(nbytes=n)
 
 
+def create_filename(extension='json'):
+    """Generates a new filename with an extension"""
+    return f'{random_string()}.{extension}'
+
+
 def parse_price(text):
     """From an incoming value, return
     it's float representation
