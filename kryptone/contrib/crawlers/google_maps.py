@@ -139,6 +139,14 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
         # and can result in errors. Try-Except these.
         # items = feed.find_elements(By.CSS_SELECTOR, 'div:not([class])')
         items = feed.find_elements(By.CSS_SELECTOR, 'div[role="article"]')
+        if not items:
+            # Try an alternative method which consists of
+            # getting the DIVs with no class and then
+            # performing the rest of the actions on them
+            items = feed.find_elements(
+                By.CSS_SELECTOR,
+                'div[role="feed"] div:not([class])'
+            )
 
         # Intermediate save - Saves the first initital results
         # that were found in he feed
