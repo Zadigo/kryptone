@@ -59,6 +59,9 @@ class GoogleMapsMixin:
 
 
 class GoogleMaps(GoogleMapsMixin, SiteCrawler):
+    """Explores the business feed, gathers each business
+    and returns the data"""
+
     final_result = []
 
     def create_dump(self):
