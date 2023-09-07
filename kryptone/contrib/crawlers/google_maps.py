@@ -115,7 +115,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
             current_position, element_height = result
 
-            if self.debug_mode:
+            if self._meta.debug_mode:
                 if current_position > 500:
                     break
 
