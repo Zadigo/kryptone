@@ -498,135 +498,142 @@ class GoogleMapsPlace(GoogleMaps):
             By.CSS_SELECTOR,
             '*[role="tablist"] button'
         )
-        tab_list[1].click()
-        time.sleep(2)
-
-        # Scroll the comment section by using
-        # the exact same above process
-        comments_is_scrollable = True
-        comments_scroll_script = """
-            const mainWrapper = document.querySelector('div[role="main"][aria-label="{business_name}"]')
-            const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
-
-            const elementHeight = elementToScroll.scrollHeight
-            let currentPosition = elementToScroll.scrollTop
-
-            // Indicates the scrolling speed
-            const scrollStep = Math.ceil(elementHeight / {scroll_step})
-
-            currentPosition += scrollStep
-            elementToScroll.scroll(0, currentPosition)
-
-            return [ currentPosition, elementHeight ]
-        """
-        comments_scroll_script = comments_scroll_script.format(
-            business_name=javascript_business_name,
-            scroll_step=self.default_scroll_step
-        )
-
-        comments_saved_position = None
-        while comments_is_scrollable:
-            result = self.driver.execute_script(comments_scroll_script)
-
-            current_position, element_height = result
-            if current_position >= element_height:
-                comments_is_scrollable = False
-
-            if self.debug_mode:
-                if current_position >= 1500:
-                    break
-
-            # There seems to be a case where the current position
-            # does not get updated and stays the same which
-            # means that we have reached the bottom of the page
-            if comments_saved_position is not None and current_position == comments_saved_position:
-                comments_is_scrollable = False
-            comments_saved_position = current_position
-            time.sleep(1)
-
-        # Before retrieving all the comments
-        # raise a small pause here
-        time.sleep(2)
-
-        retrieve_comments_script = """
-        const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
-        
-        return Array.from(commentsWrapper).map((item) => {
-            let dataReviewId = item.dataset['reviewId']
-
-            let text = ''
-            let period = null
-            let rating = null
-            const textSection = item.querySelector("*[class='MyEned']")
-
-            try {
-                // Sometimes there is a read more button
-                // that we have to click
-                
-                moreButton = (
-                    // Try the "Voir plus" button"
-                    item.querySelector('button[aria-label="Voir plus"]') ||
-                    // Try the "See more" button"
-                    item.querySelector('button[aria-label="See more"]') ||
-                    // On last resort try "aria-expanded"
-                    item.querySelector('button[aria-expanded="false"]')
-                )
-                moreButton.click()
-            } catch (e) {
-                console.log('No additional data for', dataReviewId)
-            }
-            
-            try {
-                // Or, item.querySelector('.rsqaWe').innerText
-                period = item.querySelector('.DU9Pgb').innerText
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                rating = item.querySelector('span[role="img"]').ariaLabel
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                text = textSection.innerText
-            } catch (e) {
-                // pass
-            }
-
-            try {
-                reviewerName = item.querySelector('class*="d4r55"').innerText
-                reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
-            } catch (e) {
-                // pass
-            }
-
-            return {
-                text: text,
-                rating: rating,
-                period: period
-            }
-        })
-        """
-        clean_comments = []
         try:
-            comments = self.driver.execute_script(retrieve_comments_script)
-        except Exception as e:
-            comments = ''
-            logger.error(f'Comments not found for {name}: {e.args}')
-        else:
-            comments = list(drop_null((comments)))
-            for comment in comments:
-                if not isinstance(comment, dict):
-                    continue
+            tab_list[1].click()
+        except:
+            return False
+        time.sleep(2)
 
-                clean_dict = {}
-                for key, value in comment.items():
-                    clean_text = self.clean_text(value)
-                    clean_dict[key] = clean_text
-                clean_comments.append(clean_dict)
-            logger.info(f'Found {len(clean_comments)} reviews')
+        if self.return_comments:
+            # Scroll the comment section by using
+            # the exact same above process
+            comments_is_scrollable = True
+            comments_scroll_script = """
+                const mainWrapper = document.querySelector('div[role="main"][aria-label="{business_name}"]')
+                const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+
+                const elementHeight = elementToScroll.scrollHeight
+                let currentPosition = elementToScroll.scrollTop
+
+                // Indicates the scrolling speed
+                const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+                currentPosition += scrollStep
+                elementToScroll.scroll(0, currentPosition)
+
+                return [ currentPosition, elementHeight ]
+            """
+            comments_scroll_script = comments_scroll_script.format(
+                business_name=javascript_business_name,
+                scroll_step=self.default_scroll_step
+            )
+
+            comments_saved_position = None
+            while comments_is_scrollable:
+                result = self.driver.execute_script(comments_scroll_script)
+
+                current_position, element_height = result
+                if current_position >= element_height:
+                    comments_is_scrollable = False
+
+                if self.debug_mode:
+                    if current_position >= 1500:
+                        break
+
+                # There seems to be a case where the current position
+                # does not get updated and stays the same which
+                # means that we have reached the bottom of the page
+                if comments_saved_position is not None and current_position == comments_saved_position:
+                    comments_is_scrollable = False
+                comments_saved_position = current_position
+                time.sleep(1)
+
+            # Before retrieving all the comments
+            # raise a small pause here
+            time.sleep(2)
+
+            retrieve_comments_script = """
+            const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
+            
+            return Array.from(commentsWrapper).map((item) => {
+                let dataReviewId = item.dataset['reviewId']
+
+                let text = ''
+                let period = null
+                let rating = null
+                const textSection = item.querySelector("*[class='MyEned']")
+
+                try {
+                    // Sometimes there is a read more button
+                    // that we have to click
+                    
+                    moreButton = (
+                        // Try the "Voir plus" button"
+                        item.querySelector('button[aria-label="Voir plus"]') ||
+                        // Try the "See more" button"
+                        item.querySelector('button[aria-label="See more"]') ||
+                        // On last resort try "aria-expanded"
+                        item.querySelector('button[aria-expanded="false"]')
+                    )
+                    moreButton.click()
+                } catch (e) {
+                    console.log('No additional data for', dataReviewId)
+                }
+                
+                try {
+                    // Or, item.querySelector('.rsqaWe').innerText
+                    period = item.querySelector('.DU9Pgb').innerText
+                } catch (e) {
+                    // pass
+                }
+
+                try {
+                    rating = item.querySelector('span[role="img"]').ariaLabel
+                } catch (e) {
+                    // pass
+                }
+
+                try {
+                    text = textSection.innerText
+                } catch (e) {
+                    // pass
+                }
+
+                try {
+                    reviewerName = item.querySelector('class*="d4r55"').innerText
+                    reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
+                } catch (e) {
+                    // pass
+                }
+
+                return {
+                    text: text,
+                    rating: rating,
+                    period: period
+                }
+            })
+            """
+            clean_comments = []
+            try:
+                comments = self.driver.execute_script(retrieve_comments_script)
+            except Exception as e:
+                comments = ''
+                logger.error(f'Comments not found for {name}: {e.args}')
+            else:
+                comments = list(drop_null((comments)))
+                for comment in comments:
+                    if not isinstance(comment, dict):
+                        continue
+
+                    clean_dict = {}
+                    for key, value in comment.items():
+                        clean_text = self.clean_text(value)
+                        clean_dict[key] = clean_text
+                    clean_comments.append(clean_dict)
+                logger.info(f'Found {len(clean_comments)} reviews')
+
+            # Save the comments on the model
+            business_information.comments = clean_comments
 
         def clean_information_list(items):
             # Remove useless data from the array
