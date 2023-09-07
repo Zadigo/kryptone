@@ -1,23 +1,16 @@
 import csv
-import dataclasses
 import json
-import random
-import re
 import time
-from dataclasses import field
 from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
 from kryptone import logger
 from kryptone.base import SiteCrawler
-from kryptone.conf import settings
 from kryptone.contrib.models import GoogleBusiness
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
-from kryptone.utils.text import clean_text, parse_price
+from kryptone.utils.text import create_filename
 
 
 def generate_search_url(search):
@@ -28,6 +21,11 @@ def generate_search_url(search):
 
 
 class GoogleMapsMixin:
+    return_comments = True
+
+    class Meta:
+        crawl = False
+    
     @staticmethod
     def transform_to_json(items):
         return list(map(lambda x: x.as_json, items))
@@ -160,7 +158,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 logger.info('Business information not found')
             else:
                 rows.append([name, url])
-        write_csv_document('int_save.csv', rows)
+        write_csv_document('business_urls_save.csv', rows)
 
         # For each item, we need to click on the card in
         # order to get the pieces of information for the business
@@ -226,7 +224,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 # breaks the script. We'll just keep going if we cannot get
                 # no business information
                 information = self.driver.execute_script(
-                    business_information_script)
+                    business_information_script
+                )
             except Exception as e:
                 counter = counter + 1
                 logger.critical(f'Could not parse business information: {url}')
@@ -417,7 +416,6 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             )
             business_information.rating = rating
             business_information.number_of_reviews = number_of_reviews
-            business_information.comments = clean_comments
             businesses.append(business_information)
             self.final_result = businesses
 
@@ -425,15 +423,14 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             counter = counter + 1
             time.sleep(2)
 
-        data = list(map(lambda x: x.as_json, businesses))
-        filename = self.get_filename(extension='json')
+        data = list(map(lambda x: x.as_json(), businesses))
+        filename = create_filename()
         write_json_document(filename, data)
         logger.info(f'File created: {filename}')
 
 
 class GoogleMapsPlace(GoogleMaps):
-    class Meta:
-        crawl = False
+    """Gathers data for a Google Business place"""
 
     def run_actions(self, current_url, **kwargs):
         current_time = time.time()
@@ -441,7 +438,8 @@ class GoogleMapsPlace(GoogleMaps):
 
         try:
             name = self.driver.find_element(
-                By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge').text
+                By.CSS_SELECTOR, 'h1.DUwDvf.fontHeadlineLarge'
+            ).text
             url = self.driver.current_url
             rating_section = self.driver.find_element(
                 By.CSS_SELECTOR, '.F7nice')
@@ -486,7 +484,8 @@ class GoogleMapsPlace(GoogleMaps):
             # breaks the script. We'll just keep going if we cannot get
             # no business information
             information = self.driver.execute_script(
-                business_information_script)
+                business_information_script
+            )
         except Exception as e:
             logger.critical(f'Could not parse business information: {url}')
             return False
@@ -676,11 +675,10 @@ class GoogleMapsPlace(GoogleMaps):
         )
         business_information.rating = rating
         business_information.number_of_reviews = number_of_reviews
-        business_information.comments = clean_comments
         self.final_result.append(business_information)
 
         time.sleep(2)
 
         data = list(map(lambda x: x.as_json, self.final_result))
-        write_json_document('ssr.json', data)
+        write_json_document('google_maps_results.json', data)
         # completion_time = (time.time() - current_time) / 60
