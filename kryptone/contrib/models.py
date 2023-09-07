@@ -144,3 +144,9 @@ class GoogleBusiness(BaseModel):
             self.longitude = result.group(2)
             return result.groups()
         return False
+
+
+@dataclasses.dataclass
+class GoogleSearch:
+    title: str
+    url: str

@@ -25,6 +25,7 @@ from kryptone.conf import settings
 from kryptone.db import backends
 from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
+from kryptone import exceptions
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
 from kryptone.utils.file_readers import (URLCache, read_csv_document,
@@ -448,12 +449,11 @@ class BaseCrawler(metaclass=Crawler):
             logger.info('Consent button not found')
 
     def evaluate_xpath(self, path):
-        return self.driver.execute_script(
-            f"""
-            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-            return result.singleNodeValue
-            """
-        )
+        script = """
+        const result = document.evaluate('{path}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+        return result.singleNodeValue
+        """.format(path=path)
+        return self.driver.execute_script(script)
 
     def scroll_page_section(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
@@ -741,7 +741,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # Run custom user actions once
             # everything is completed
             url_instance = URL(current_url)
-            self.run_actions(url_instance)
+            try:
+                self.run_actions(url_instance)
+            except TypeError:
+                raise TypeError("run_actions should accept arguments") 
+            except Exception:
+                ExceptionGroup('An exception occured while trying to run user actions', [
+                    exceptions.SpiderExecutionError()
+                ])
 
             # Run routing actions aka, base on given
             # url path, route to a function that
