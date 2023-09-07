@@ -115,11 +115,14 @@ class Product(BaseModel):
 
 @dataclasses.dataclass
 class GoogleBusiness(BaseModel):
-    name: str
-    url: str
-    address: str
-    rating: str
-    number_of_reviews: int
+    name: str = None
+    url: str = None
+    feed_url: str = None
+    address: str = None
+    rating: str = None
+    latitude: int = None
+    longitude: int = None
+    number_of_reviews: int = None
     comments: str = field(default_factory=list)
 
     def as_csv(self):
