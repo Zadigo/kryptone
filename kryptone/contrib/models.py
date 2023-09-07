@@ -2,8 +2,10 @@ import dataclasses
 import pathlib
 import re
 from dataclasses import field
-from functools import cached_property, lru_cache
+from functools import cached_property
 from urllib.parse import unquote, urlparse
+
+import pandas
 
 from kryptone.utils.text import remove_accents, remove_punctuation
 
@@ -31,6 +33,13 @@ class BaseModel:
 
     def __getitem__(self, key):
         return getattr(self, key)
+    
+    def as_dataframe(self, sort_by=None):
+        df = pandas.read_json(self.as_json())
+        if sort_by is not None:
+            df = df.sort_values(sort_by)
+        df = df.drop_duplicates()
+        return df
 
     def as_json(self):
         """Return the object as dictionnary"""
