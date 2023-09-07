@@ -136,3 +136,11 @@ class GoogleBusiness(BaseModel):
             rows.append(row)
         header = [*self.fields, 'comment_period', 'comment_text']
         return rows.insert(0, header)
+
+    def get_gps_coordinates_from_url(self, substitute_url=None):        
+        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)', substitute_url or self.feed_url)
+        if result:
+            self.latitude = result.group(1)
+            self.longitude = result.group(2)
+            return result.groups()
+        return False
