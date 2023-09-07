@@ -27,15 +27,13 @@ from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
-from kryptone.utils.file_readers import (read_csv_document, read_json_document,
+from kryptone.utils.file_readers import (URLCache, read_csv_document,
+                                         read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLPassesTest
-from kryptone.utils.file_readers import URLCache
-
-WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+from kryptone.utils.urls import URL
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
