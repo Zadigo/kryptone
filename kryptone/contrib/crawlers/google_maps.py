@@ -197,8 +197,20 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 javascript_business_name = name
 
             # Opens the side panel
-            link.click()
-            time.sleep(2)
+            try:
+                link.click()
+            except:
+                continue
+            else:
+                # Since the url is dynamic we have to query the driver
+                # to get the current displayed url. This technique is
+                # used as it is way more easier than right clicking
+                # to get the coordinates
+                feed_url_script = """return document.location.href"""
+                feed_url = self.driver.execute_script(feed_url_script)
+                business_information.feed_url = feed_url
+                business_information.get_gps_coordinates_from_url()
+                time.sleep(2)
 
             # 1.1 Get additonal business information - This is
             # a brute force method that gets any business details
