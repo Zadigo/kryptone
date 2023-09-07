@@ -90,10 +90,10 @@ class CombinedIterators:
 class PageImagesIterator:
     """An iterator for storing images collected
     on a given page. This will by default get any
-    images on the page except base64 image types
+    images on the page except base64 types
 
     Subclass PageImagesIterator to collect specific
-    types of images
+    types of images.
     """
 
     images_list_filter = []
