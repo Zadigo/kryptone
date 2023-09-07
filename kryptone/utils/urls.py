@@ -264,7 +264,7 @@ class UrlPassesRegexTest:
         return False
 
 
-class URLITerator:
+class URLIterator:
     _urls_to_visit = set()
     _visited_urls = set()
     _seen_urls = set()
@@ -406,9 +406,10 @@ class URLITerator:
     def update(self, urls, current_url=None):
         keys = self._grouped_by_page.keys()
         if keys:
-            key = list(keys)[-1] + 1
+            key = current_url or list(keys)[-1] + 1
         else:
-            key = 1
+            key = current_url or 1
+            
         for url in urls:
             self._grouped_by_page[key].add(url)
             self.append(url)
@@ -419,6 +420,3 @@ class URLITerator:
         self._visited_urls.add(url)
         return self._current_url
 
-
-i = URLITerator()
-print(i.backup())
