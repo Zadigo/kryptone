@@ -434,7 +434,7 @@ class BaseCrawler(metaclass=Crawler):
             new_scroll_pixels = new_scroll_pixels + increment
             time.sleep(wait_time)
 
-    def click_consent_button(self, element_id=None, element_class=None):
+    def click_consent_button(self, element_id=None, element_class=None, wait_time=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
         try:
@@ -447,6 +447,14 @@ class BaseCrawler(metaclass=Crawler):
             element.click()
         except:
             logger.info('Consent button not found')
+        finally:
+            # Some websites might create an issue when
+            # trying to gather the urls of page just
+            # after clicking the consent button. Using
+            # the wait time can prevent the stale element
+            # error from being raised
+            if wait_time is not None:
+                time.sleep(wait_time)
 
     def evaluate_xpath(self, path):
         script = """
@@ -562,7 +570,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
-        self.list_of_seen_urls = set(read_csv_document('seen_urls.csv', flatten=True))
+        self.list_of_seen_urls = set(
+            read_csv_document('seen_urls.csv', flatten=True))
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -635,7 +644,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             raise ValueError('A starting url should be provided to the spider')
 
         # If we have no urls to visit in
-        # the array, try to eventually 
+        # the array, try to eventually
         # populate the list with existing ones
         if not self.urls_to_visit:
             # Start spider from .xml page
@@ -690,7 +699,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # )
 
             self.visited_urls.add(current_url)
-            
+
             # TODO: Check performance issues here
             if self._meta.crawl:
                 self.get_page_urls()
@@ -744,7 +753,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             try:
                 self.run_actions(url_instance)
             except TypeError:
-                raise TypeError("run_actions should accept arguments") 
+                raise TypeError("run_actions should accept arguments")
             except Exception:
                 ExceptionGroup('An exception occured while trying to run user actions', [
                     exceptions.SpiderExecutionError()
