@@ -3,14 +3,14 @@ import airtable
 import gspread
 import requests
 
-from kryptone.base import db_signal
+# from kryptone.base import db_signal
 from kryptone.conf import settings
 from kryptone.db.connections import redis_connection
-from kryptone.signals import function_to_receiver
+# from kryptone.signals import function_to_receiver
 
 AIRTABLE_ID_CACHE = set()
 
-@function_to_receiver(db_signal)
+# @function_to_receiver(db_signal)
 def airtable_backend(sender, **kwargs):
     """Use Airtable as a storage backend"""
     if 'airtable' in settings.ACTIVE_STORAGE_BACKENDS:
