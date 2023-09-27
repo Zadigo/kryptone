@@ -721,7 +721,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
                 # Save the website's text
                 website_text = ' '.join(self.fitted_page_documents)
-                file_readers.write_text_document('website.txt', website_text)
+                file_readers.write_text_document('website_text.txt', website_text)
 
                 # cache.set_value('page_audit', self.page_audits)
                 # cache.set_value('global_audit', vocabulary)
