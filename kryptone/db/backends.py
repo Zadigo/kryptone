@@ -6,6 +6,7 @@ import requests
 # from kryptone.base import db_signal
 from kryptone.conf import settings
 from kryptone.db.connections import redis_connection
+from kryptone import logger
 # from kryptone.signals import function_to_receiver
 
 AIRTABLE_ID_CACHE = set()
@@ -62,9 +63,15 @@ def notion_backend(sender, **kwargs):
 
 def google_sheets_backend(sender, **kwargs):
     """Use Google Sheets as a storage backend"""
-    if 'google sheets' in settings.ACTIVE_STORAGE_BACKENDS:
-        google_sheet_settings = settings.STORAGE_BACKENDS['google_sheets']
-        worksheet = gspread.service_account(filename=google_sheet_settings['credentials'])
+    # if 'google sheets' in settings.ACTIVE_STORAGE_BACKENDS:
+    google_sheet_settings = settings.STORAGE_BACKENDS['google_sheets']
+    project_path = settings.PROJECT_PATH
+
+    if project_path is None:
+        logger.critical("Cannot find 'creds.json' for Google sheet API")
+    else:
+        file_path = project_path / google_sheet_settings['credentials']
+        worksheet = gspread.service_account(filename=file_path)
 
         #connect to your sheet (between "" = the name of your G Sheet, keep it short)
         sheet = worksheet.open(google_sheet_settings['sheet_name']).sheet1
