@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 
 
@@ -76,10 +77,19 @@ STORAGE_BACKENDS = {
             'DATABASE_ID': None
         }
     },
-    'webhooks': [
-
-    ]
+    'webhooks': []
 }
+
+# Determines the frequency data should
+# be sent in the webhooks registered in
+# in storage backends
+WEBHOOK_INTERVAL = 15
+
+# Determines the amount of data that should
+# be sent per request. If the amount of data
+# is lowert than the pagination, the request
+# is not sent until the requirement is met
+WEBHOOK_PAGINATION = 100
 
 
 # Email setting values used essentially
