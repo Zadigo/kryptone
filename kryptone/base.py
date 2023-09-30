@@ -34,6 +34,7 @@ from kryptone.utils.file_readers import (URLCache, read_csv_document,
 from kryptone.utils.iterators import JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL
+from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
@@ -658,6 +659,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         if start_urls:
             self.add_urls(*start_urls)
+
+        webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
