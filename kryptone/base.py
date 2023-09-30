@@ -19,13 +19,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import logger
+from kryptone import exceptions, logger
 # from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
 from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone import exceptions
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
 from kryptone.utils.file_readers import (URLCache, read_csv_document,
