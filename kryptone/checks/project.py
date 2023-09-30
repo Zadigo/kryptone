@@ -18,6 +18,14 @@ E004 = (
     "WAIT_TIME should be an integer. Got {time}"
 )
 
+E005 = (
+    'WEBHOOK_INTERVAL and WEBHOOK_PAGINATION should be integers'
+)
+
+E006 = (
+    'WEBHOOK_INTERVAL and WEBHOOK_PAGINATION cannot be negative integers'
+)
+
 
 @checks_registry.register('spider_names')
 def check_spiders():
@@ -73,3 +81,16 @@ def check_strings():
         errors.append(["WEBSITE_LANGUAGE should be a string"])
 
     return []
+
+
+@checks_registry.register()
+def check_webkook_interval():
+    errors = []
+    if (not isinstance(settings.WEBHOOK_INTERVAL, int) or
+            not isinstance(settings.WEBHOOK_PAGINATION, int)):
+        errors.append(E005)
+
+    if settings.WEBHOOK_INTERVAL < 0 or settings.WEBHOOK_PAGINATION:
+        errors.append(E006)
+
+    return errors
