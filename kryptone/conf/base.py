@@ -50,8 +50,8 @@ CACHE_FILE_NAME = 'cache'
 ACTIVE_STORAGE_BACKENDS = []
 
 
-# External storage backends to use to save the
-# data gathered by the spiders
+# External storage backends to configure
+# for using in ACTIVE_STORAGE_BACKENDS
 STORAGE_BACKENDS = {
     'airtable': {
         'type': 'online',
@@ -63,8 +63,11 @@ STORAGE_BACKENDS = {
     },
     'google_sheets': {
         'type': 'online',
-        'sheet_name': None,
-        'credentials': 'creds.json'
+        'spreadsheet_id': None,
+        'credentials': 'creds.json',
+        'scopes': [
+            'https://www.googleapis.com/auth/spreadsheets.readonly'
+        ]
     },
     'notion': {
         'type': 'online',
@@ -72,7 +75,10 @@ STORAGE_BACKENDS = {
             'TOKEN': None,
             'DATABASE_ID': None
         }
-    }
+    },
+    'webhooks': [
+
+    ]
 }
 
 
