@@ -116,8 +116,10 @@ class GoogleSheets(BaseConnection):
 
         project_path = settings.PROJECT_PATH
         if project_path is None:
-            logger.critical(f"{self.__class__.__name__} connection "
-                            "should be a ran in a project")
+            logger.critical(
+                f"{self.__class__.__name__} connection "
+                "should be a ran in a project"
+            )
         else:
             try:
                 tokens_file_path = project_path / \
