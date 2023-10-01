@@ -15,11 +15,6 @@ PROJECT_PATH = None
 SPIDERS = []
 
 
-# Register spiders to automate
-# actions on a set of pages
-AUTOMATERS = []
-
-
 # Indicates the Selenium
 # browser to use
 WEBDRIVER = 'Chrome'

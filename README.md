@@ -184,10 +184,6 @@ Some websites will have user friendly sitemap to facilitate navigation. This can
 
 This is the list of available project commands for Krytpone.
 
-### Automate
-
-Launches the automaters registered in `AUTOMATERS` in the settings file.
-
 ### Create task
 
 ### Healthcheck

@@ -10,9 +10,6 @@ PROJECT_PATH: pathlib.Path
 SPIDERS: list
 
 
-AUTOMATERS: list
-
-
 WEBDRIVER: str
 
 

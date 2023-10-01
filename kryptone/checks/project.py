@@ -33,11 +33,7 @@ def check_spiders():
     for item in settings.SPIDERS:
         if not isinstance(item, str):
             errors.append(E001.format(name=item))
-
-    for item in settings.AUTOMATERS:
-        if not isinstance(item, str):
-            errors.append(E001.format(name=item))
-
+            
     return errors
 
 

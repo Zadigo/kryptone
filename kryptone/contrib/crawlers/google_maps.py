@@ -254,19 +254,19 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 # the exact same above process
                 comments_is_scrollable = True
                 comments_scroll_script = """
-                    const mainWrapper = document.querySelector('div[role="main"][aria-label="{business_name}"]')
-                    const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+                const mainWrapper = document.querySelector('div[role="main"][aria-label="{business_name}"]')
+                const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
 
-                    const elementHeight = elementToScroll.scrollHeight
-                    let currentPosition = elementToScroll.scrollTop
+                const elementHeight = elementToScroll.scrollHeight
+                let currentPosition = elementToScroll.scrollTop
 
-                    // Indicates the scrolling speed
-                    const scrollStep = Math.ceil(elementHeight / {scroll_step})
+                // Indicates the scrolling speed
+                const scrollStep = Math.ceil(elementHeight / {scroll_step})
 
-                    currentPosition += scrollStep
-                    elementToScroll.scroll(0, currentPosition)
+                currentPosition += scrollStep
+                elementToScroll.scroll(0, currentPosition)
 
-                    return [ currentPosition, elementHeight ]
+                return [ currentPosition, elementHeight ]
                 """
                 comments_scroll_script = comments_scroll_script.format(
                     business_name=javascript_business_name,

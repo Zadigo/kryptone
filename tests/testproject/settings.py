@@ -9,11 +9,6 @@ PROJECT_PATH = pathlib.Path(__file__).parent.absolute()
 SPIDERS = ['Jennyfer']
 
 
-# Register spiders to automate
-# actions on a set of pages
-AUTOMATERS = []
-
-
 # Indicates the Selenium
 # browser to use
 WEBDRIVER = 'Edge'
