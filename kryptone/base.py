@@ -1,3 +1,4 @@
+import asyncio
 import bisect
 import datetime
 import json
@@ -8,9 +9,12 @@ import time
 from collections import defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
 
+import pandas
 import pytz
 import requests
 from lxml import etree
+from requests import Session
+from requests.models import Request
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -27,11 +31,12 @@ from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
+from kryptone.utils.date_functions import get_current_date, is_expired
 from kryptone.utils.file_readers import (URLCache, read_csv_document,
                                          read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import JPEGImagesIterator
+from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL
 from kryptone.webhooks import Webhooks
@@ -510,7 +515,7 @@ class BaseCrawler(metaclass=Crawler):
         return self.urls_audit(
             count_urls_to_visit=len(self.urls_to_visit),
             count_visited_urls=len(self.visited_urls),
-            total_urls=total_urls, 
+            total_urls=total_urls,
             completion_percentage=percentage
         )
 
@@ -534,7 +539,7 @@ class BaseCrawler(metaclass=Crawler):
         This functions is called only when an exception
         occurs during the crawling process
         """
-    
+
 
 class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
@@ -546,12 +551,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self._start_time = time.time()
         self._end_time = None
         self.performance_audit = namedtuple(
-            'Performance', 
+            'Performance',
             ['days', 'duration']
         )
         self.urls_audit = namedtuple(
-            'URLsAudit', 
-            ['count_urls_to_visit', 'count_visited_urls', 
+            'URLsAudit',
+            ['count_urls_to_visit', 'count_visited_urls',
              'completion_percentage', 'total_urls']
         )
 
@@ -735,7 +740,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
                 # Save the website's text
                 website_text = ' '.join(self.fitted_page_documents)
-                file_readers.write_text_document('website_text.txt', website_text)
+                file_readers.write_text_document(
+                    'website_text.txt', website_text)
 
                 # cache.set_value('page_audit', self.page_audits)
                 # cache.set_value('global_audit', vocabulary)
@@ -797,3 +803,124 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
+
+
+class JSONCrawler:
+    """Crawl the data of an API endpoint by retrieving
+    the data given an interval in minutes"""
+
+    base_url = None
+    receveived_data = []
+    iterator = AsyncIterator
+
+    def __init__(self, chunks=10):
+        self.chunks = chunks
+        self.request_sent = 0
+
+        self.max_pages = 0
+        self.current_page_key = None
+        self.current_page = 1
+        self.max_pages_key = None
+        self.paginate_data = False
+        self.pagination = 0
+
+        if self.base_url is None:
+            raise ValueError("'base_url' cannot be None")
+
+        self._url = URL(self.base_url)
+
+    @property
+    def data(self):
+        return self.iterator(self.receveived_data, by=self.chunks)
+
+    async def clean(self, dataframe):
+        """Use this function to run additional logic
+        on the retrieved data"""
+        return dataframe.to_json()
+
+    async def start(self, interval=15):
+        logger.info('Starting JSON crawler')
+
+        session = Session()
+        request = Request(
+            method='get',
+            url=str(self._url),
+            headers={'Content-Type': 'application/json'},
+            auth=None
+        )
+        prepared_request = session.prepare_request(request)
+
+        interval = datetime.timedelta(minutes=interval)
+        time_interval = (0, 0)
+
+        queue = asyncio.Queue()
+
+        async def receiver():
+            webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
+            while True:
+                while not queue.empty():
+                    data = await queue.get()
+                    # self.receveived_data.extend(data)
+                    # await webhooks.resolve(data)
+                    await asyncio.sleep(5)
+                await asyncio.sleep(15)
+
+        async def sender():
+            next_date = get_current_date() + interval
+            time_until_next_execution = 0
+            while True:
+                current_date = get_current_date()
+
+                # start_time, end_time = time_interval
+                time_until_next_execution = (
+                    next_date - current_date
+                ).total_seconds()
+
+                if time_until_next_execution <= 0:
+                    start_time = time.time()
+
+                    # Some endpoints allow pagination
+                    # of the data in order to get additional
+                    # items. So updat the pagination number
+                    # on the url
+                    if self.paginate_data:
+                        if self.pagination == 0:
+                            self.pagination = self.pagination + 1
+                            continue
+
+                        page = self.pagination + 1
+                        if page > self.max_pages:
+                            page = 0
+
+                    try:
+                        response = session.send(prepared_request)
+                    except:
+                        logger.error('Request failed')
+                    else:
+                        df = pandas.DataFrame(data=response.json())
+                        data_or_dataframe = await self.clean(df)
+                        if isinstance(data_or_dataframe, pandas.DataFrame):
+                            data = data_or_dataframe.to_json(orient='records', force_ascii=False)
+                        else:
+                            data = data_or_dataframe
+
+                        if self.paginate_data: 
+                            self.max_pages = data[self.max_pages_key]
+                            self.current_page = data[self.current_page]
+
+                        end_time = round(time.time() - start_time, 1)
+                        await queue.put(data)
+                    
+                    next_date = next_date + interval
+                    self.request_sent = self.request_sent + 1
+                    
+                    logger.info(f'Request completed in {end_time}s')
+
+                await asyncio.sleep(60)
+
+        await asyncio.gather(sender(), receiver())
+
+
+# c = JSONCrawler()
+# c.base_url = 'https://jsonplaceholder.typicode.com/todos'
+# asyncio.run(c.start(interval=1))

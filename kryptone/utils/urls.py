@@ -163,6 +163,14 @@ class URL:
             return False
         return list(drop_while(clean_values, result))
 
+    def paginate(self, regex_path=None, param=None):
+        """Increase the pagination number provided
+        on a given url"""
+        if regex_path is None and param is None:
+            # If we have nothing, classically, page
+            # is used to paginate in urls
+            param = 'page'
+        return 1
 
 class TestUrl:
     """Test two different urls by checking path
