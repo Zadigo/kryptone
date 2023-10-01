@@ -12,6 +12,9 @@ from kryptone.utils.text import remove_accents, remove_punctuation
 
 class BaseModel:
     """Base class for all models"""
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
     @cached_property
     def fields(self):
         """Get the fields present on the model"""
@@ -31,8 +34,6 @@ class BaseModel:
     def url_stem(self):
         return pathlib.Path(str(self.url)).stem
 
-    def __getitem__(self, key):
-        return getattr(self, key)
     
     def as_dataframe(self, sort_by=None):
         df = pandas.read_json(self.as_json())
