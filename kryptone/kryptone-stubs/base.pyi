@@ -1,14 +1,17 @@
 import datetime
 import time
-from typing import List, Literal, NamedTuple, NoReturn, Tuple, Union
+from typing import (Coroutine, Iterator, List, Literal, NamedTuple, NoReturn,
+                    Tuple, Union)
 from urllib.parse import ParseResult
 
+import pandas
 from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.remote.webelement import WebElement
 
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.routing import Router
 from kryptone.utils.file_readers import URLCache
+from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.urls import URL, UrlPassesRegexTest, URLPassesTest
 
 WEBDRIVER_ENVIRONMENT_PATH: str = 'KRYPTONE_WEBDRIVER'
@@ -148,3 +151,28 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         start_urls: List[str] = ...,
         **kwargs
     ) -> None: ...
+
+
+class JSONCrawler:
+    base_url: str = ...
+    receveived_data: List[list, dict] = ...
+    iterator = AsyncIterator
+    chunks: int = Literal[10]
+    request_sent: int = Literal[0]
+    max_pages: int = Literal[0]
+    current_page_key: str = ...
+    current_page: int = Literal[1]
+    max_pages_key: int = ...
+    paginate_data: bool = ...
+    pagination: int = Literal[0]
+    _url: URL = ...
+
+    def __init__(self, chunks: int = ...): ...
+    @property
+    def data(self) -> List[Iterator[list, dict]]: ...
+
+    async def clean(
+        self,
+        dataframe: pandas.DataFrame
+    ) -> Coroutine[pandas.DataFrame]: ...
+    async def start(self, interval: int=...) -> Coroutine: ...
