@@ -3,7 +3,6 @@ from typing import Callable, List, OrderedDict, Self, Tuple, Union
 from kryptone.base import SiteCrawler
 from kryptone.utils.urls import URL
 
-
 class Route:
     path: str = ...
     regex: str = ...
