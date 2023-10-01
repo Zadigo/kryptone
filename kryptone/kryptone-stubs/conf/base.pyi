@@ -31,6 +31,12 @@ ACTIVE_STORAGE_BACKENDS: list[str]
 STORAGE_BACKENDS: dict[str, str]
 
 
+WEBHOOK_INTERVAL: int
+
+
+WEBHOOK_PAGINATION: int
+
+
 EMAIL_HOST: str
 
 
