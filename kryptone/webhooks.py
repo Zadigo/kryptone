@@ -73,6 +73,9 @@ class Webhooks:
         for url in urls:
             self.webhooks.append(Webhook(url=url))
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__}[count={len(self.webhooks)}]>'
+
     async def resolve(self, data):
         tasks = []
 
