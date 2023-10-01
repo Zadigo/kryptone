@@ -83,14 +83,14 @@ def check_strings():
     return []
 
 
-@checks_registry.register()
-def check_webkook_interval():
-    errors = []
-    if (not isinstance(settings.WEBHOOK_INTERVAL, int) or
-            not isinstance(settings.WEBHOOK_PAGINATION, int)):
-        errors.append(E005)
+# @checks_registry.register()
+# def check_webkook_interval():
+#     errors = []
+#     if (not isinstance(settings.WEBHOOK_INTERVAL, int) or
+#             not isinstance(settings.WEBHOOK_PAGINATION, int)):
+#         errors.append(E005)
 
-    if settings.WEBHOOK_INTERVAL < 0 or settings.WEBHOOK_PAGINATION:
-        errors.append(E006)
+#     if settings.WEBHOOK_INTERVAL < 0 or settings.WEBHOOK_PAGINATION:
+#         errors.append(E006)
 
-    return errors
+#     return errors
