@@ -777,7 +777,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # url path, route to a function that
             # would execute said task
             if self._meta.router is not None:
-                self._meta.router.resolve(current_url, self)
+                self._meta.router.resolve(url_instance, self)
 
             if self._meta.crawl:
                 performance = self.calculate_performance()
