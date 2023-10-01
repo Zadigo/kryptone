@@ -56,7 +56,7 @@ class Route:
                 
                 func(current_url, route=self)
                 if result:
-                    logger.debug(
+                    logger.info(
                         f"Routing sucessful for {current_url} "
                         f"to '{self.function_name}'"
                     )
