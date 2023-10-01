@@ -534,7 +534,7 @@ class BaseCrawler(metaclass=Crawler):
         This functions is called only when an exception
         occurs during the crawling process
         """
-
+    
 
 class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
@@ -557,9 +557,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.statistics = {}
 
-    def update_statistics(self):
-        current_date = self.get_current_date().date()
-        self.date_history[current_date] = self.date_history[current_date] + 1
+    # def update_statistics(self):
+    #     current_date = self.get_current_date().date()
+    #     self.date_history[current_date] = self.date_history[current_date] + 1
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit
