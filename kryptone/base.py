@@ -507,6 +507,12 @@ class BaseCrawler(metaclass=Crawler):
         result = len(self.visited_urls) / total_urls
         percentage = round(result, 5)
         logger.info(f'{percentage * 100}% of total urls visited')
+        return self.urls_audit(
+            count_urls_to_visit=len(self.urls_to_visit),
+            count_visited_urls=len(self.visited_urls),
+            total_urls=total_urls, 
+            completion_percentage=percentage
+        )
 
     def get_current_date(self):
         timezone = pytz.timezone(self.timezone)
@@ -540,7 +546,13 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self._start_time = time.time()
         self._end_time = None
         self.performance_audit = namedtuple(
-            'Performance', ['days', 'duration']
+            'Performance', 
+            ['days', 'duration']
+        )
+        self.urls_audit = namedtuple(
+            'URLsAudit', 
+            ['count_urls_to_visit', 'count_visited_urls', 
+             'completion_percentage', 'total_urls']
         )
 
         self.statistics = {}
@@ -769,7 +781,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             if self._meta.crawl:
                 performance = self.calculate_performance()
-                self.calculate_completion_percentage()
+                urls_performance = self.calculate_completion_percentage()
+                performance_document = {
+                    'days': performance.days,
+                    'duration': performance.duration,
+                    'count_urls_to_visit': urls_performance.count_urls_to_visit,
+                    'count_visited_urls': urls_performance.count_visited_urls
+                }
+                write_json_document('performance.json', performance_document)
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
