@@ -581,7 +581,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
         self.list_of_seen_urls = set(
-            read_csv_document('seen_urls.csv', flatten=True))
+            read_csv_document('seen_urls.csv', flatten=True)
+        )
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
