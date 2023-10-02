@@ -370,8 +370,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
                         clean_dict = {}
                         for key, value in comment.items():
-                            clean_text = self.clean_text(value)
-                            clean_dict[key] = clean_text
+                            cleaned_text = clean_text(value)
+                            clean_dict[key] = cleaned_text
                         clean_comments.append(clean_dict)
                     business_information.comments = clean_comments
                     logger.info(f'Found {len(clean_comments)} reviews')
