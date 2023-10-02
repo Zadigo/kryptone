@@ -1,3 +1,4 @@
+from string import Template
 from collections import defaultdict
 import bisect
 import datetime
@@ -171,6 +172,7 @@ class URL:
             # is used to paginate in urls
             param = 'page'
         return 1
+
 
 class TestUrl:
     """Test two different urls by checking path
@@ -417,7 +419,7 @@ class URLIterator:
             key = current_url or list(keys)[-1] + 1
         else:
             key = current_url or 1
-            
+
         for url in urls:
             self._grouped_by_page[key].add(url)
             self.append(url)
@@ -428,3 +430,79 @@ class URLIterator:
         self._visited_urls.add(url)
         return self._current_url
 
+
+class URLGenerator:
+    """Generates a set of urls using a template
+
+    >>> generator = URLGenerator('http://example.com/$id')
+    """
+
+    def __init__(self, template, params={}, k=10, start=0):
+        self.base_template_url = Template(template)
+
+        new_params = []
+        base_params = [params for _ in range(k)]
+        for i, param in enumerate(base_params, start=start):
+            new_param = {}
+            for key, value in param.items():
+                if value == 'number':
+                    new_param[key] = i
+            new_params.append(new_param)
+
+        self.urls = []
+        for i in range(k):
+            try:
+                self.urls.append(
+                    self.base_template_url.substitute(new_params[i])
+                )
+            except KeyError:
+                self.urls.append(template)
+
+    def __iter__(self):
+        for url in self.urls:
+            yield url
+
+    def __aiter__(self):
+        for url in self.urls:
+            yield url
+
+    def __len__(self):
+        return len(self.urls)
+
+
+class URLsLoader:
+    """Loads a set of urls from a file"""
+    
+    def __init__(self):
+        self.data = {}
+        self._urls_to_visit = []
+        self._visited_urls = []
+
+    def __repr__(self) -> str:
+        statistics = f'urls_to_visit={len(self._urls_to_visit)} '
+        f'visited_urls={len(self._visited_urls)}'
+        return f'<URLCache: {statistics}>'
+
+    @property
+    def urls_to_visit(self):
+        return set(self._urls_to_visit)
+
+    @property
+    def visited_urls(self):
+        return set(self._visited_urls)
+
+    def load_from_file(self):
+        from kryptone.utils.file_readers import read_json_document
+
+        data = read_json_document('cache.json')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        logger.info(f'Loaded {len(self._urls_to_visit)} urls')
+        self.data = data
+
+    def load_from_dict(self, data):
+        if not isinstance(data, dict):
+            raise ValueError('Data should be a dictionnary')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        self.data = data
