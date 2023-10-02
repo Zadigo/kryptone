@@ -1,6 +1,7 @@
 import csv
 import json
 import time
+import unicodedata
 from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
@@ -10,7 +11,7 @@ from kryptone.base import SiteCrawler
 from kryptone.contrib.models import GoogleBusiness
 from kryptone.utils.file_readers import write_csv_document, write_json_document
 from kryptone.utils.iterators import drop_null
-from kryptone.utils.text import create_filename
+from kryptone.utils.text import clean_text, create_filename
 
 
 def generate_search_url(search):
@@ -22,13 +23,14 @@ def generate_search_url(search):
 
 class GoogleMapsMixin:
     return_comments = True
+    sort_comments = False
 
     class Meta:
         crawl = False
     
     @staticmethod
     def transform_to_json(items):
-        return list(map(lambda x: x.as_json, items))
+        return list(map(lambda x: x.as_json(), items))
 
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
@@ -55,6 +57,18 @@ class GoogleMapsMixin:
                         continue
                     writer.writerow(row)
 
+    def apply_sort_to_comments(self):
+        script = """
+        const sortButton = document.querySelector('button[aria-label*="Sort reviews"][data-value^="Sort"]')
+        const menu = document.querySelector('div[id="action-menu"][role="menu"]').querySelectorAll('div[role="menuitemradio"]')
+        const newestRadio = menu[0]
+
+        sortButton && sortButton.click()
+        newestRadio && newestRadio.click()
+        """
+        self.driver.execute_script(script)
+        time.sleep(5)
+
 
 class GoogleMaps(GoogleMapsMixin, SiteCrawler):
     """Explores the business feed, gathers each business
@@ -64,7 +78,9 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
     def create_dump(self):
         write_json_document(
-            'dump.json', self.transform_to_json(self.final_result))
+            'dump.json', 
+            self.transform_to_json(self.final_result)
+        )
 
     def post_visit_actions(self, **kwargs):
         try:
@@ -234,11 +250,6 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 clean_information = set(list(drop_null(information)))
 
             if self.return_comments:
-                # 2.1. Get the side panel
-                # side_panel = self.driver.find_elements(
-                #     By.CSS_SELECTOR,
-                #     'div[role="main"]'
-                # )[-1]
                 # 2.2. Move to the comment section
                 tab_list = self.driver.find_elements(
                     By.CSS_SELECTOR,
@@ -370,8 +381,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
                         clean_dict = {}
                         for key, value in comment.items():
-                            clean_text = self.clean_text(value)
-                            clean_dict[key] = clean_text
+                            cleaned_text = clean_text(value)
+                            clean_dict[key] = cleaned_text
                         clean_comments.append(clean_dict)
                     business_information.comments = clean_comments
                     logger.info(f'Found {len(clean_comments)} reviews')
@@ -626,8 +637,8 @@ class GoogleMapsPlace(GoogleMaps):
 
                     clean_dict = {}
                     for key, value in comment.items():
-                        clean_text = self.clean_text(value)
-                        clean_dict[key] = clean_text
+                        cleaned_text = clean_text(value)
+                        clean_dict[key] = cleaned_text
                     clean_comments.append(clean_dict)
                 logger.info(f'Found {len(clean_comments)} reviews')
 
@@ -673,12 +684,11 @@ class GoogleMapsPlace(GoogleMaps):
         business_information.address = clean_information_list(
             list(clean_information)
         )
-        business_information.rating = rating
-        business_information.number_of_reviews = number_of_reviews
+        business_information.rating = clean_text(rating)
+        business_information.number_of_reviews = clean_text(number_of_reviews)
         self.final_result.append(business_information)
 
         time.sleep(2)
 
         data = list(map(lambda x: x.as_json, self.final_result))
         write_json_document('google_maps_results.json', data)
-        # completion_time = (time.time() - current_time) / 60

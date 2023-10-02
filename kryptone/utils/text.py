@@ -2,6 +2,7 @@ import re
 import string
 import secrets
 import unidecode
+import unicodedata
 from kryptone.utils.iterators import drop_while
 
 from kryptone.utils.iterators import drop_null
@@ -55,6 +56,7 @@ def clean_text(text):
     items = text.split('\n')
     text = ' '.join(items)
 
+    text = unicodedata.normalize('NFKD', text)
     items = drop_null(text.split(' '))
     return ' '.join(items)
 
