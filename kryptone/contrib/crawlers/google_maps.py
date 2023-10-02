@@ -28,7 +28,7 @@ class GoogleMapsMixin:
     
     @staticmethod
     def transform_to_json(items):
-        return list(map(lambda x: x.as_json, items))
+        return list(map(lambda x: x.as_json(), items))
 
     def generate_csv_file(self, filename=None):
         with open('ange.json', encoding='utf-8') as f:
