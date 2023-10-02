@@ -2,6 +2,7 @@ import re
 import string
 import secrets
 import unidecode
+from kryptone.utils.iterators import drop_while
 
 from kryptone.utils.iterators import drop_null
 
@@ -13,6 +14,11 @@ PRICE_EURO = re.compile(r'\d+\€\d+')
 
 def random_string(n=10):
     return secrets.token_hex(nbytes=n)
+
+
+def create_filename(extension='json'):
+    """Generates a new filename with an extension"""
+    return f'{random_string()}.{extension}'
 
 
 def parse_price(text):
@@ -79,8 +85,8 @@ class Text:
         """Applies simple cleaning techniques on the
         text by removing newlines, lowering the characters
         and removing extra spaces"""
-        result2 = re.sub('\W', ' ', text)
-        lowered_text = str(text).lower().strip()
+        clean_text = re.sub('\W', ' ', text)
+        lowered_text = str(clean_text).lower().strip()
         text = lowered_text.encode(encoding).decode(encoding)
         normalized_text = text.replace('\n', ' ')
         return normalized_text.strip()

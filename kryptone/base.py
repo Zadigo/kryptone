@@ -1,3 +1,4 @@
+import asyncio
 import bisect
 import datetime
 import json
@@ -8,9 +9,12 @@ import time
 from collections import defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
 
+import pandas
 import pytz
 import requests
 from lxml import etree
+from requests import Session
+from requests.models import Request
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -19,7 +23,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import logger
+from kryptone import exceptions, logger
 # from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
@@ -27,23 +31,24 @@ from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
-from kryptone.utils.file_readers import (read_csv_document, read_json_document,
+from kryptone.utils.date_functions import get_current_date, is_expired
+from kryptone.utils.file_readers import (read_csv_document,
+                                         read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import JPEGImagesIterator
+from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLFile, URLPassesTest
-
-WEBDRIVER_ENVIRONMENT_PATH = 'KRYPTONE_WEBDRIVER'
+from kryptone.utils.urls import URL, URLsLoader, URLGenerator
+from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router'
+    'gather_emails', 'router', 'crawl'
 }
 
 
-# post_init = Signal()
+post_init = Signal()
 navigation = Signal()
 db_signal = Signal()
 
@@ -98,10 +103,16 @@ class CrawlerOptions:
         self.default_scroll_step = 80
         self.gather_emails = False
         self.router = None
+        self.crawl = True
+        self.start_urls = []
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
 
+    @property
+    def has_start_urls(self):
+        return len(self.start_urls) > 0
+    
     def add_meta_options(self, options):
         for name, value in options:
             if name not in DEFAULT_META_OPTIONS:
@@ -115,20 +126,8 @@ class CrawlerOptions:
             setattr(self, name, value)
 
     def prepare(self):
-        pass
-        # for option in DEFAULT_META_OPTIONS:
-        #     if not hasattr(self, option):
-        #         if option in ['domains', 'url_passes_tests']:
-        #             setattr(self, option, [])
-
-        #         if option in ['audit_page', 'gather_emails', 'debug_mode']:
-        #             setattr(self, option, False)
-
-        #         if option == 'site_language':
-        #             setattr(self, option, None)
-
-        #         if option == 'default_scroll_step':
-        #             setattr(self, 'default_scroll_step', 80)
+        if isinstance(self.start_urls, URLGenerator):
+            self.start_urls = list(self.start_urls)
 
 
 class Crawler(type):
@@ -174,6 +173,18 @@ class BaseCrawler(metaclass=Crawler):
     debug_mode = False
     timezone = 'UTC'
     default_scroll_step = 80
+
+    def __init__(self, browser_name=None):
+        self._start_url_object = None
+        self.driver = get_selenium_browser_instance(
+            browser_name=browser_name or self.browser_name
+        )
+
+        # navigation.connect(collect_images_receiver, sender=self)
+
+        # db_signal.connect(backends.airtable_backend, sender=self)
+        # db_signal.connect(backends.notion_backend, sender=self)
+        # db_signal.connect(backends.google_sheets_backend, sender=self)
 
     def __repr__(self):
         return f'<{self.__class__.__name__}>'
@@ -315,7 +326,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             self.urls_to_visit.add(new_url)
-        logger.info(f'{len(urls_or_paths)} added')
+        logger.info(f'{len(urls_or_paths)} url(s) added')
 
     def get_page_urls(self):
         """Returns all the urls present on the
@@ -421,7 +432,7 @@ class BaseCrawler(metaclass=Crawler):
             new_scroll_pixels = new_scroll_pixels + increment
             time.sleep(wait_time)
 
-    def click_consent_button(self, element_id=None, element_class=None):
+    def click_consent_button(self, element_id=None, element_class=None, wait_time=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
         try:
@@ -434,14 +445,21 @@ class BaseCrawler(metaclass=Crawler):
             element.click()
         except:
             logger.info('Consent button not found')
+        finally:
+            # Some websites might create an issue when
+            # trying to gather the urls of page just
+            # after clicking the consent button. Using
+            # the wait time can prevent the stale element
+            # error from being raised
+            if wait_time is not None:
+                time.sleep(wait_time)
 
     def evaluate_xpath(self, path):
-        return self.driver.execute_script(
-            f"""
-            const result = document.evaluate({path}, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-            return result.singleNodeValue
-            """
-        )
+        script = """
+        const result = document.evaluate('{path}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+        return result.singleNodeValue
+        """.format(path=path)
+        return self.driver.execute_script(script)
 
     def scroll_page_section(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
@@ -487,6 +505,12 @@ class BaseCrawler(metaclass=Crawler):
         result = len(self.visited_urls) / total_urls
         percentage = round(result, 5)
         logger.info(f'{percentage * 100}% of total urls visited')
+        return self.urls_audit(
+            count_urls_to_visit=len(self.urls_to_visit),
+            count_visited_urls=len(self.visited_urls),
+            total_urls=total_urls,
+            completion_percentage=percentage
+        )
 
     def get_current_date(self):
         timezone = pytz.timezone(self.timezone)
@@ -514,30 +538,26 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
     start_url = None
 
     def __init__(self, browser_name=None):
-        self._start_url_object = None
-        self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
-        )
-
-        # navigation.connect(collect_images_receiver, sender=self)
-
-        # db_signal.connect(backends.airtable_backend, sender=self)
-        # db_signal.connect(backends.notion_backend, sender=self)
-        # db_signal.connect(backends.google_sheets_backend, sender=self)
-
+        super().__init__(browser_name=browser_name)
         self._start_date = self.get_current_date()
 
         self._start_time = time.time()
         self._end_time = None
         self.performance_audit = namedtuple(
-            'Performance', ['days', 'duration']
+            'Performance',
+            ['days', 'duration']
+        )
+        self.urls_audit = namedtuple(
+            'URLsAudit',
+            ['count_urls_to_visit', 'count_visited_urls',
+             'completion_percentage', 'total_urls']
         )
 
         self.statistics = {}
 
-    def update_statistics(self):
-        current_date = self.get_current_date().date()
-        self.date_history[current_date] = self.date_history[current_date] + 1
+    # def update_statistics(self):
+    #     current_date = self.get_current_date().date()
+    #     self.date_history[current_date] = self.date_history[current_date] + 1
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit
@@ -560,7 +580,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
-        self.list_of_seen_urls = set(read_csv_document('seen_urls.csv', flatten=True))
+        self.list_of_seen_urls = set(
+            read_csv_document('seen_urls.csv', flatten=True)
+        )
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -605,7 +627,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start(self, start_urls=[], url_cache=None, **kwargs):
+    def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
 
         >>> instance = BaseCrawler()
@@ -625,21 +647,22 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
-        if url_cache is not None:
-            self.urls_to_visit = url_cache.urls_to_visit
-            self.visited_urls = url_cache.visited_urls
+        if isinstance(start_urls, URLsLoader):
+            self.urls_to_visit = start_urls.urls_to_visit
+            self.visited_urls = start_urls.visited_urls
 
         if self.start_url is None:
-            raise ValueError('A starting url should be provided to the spider')
+            raise ValueError('No start url provided')
 
-        # If the urls_to_visit already populated,
-        # makes no sense to use the start_url but
-        # directly just go to an url already
-        # present in the list
+        # If we have no urls to visit in
+        # the array, try to eventually
+        # populate the list with existing ones
         if not self.urls_to_visit:
             # Start spider from .xml page
             is_xml_page = self.start_url.endswith('.xml')
             if not is_xml_page:
+                # Add the start_url to the list of
+                # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
             else:
                 start_urls = self.start_from_sitemap_xml(self.start_url)
@@ -647,6 +670,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         if start_urls:
             self.add_urls(*start_urls)
+
+        webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
@@ -688,10 +713,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             self.visited_urls.add(current_url)
 
-            # We can either crawl all the website
-            # or just specific page TODO: Check performance issues here
-            self.get_page_urls()
-            self._backup_urls()
+            # TODO: Check performance issues here
+            if self._meta.crawl:
+                self.get_page_urls()
+                self._backup_urls()
 
             if self._meta.audit_page:
                 self.audit_page(current_url)
@@ -709,7 +734,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
                 # Save the website's text
                 website_text = ' '.join(self.fitted_page_documents)
-                file_readers.write_text_document('website_text.txt', website_text)
+                file_readers.write_text_document(
+                    'website_text.txt', website_text)
 
                 # cache.set_value('page_audit', self.page_audits)
                 # cache.set_value('global_audit', vocabulary)
@@ -738,16 +764,31 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # Run custom user actions once
             # everything is completed
             url_instance = URL(current_url)
-            self.run_actions(url_instance)
+            try:
+                self.run_actions(url_instance)
+            except TypeError:
+                raise TypeError("run_actions should accept arguments")
+            except Exception:
+                ExceptionGroup('An exception occured while trying to run user actions', [
+                    exceptions.SpiderExecutionError()
+                ])
 
             # Run routing actions aka, base on given
             # url path, route to a function that
             # would execute said task
             if self._meta.router is not None:
-                self._meta.router.resolve(current_url, self)
+                self._meta.router.resolve(url_instance, self)
 
-            performance = self.calculate_performance()
-            self.calculate_completion_percentage()
+            if self._meta.crawl:
+                performance = self.calculate_performance()
+                urls_performance = self.calculate_completion_percentage()
+                performance_document = {
+                    'days': performance.days,
+                    'duration': performance.duration,
+                    'count_urls_to_visit': urls_performance.count_urls_to_visit,
+                    'count_visited_urls': urls_performance.count_visited_urls
+                }
+                write_json_document('performance.json', performance_document)
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
@@ -758,84 +799,122 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             time.sleep(wait_time)
 
 
-class SinglePageAutomater(BaseCrawler):
-    """Automates user defined actions on a
-    single or multiple user provided
-    pages as oppposed to crawing the
-    whole website"""
+class JSONCrawler:
+    """Crawl the data of an API endpoint by retrieving
+    the data given an interval in minutes"""
 
-    start_urls = []
+    base_url = None
+    receveived_data = []
+    iterator = AsyncIterator
+
+    def __init__(self, chunks=10):
+        self.chunks = chunks
+        self.request_sent = 0
+
+        self.max_pages = 0
+        self.current_page_key = None
+        self.current_page = 1
+        self.max_pages_key = None
+        self.paginate_data = False
+        self.pagination = 0
+
+        if self.base_url is None:
+            raise ValueError("'base_url' cannot be None")
+
+        self._url = URL(self.base_url)
 
     @property
-    def name(self):
-        return 'automater'
+    def data(self):
+        return self.iterator(self.receveived_data, by=self.chunks)
 
-    def start(self, start_urls=[], wait_time=None, debug_mode=False):
-        """Entrypoint to start the web scrapper"""
-        # To ensure efficient navigation and/or
-        # scrapping, use a maximised window since
-        # layouts can fundamentally change when
-        # using a smaller window
-        logger.info(
-            f'{self.__class__.__name__} ready to automate actions on website'
+    async def clean(self, dataframe):
+        """Use this function to run additional logic
+        on the retrieved data"""
+        return dataframe.to_json()
+
+    async def start(self, interval=15):
+        logger.info('Starting JSON crawler')
+
+        session = Session()
+        request = Request(
+            method='get',
+            url=str(self._url),
+            headers={'Content-Type': 'application/json'},
+            auth=None
         )
-        self.driver.maximize_window()
+        prepared_request = session.prepare_request(request)
 
-        self.debug_mode = debug_mode
+        interval = datetime.timedelta(minutes=interval)
+        time_interval = (0, 0)
 
-        logger.info('Starting Kryptone automation...')
+        queue = asyncio.Queue()
 
-        if isinstance(self.start_urls, URLFile):
-            self.start_urls = list(self.start_urls)
+        async def receiver():
+            webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
+            while True:
+                while not queue.empty():
+                    data = await queue.get()
+                    # self.receveived_data.extend(data)
+                    # await webhooks.resolve(data)
+                    await asyncio.sleep(5)
+                await asyncio.sleep(15)
 
-        self.start_urls.extend(start_urls)
-        start_urls = self.start_urls
+        async def sender():
+            next_date = get_current_date() + interval
+            time_until_next_execution = 0
+            while True:
+                current_date = get_current_date()
 
-        if start_urls:
-            self.urls_to_visit.update(set(start_urls))
+                # start_time, end_time = time_interval
+                time_until_next_execution = (
+                    next_date - current_date
+                ).total_seconds()
 
-        while self.urls_to_visit:
-            current_url = self.urls_to_visit.pop()
-            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
+                if time_until_next_execution <= 0:
+                    start_time = time.time()
 
-            if current_url is None:
-                continue
+                    # Some endpoints allow pagination
+                    # of the data in order to get additional
+                    # items. So updat the pagination number
+                    # on the url
+                    if self.paginate_data:
+                        if self.pagination == 0:
+                            self.pagination = self.pagination + 1
+                            continue
 
-            logger.info(f'Going to url: {current_url}')
-            self.driver.get(current_url)
+                        page = self.pagination + 1
+                        if page > self.max_pages:
+                            page = 0
 
-            # Always wait for the body section of
-            # the page to be located  or visible
-            wait = WebDriverWait(self.driver, 8)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
-            self.post_visit_actions(current_url=current_url)
+                    try:
+                        response = session.send(prepared_request)
+                    except:
+                        logger.error('Request failed')
+                    else:
+                        df = pandas.DataFrame(data=response.json())
+                        data_or_dataframe = await self.clean(df)
+                        if isinstance(data_or_dataframe, pandas.DataFrame):
+                            data = data_or_dataframe.to_json(orient='records', force_ascii=False)
+                        else:
+                            data = data_or_dataframe
 
-            # Post navigation signal
-            # TEST: This has to be tested
-            # navigation.send(self, current_url=current_url)
+                        if self.paginate_data: 
+                            self.max_pages = data[self.max_pages_key]
+                            self.current_page = data[self.current_page]
 
-            self.visited_urls.add(current_url)
-            self._backup_urls()
+                        end_time = round(time.time() - start_time, 1)
+                        await queue.put(data)
+                    
+                    next_date = next_date + interval
+                    self.request_sent = self.request_sent + 1
+                    
+                    logger.info(f'Request completed in {end_time}s')
 
-            self.emails(
-                self.get_transformed_raw_page_text,
-                elements=self.get_page_link_elements
-            )
-            write_csv_document('emails.csv', self.emails_container)
+                await asyncio.sleep(60)
 
-            # Run custom user actions once
-            # everything is completed
-            self.run_actions(current_url)
-            # db_signal.send(
-            #     self,
-            #     current_url=current_url,
-            #     emails=self.emails_container
-            # )
+        await asyncio.gather(sender(), receiver())
 
-            if settings.WAIT_TIME_RANGE:
-                start = settings.WAIT_TIME_RANGE[0]
-                stop = settings.WAIT_TIME_RANGE[1]
-                wait_time = random.randrange(start, stop)
 
-            logger.info(f"Waiting {wait_time}s")
-            time.sleep(wait_time or 15)
+# c = JSONCrawler()
+# c.base_url = 'https://jsonplaceholder.typicode.com/todos'
+# asyncio.run(c.start(interval=1))

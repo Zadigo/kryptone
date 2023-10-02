@@ -47,8 +47,8 @@ class ApplicationChecks(GlobalMixins):
                 )
 
         requires_list_or_tuple = [
-            'SPIDERS', 'AUTOMATERS',
-            'ACTIVE_STORAGE_BACKENDS', 'WAIT_TIME_RANGE'
+            'SPIDERS', 'ACTIVE_STORAGE_BACKENDS', 
+            'WAIT_TIME_RANGE'
         ]
         for item in requires_list_or_tuple:
             value = getattr(settings, item)

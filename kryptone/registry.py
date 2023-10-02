@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import inspect
 import threading
 import os
@@ -10,7 +11,6 @@ from pathlib import Path
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.signals import Signal
-from kryptone.utils.urls import URLFile
 
 # registry_populated = Signal()
 # pre_init_spider = Signal()
@@ -147,6 +147,13 @@ class MasterRegistry:
             raise ValueError("MEDIA_FOLDER path does does not exist")
         setattr(settings, 'MEDIA_FOLDER', media_path)
 
+        # Set the webhook interval to a
+        # timedelta element
+        delta = datetime.timedelta(
+            minutes=getattr(settings, 'WEBHOOK_INTERVAL', 15)
+        )
+        setattr(settings, 'WEBHOOK_INTERVAL', delta)
+
         self.is_ready = True
 
     def populate(self):
@@ -167,7 +174,7 @@ class MasterRegistry:
                 f"Could not load the project's related module: '{dotted_path}'"
             )
 
-        from kryptone.base import BaseCrawler, SinglePageAutomater
+        from kryptone.base import BaseCrawler
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -186,19 +193,6 @@ class MasterRegistry:
                 ]
             )
 
-        try:
-            automaters_module = import_module(
-                f'{dotted_path}.{AUTOMATERS_MODULE}')
-        except Exception as e:
-            raise ExceptionGroup(
-                "Project loading fail",
-                [
-                    Exception(e.args),
-                    ImportError(
-                        "Failed to load the project's automaters submodule")
-                ]
-            )
-
         # Check that there are class objects that can be used
         # and are subclasses of the main Spider class object
         spiders = inspect.getmembers(
@@ -206,16 +200,9 @@ class MasterRegistry:
             predicate=inspect.isclass
         )
 
-        automaters = inspect.getmembers(
-            automaters_module,
-            predicate=inspect.isclass
-        )
-
-        elements = spiders + automaters
-
         valid_spiders = filter(
-            lambda x: issubclass(x[1], (BaseCrawler, SinglePageAutomater)),
-            elements
+            lambda x: issubclass(x[1], BaseCrawler),
+            spiders
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
@@ -226,16 +213,6 @@ class MasterRegistry:
                     spiders_module,
                     dotted_path=dotted_path
                 )
-                instance.registry = self
-                self.spiders[name] = instance
-
-            if name in settings.AUTOMATERS:
-                instance = SpiderConfig.create(
-                    name,
-                    automaters_module,
-                    dotted_path=dotted_path
-                )
-                instance.is_automater = True
                 instance.registry = self
                 self.spiders[name] = instance
 

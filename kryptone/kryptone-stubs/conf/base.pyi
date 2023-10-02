@@ -10,9 +10,6 @@ PROJECT_PATH: pathlib.Path
 SPIDERS: list
 
 
-AUTOMATERS: list
-
-
 WEBDRIVER: str
 
 
@@ -32,6 +29,12 @@ ACTIVE_STORAGE_BACKENDS: list[str]
 
 
 STORAGE_BACKENDS: dict[str, str]
+
+
+WEBHOOK_INTERVAL: int
+
+
+WEBHOOK_PAGINATION: int
 
 
 EMAIL_HOST: str

@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 
 
@@ -12,11 +13,6 @@ PROJECT_PATH = None
 # Register spiders to crawl
 # pages on a website
 SPIDERS = []
-
-
-# Register spiders to automate
-# actions on a set of pages
-AUTOMATERS = []
 
 
 # Indicates the Selenium
@@ -50,8 +46,8 @@ CACHE_FILE_NAME = 'cache'
 ACTIVE_STORAGE_BACKENDS = []
 
 
-# External storage backends to use to save the
-# data gathered by the spiders
+# External storage backends to configure
+# for using in ACTIVE_STORAGE_BACKENDS
 STORAGE_BACKENDS = {
     'airtable': {
         'type': 'online',
@@ -63,8 +59,11 @@ STORAGE_BACKENDS = {
     },
     'google_sheets': {
         'type': 'online',
-        'sheet_name': None,
-        'credentials': 'creds.json'
+        'spreadsheet_id': None,
+        'credentials': 'creds.json',
+        'scopes': [
+            'https://www.googleapis.com/auth/spreadsheets.readonly'
+        ]
     },
     'notion': {
         'type': 'online',
@@ -72,8 +71,20 @@ STORAGE_BACKENDS = {
             'TOKEN': None,
             'DATABASE_ID': None
         }
-    }
+    },
+    'webhooks': []
 }
+
+# Determines the frequency data should
+# be sent in the webhooks registered in
+# in storage backends
+WEBHOOK_INTERVAL = 15
+
+# Determines the amount of data that should
+# be sent per request. If the amount of data
+# is lowert than the pagination, the request
+# is not sent until the requirement is met
+WEBHOOK_PAGINATION = 100
 
 
 # Email setting values used essentially

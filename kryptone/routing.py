@@ -5,8 +5,8 @@ from kryptone.utils.urls import URL
 
 
 class Route:
-    """Represents the route to use for a path that matches
-    the current route
+    """Points to a specific function on the crawler for a 
+    route that matches the specific path
 
     >>> router = Router([
     ...    route('logic_for_first_url', regex='\/products', name='products')
@@ -56,7 +56,7 @@ class Route:
                 
                 func(current_url, route=self)
                 if result:
-                    logger.debug(
+                    logger.info(
                         f"Routing sucessful for {current_url} "
                         f"to '{self.function_name}'"
                     )
@@ -65,6 +65,11 @@ class Route:
             return result
         return self, wrapper
 
+    @classmethod
+    def new(cls):
+        instance = cls()
+        return instance 
+    
 
 # FIXME: This creates an instance pointing to the
 # same class with this technique, in other words,
