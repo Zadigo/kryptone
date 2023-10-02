@@ -32,7 +32,7 @@ from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date, is_expired
-from kryptone.utils.file_readers import (URLCache, read_csv_document,
+from kryptone.utils.file_readers import (read_csv_document,
                                          read_json_document,
                                          write_csv_document,
                                          write_json_document)
