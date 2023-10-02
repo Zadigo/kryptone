@@ -1,8 +1,4 @@
-from ctypes import Union
-from typing import List, Tuple
-from typing import OrderedDict
-from typing import Callable
-from typing import Self
+from typing import Callable, List, OrderedDict, Self, Tuple, Union
 
 from kryptone.base import SiteCrawler
 from kryptone.utils.urls import URL
@@ -31,7 +27,8 @@ route: Route = ...
 
 
 class Router:
-    routes: OrderedDict[str, Callable[[str, SiteCrawler], bool]] = OrderedDict()
+    routes: OrderedDict[str, Callable[[
+        str, SiteCrawler], bool]] = OrderedDict()
 
     def __init__(self: Self, routes: List[Route]) -> None: ...
     def __repr__(self: Self) -> str: ...

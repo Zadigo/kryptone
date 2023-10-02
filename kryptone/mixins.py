@@ -1,16 +1,14 @@
-from urllib.parse import urlparse
-import itertools
-import re
 import json
+import re
 import string
 from collections import Counter, defaultdict
-from functools import lru_cache, cached_property
+from functools import cached_property, lru_cache
+from urllib.parse import urlparse
 
-# from nltk.tokenize import LineTokenizer, NLTKWordTokenizer
 from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
-from kryptone.utils.file_readers import read_document, read_documents
+from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_null, drop_while, keep_while
 
 EMAIL_REGEX = r'\S+\@\S+'
@@ -219,6 +217,7 @@ class SEOMixin(TextMixin):
     """A mixin for auditing a web page"""
 
     page_audits = defaultdict(dict)
+    raw_texts = []
     error_pages = set()
 
     @property
@@ -367,8 +366,9 @@ class SEOMixin(TextMixin):
     def vectorize_page(self, text):
         from sklearn.feature_extraction.text import CountVectorizer
         vectorizer = CountVectorizer()
+        self.raw_texts.append(text)
         transformed_text = self.fit_transform(
-            text, 
+            text=text, 
             language=settings.WEBSITE_LANGUAGE
         )
         matrix = vectorizer.fit_transform(transformed_text)

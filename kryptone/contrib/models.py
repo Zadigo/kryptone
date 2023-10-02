@@ -2,14 +2,19 @@ import dataclasses
 import pathlib
 import re
 from dataclasses import field
-from functools import cached_property, lru_cache
+from functools import cached_property
 from urllib.parse import unquote, urlparse
+
+import pandas
 
 from kryptone.utils.text import remove_accents, remove_punctuation
 
 
 class BaseModel:
     """Base class for all models"""
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
     @cached_property
     def fields(self):
         """Get the fields present on the model"""
@@ -29,8 +34,13 @@ class BaseModel:
     def url_stem(self):
         return pathlib.Path(str(self.url)).stem
 
-    def __getitem__(self, key):
-        return getattr(self, key)
+    
+    def as_dataframe(self, sort_by=None):
+        df = pandas.read_json(self.as_json())
+        if sort_by is not None:
+            df = df.sort_values(sort_by)
+        df = df.drop_duplicates()
+        return df
 
     def as_json(self):
         """Return the object as dictionnary"""
@@ -115,11 +125,14 @@ class Product(BaseModel):
 
 @dataclasses.dataclass
 class GoogleBusiness(BaseModel):
-    name: str
-    url: str
-    address: str
-    rating: str
-    number_of_reviews: int
+    name: str = None
+    url: str = None
+    feed_url: str = None
+    address: str = None
+    rating: str = None
+    latitude: int = None
+    longitude: int = None
+    number_of_reviews: int = None
     comments: str = field(default_factory=list)
 
     def as_csv(self):
@@ -133,6 +146,14 @@ class GoogleBusiness(BaseModel):
             rows.append(row)
         header = [*self.fields, 'comment_period', 'comment_text']
         return rows.insert(0, header)
+
+    def get_gps_coordinates_from_url(self, substitute_url=None):        
+        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)', substitute_url or self.feed_url)
+        if result:
+            self.latitude = result.group(1)
+            self.longitude = result.group(2)
+            return result.groups()
+        return False
 
 
 @dataclasses.dataclass

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import inspect
 import threading
 import os
@@ -145,6 +146,13 @@ class MasterRegistry:
         if not media_path.exists():
             raise ValueError("MEDIA_FOLDER path does does not exist")
         setattr(settings, 'MEDIA_FOLDER', media_path)
+
+        # Set the webhook interval to a
+        # timedelta element
+        delta = datetime.timedelta(
+            minutes=getattr(settings, 'WEBHOOK_INTERVAL', 15)
+        )
+        setattr(settings, 'WEBHOOK_INTERVAL', delta)
 
         self.is_ready = True
 

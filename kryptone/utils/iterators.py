@@ -1,3 +1,4 @@
+import itertools
 import re
 from collections import defaultdict
 from functools import cached_property
@@ -90,10 +91,10 @@ class CombinedIterators:
 class PageImagesIterator:
     """An iterator for storing images collected
     on a given page. This will by default get any
-    images on the page except base64 image types
+    images on the page except base64 types
 
     Subclass PageImagesIterator to collect specific
-    types of images
+    types of images.
     """
 
     images_list_filter = []
@@ -184,6 +185,43 @@ class EcommercePageImagesIterator(JPEGImagesIterator):
     filter to classify images related by a specific
     collection together
     """
+
+
+def iterate_chunks(items, n):
+    """Function that creates and iterates over
+    chunks of data
+    
+    >>> iterate_chunks([1, 2, 3], 2)
+    ... [1, 2]
+    ... [3]
+    """
+    if n < 1:
+        raise ValueError(f'n must be greater or equal to 1. Got: {n}')
+
+    it = iter(items)
+    while True:
+        chunked_items = itertools.islice(it, n)
+        try:
+            first_element = next(chunked_items)
+        except StopIteration:
+            return
+        yield itertools.chain((first_element,), chunked_items)
+
+
+class AsyncIterator:
+    def __init__(self, data, by=10):
+        self.data = data
+        self.by = by
+
+    def __alen__(self):
+        return len(self.data)
+
+    def __aiter__(self):
+        result = iterate_chunks(self.data, self.by)
+        for item in result:
+            yield list(item)
+
+
 
 
 # class W:

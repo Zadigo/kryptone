@@ -1,8 +1,15 @@
+from string import Template
+from collections import defaultdict
+import bisect
+import datetime
 import pathlib
+import random
 import re
 from functools import lru_cache
+from collections import OrderedDict
 from urllib.parse import urljoin, urlparse
 
+import pytz
 import requests
 
 from kryptone import logger
@@ -157,6 +164,15 @@ class URL:
             return False
         return list(drop_while(clean_values, result))
 
+    def paginate(self, regex_path=None, param=None):
+        """Increase the pagination number provided
+        on a given url"""
+        if regex_path is None and param is None:
+            # If we have nothing, classically, page
+            # is used to paginate in urls
+            param = 'page'
+        return 1
+
 
 class TestUrl:
     """Test two different urls by checking path
@@ -256,3 +272,237 @@ class UrlPassesRegexTest:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
+
+
+class URLIterator:
+    _urls_to_visit = set()
+    _visited_urls = set()
+    _seen_urls = set()
+    _grouped_by_page = defaultdict(set)
+    _current_url = None
+
+    def __init__(self, start_urls=[], sort_urls=False):
+        self.sort_urls = sort_urls
+        result = self.pre_save(start_urls)
+        self._urls_to_visit.update(result)
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        return f'<{name} urls_to_visit={self.urls_to_visit_count} visited_urls={self.visited_urls_count}>'
+
+    def __iter__(self):
+        for url in self._urls_to_visit:
+            yield url
+
+    def __contains__(self, url):
+        return any([
+            str(url) in self._urls_to_visit,
+            str(url) in self._visited_urls
+        ])
+
+    def __len__(self):
+        """Returns the amount of urls
+        left to visit"""
+        return len(self._urls_to_visit)
+
+    def __getitem__(self, index):
+        url = list(self._urls_to_visit)[index]
+        return URL(url)
+
+    @property
+    def empty(self):
+        return len(self._urls_to_visit) == 0
+
+    @property
+    def urls_to_visit(self):
+        for url in self._urls_to_visit:
+            yield URL(url)
+
+    @property
+    def visited_urls(self):
+        for url in self._visited_urls:
+            yield URL(url)
+
+    @property
+    def urls_to_visit_count(self):
+        return len(self._urls_to_visit)
+
+    @property
+    def visited_urls_count(self):
+        return len(self._visited_urls)
+
+    @property
+    def total_urls_count(self):
+        return sum([self.urls_to_visit_count, self.visited_urls_count])
+
+    @property
+    def completion_rate(self):
+        try:
+            result = self.urls_to_visit_count / self.visited_urls_count
+            return round(result, 2)
+        except ZeroDivisionError:
+            return float(0)
+
+    @property
+    def next_url(self):
+        try:
+            return list(self.urls_to_visit)[0]
+        except IndexError:
+            return None
+
+    @property
+    def grouped_by_page(self):
+        container = OrderedDict()
+        for key, values in self._grouped_by_page.items():
+            container[key] = list(values)
+        return container
+
+    def pre_save(self, urls):
+        # final_urls = set()
+        # urls = map(lambda x: URL(x), urls)
+        # for url in urls:
+        #     if url.is_file:
+        #         continue
+        #     final_urls.add(str(url))
+        # return list(final_urls)
+        return urls
+
+    def backup(self):
+        return {
+            'date': str(datetime.datetime.now(tz=pytz.UTC)),
+            'urls_to_visit': list(self._urls_to_visit),
+            'visited_urls': list(self._visited_urls),
+            'statistics': {
+                'last_visited_url': str(self._current_url) if self._current_url is not None else None,
+                'urls_to_visit_count': self.urls_to_visit_count,
+                'visited_urls_count': self.visited_urls_count,
+                'total_urls': sum([self.urls_to_visit_count, self.visited_urls_count]),
+                'completion_rate': self.completion_rate
+            }
+        }
+
+    def append(self, url):
+        self._seen_urls.add(url)
+
+        if url in self._urls_to_visit:
+            return False
+
+        if url in self._visited_urls:
+            return False
+
+        self._urls_to_visit.add(url)
+        if self.sort_urls:
+            self._urls_to_visit = set(sorted(self._urls_to_visit))
+            self._visited_urls = set(sorted(self._visited_urls))
+
+    def appendleft(self, url):
+        urls_to_visit = list(self._urls_to_visit)
+        urls_to_visit.insert(0, url)
+        self._urls_to_visit = set(urls_to_visit)
+
+    def clear(self):
+        self._urls_to_visit.clear()
+        self._visited_urls.clear()
+
+    def reverse(self):
+        container = []
+        for i in range(self.urls_to_visit_count, 0, -1):
+            try:
+                container.append(list(self._urls_to_visit)[i - 1])
+            except IndexError:
+                continue
+        self._urls_to_visit = set(container)
+
+    def update(self, urls, current_url=None):
+        keys = self._grouped_by_page.keys()
+        if keys:
+            key = current_url or list(keys)[-1] + 1
+        else:
+            key = current_url or 1
+
+        for url in urls:
+            self._grouped_by_page[key].add(url)
+            self.append(url)
+
+    def get(self):
+        url = self._urls_to_visit.pop()
+        self._current_url = URL(url)
+        self._visited_urls.add(url)
+        return self._current_url
+
+
+class URLGenerator:
+    """Generates a set of urls using a template
+
+    >>> generator = URLGenerator('http://example.com/$id')
+    """
+
+    def __init__(self, template, params={}, k=10, start=0):
+        self.base_template_url = Template(template)
+
+        new_params = []
+        base_params = [params for _ in range(k)]
+        for i, param in enumerate(base_params, start=start):
+            new_param = {}
+            for key, value in param.items():
+                if value == 'number':
+                    new_param[key] = i
+            new_params.append(new_param)
+
+        self.urls = []
+        for i in range(k):
+            try:
+                self.urls.append(
+                    self.base_template_url.substitute(new_params[i])
+                )
+            except KeyError:
+                self.urls.append(template)
+
+    def __iter__(self):
+        for url in self.urls:
+            yield url
+
+    def __aiter__(self):
+        for url in self.urls:
+            yield url
+
+    def __len__(self):
+        return len(self.urls)
+
+
+class URLsLoader:
+    """Loads a set of urls from a file"""
+    
+    def __init__(self):
+        self.data = {}
+        self._urls_to_visit = []
+        self._visited_urls = []
+
+    def __repr__(self) -> str:
+        statistics = f'urls_to_visit={len(self._urls_to_visit)} '
+        f'visited_urls={len(self._visited_urls)}'
+        return f'<URLCache: {statistics}>'
+
+    @property
+    def urls_to_visit(self):
+        return set(self._urls_to_visit)
+
+    @property
+    def visited_urls(self):
+        return set(self._visited_urls)
+
+    def load_from_file(self):
+        from kryptone.utils.file_readers import read_json_document
+
+        data = read_json_document('cache.json')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        logger.info(f'Loaded {len(self._urls_to_visit)} urls')
+        self.data = data
+
+    def load_from_dict(self, data):
+        if not isinstance(data, dict):
+            raise ValueError('Data should be a dictionnary')
+        self._urls_to_visit = data['urls_to_visit']
+        self._visited_urls = data['visited_urls']
+        self.data = data

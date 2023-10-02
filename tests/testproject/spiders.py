@@ -34,7 +34,7 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
     start_url = 'https://www.jennyfer.com/fr-fr/vetements/maillots-de-bain/haut-de-maillot-de-bain/haut-de-maillot-de-bain-crepe-noir-10040867060.html'
 
     class Meta:
-        crawl = False
+        crawl = True
         # router = Router([
         #     route(
         #         'handle_products',
