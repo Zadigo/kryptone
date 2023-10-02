@@ -647,7 +647,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
-        if isinstance(start_urls, URLCache):
+        if isinstance(start_urls, URLsLoader):
             self.urls_to_visit = start_urls.urls_to_visit
             self.visited_urls = start_urls.visited_urls
 
