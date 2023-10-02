@@ -170,7 +170,7 @@ The main method for starting the spider is `start`. However, there are three oth
 
 #### Resuming a previous crawl
 
-If you have started a previous crawl and need to continue from a set of urls that were initially gathered, call this method.
+If you started a previous crawl and need to continue from a set of urls that were initially gathered, call this method.
 
 #### Starting from a website's XML sitemap
 
@@ -299,27 +299,31 @@ You can specify a wait time for which the web scrapper is supposed to wait until
 
 __PROJECT_PATH__
 
+Determines the absolute path the local project
 
 __SPIDERS__
 
-
-__AUTOMATERS__
-
+Lists the spiders to run for the project
 
 __WEBDRIVER__
 
+The browser's name to use for crawling pages
 
 __MEDIA_FOLDER__
 
+The name of the media folder to use
 
 __WAIT_TIME__
 
+The amount of time to wait before moving the to the next page
 
 __WAIT_TIME_RANGE__
 
+The random amount of time to wait from the range before moving to the next page
 
 __CACHE_FILE_NAME__
 
+The name of the cache file to use for storing visited urls and urls to visit
 
 __ACTIVE_STORAGE_BACKENDS__
 
@@ -346,3 +350,5 @@ __DEFAULT_FROM_EMAIL__
 
 
 __WEBSITE_LANGUAGE__
+
+The language the of the visited website
