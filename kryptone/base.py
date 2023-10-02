@@ -38,7 +38,7 @@ from kryptone.utils.file_readers import (URLCache, read_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL
+from kryptone.utils.urls import URL, URLsLoader, URLGenerator
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -104,10 +104,15 @@ class CrawlerOptions:
         self.gather_emails = False
         self.router = None
         self.crawl = True
+        self.start_urls = []
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
 
+    @property
+    def has_start_urls(self):
+        return len(self.start_urls) > 0
+    
     def add_meta_options(self, options):
         for name, value in options:
             if name not in DEFAULT_META_OPTIONS:
@@ -121,20 +126,8 @@ class CrawlerOptions:
             setattr(self, name, value)
 
     def prepare(self):
-        pass
-        # for option in DEFAULT_META_OPTIONS:
-        #     if not hasattr(self, option):
-        #         if option in ['domains', 'url_passes_tests']:
-        #             setattr(self, option, [])
-
-        #         if option in ['audit_page', 'gather_emails', 'debug_mode']:
-        #             setattr(self, option, False)
-
-        #         if option == 'site_language':
-        #             setattr(self, option, None)
-
-        #         if option == 'default_scroll_step':
-        #             setattr(self, 'default_scroll_step', 80)
+        if isinstance(self.start_urls, URLGenerator):
+            self.start_urls = list(self.start_urls)
 
 
 class Crawler(type):
