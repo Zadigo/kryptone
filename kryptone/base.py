@@ -769,9 +769,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             except TypeError:
                 raise TypeError("run_actions should accept arguments")
             except Exception:
-                ExceptionGroup('An exception occured while trying to run user actions', [
-                    exceptions.SpiderExecutionError()
-                ])
+                raise ExceptionGroup(
+                    "An exception occured within 'run_actions'",
+                    [
+                        exceptions.SpiderExecutionError()
+                    ]
+                )
 
             # Run routing actions aka, base on given
             # url path, route to a function that
