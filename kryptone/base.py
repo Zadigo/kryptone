@@ -652,7 +652,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.visited_urls = start_urls.visited_urls
 
         if self.start_url is None:
-            raise ValueError('A starting url should be provided to the spider')
+            raise ValueError('No start url provided')
 
         # If we have no urls to visit in
         # the array, try to eventually
