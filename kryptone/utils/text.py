@@ -107,3 +107,14 @@ def remove_punctuation(text, email_exception=False):
 def remove_accents(text):
     """Remove accents from the text"""
     return unidecode.unidecode(text)
+
+
+def clean_dictionnary(item, remove_accents=False, remove_punctuation=False):
+    new_item = {}
+    for key, value in item.items():
+        if isinstance(value, str):
+            result1 = value.replace('\n', '')
+            tokens = result1.split(' ')
+            result2 = ' '.join(drop_null(tokens))
+            new_item[key] = result2
+    return new_item

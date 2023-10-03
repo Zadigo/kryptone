@@ -12,6 +12,7 @@ from kryptone.conf import settings
 from kryptone.contrib.models import Product
 from kryptone.utils.file_readers import read_json_document, write_json_document
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.text import clean_dictionnary
 
 
 class EcommerceCrawlerMixin:
@@ -55,7 +56,7 @@ class EcommerceCrawlerMixin:
             product.set_collection_id(collection_id_regex)
 
         self.product_objects.append(product)
-        self.products.append(product.as_json())
+        self.products.append(clean_dictionnary(product.as_json()))
         return True, product
 
     def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
