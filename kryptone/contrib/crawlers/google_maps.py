@@ -171,7 +171,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
             except:
-                logger.info('Business information not found')
+                logger.info('Business information not found or not existant')
             else:
                 rows.append([name, url])
         write_csv_document('business_urls_save.csv', rows)

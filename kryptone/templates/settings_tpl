@@ -103,3 +103,14 @@ DEFAULT_FROM_EMAIL = None
 # determining the nature of the stop words to
 # block when gathering the text
 WEBSITE_LANGUAGE = 'fr'
+
+
+# Allow Selenium to be launched in headless mode
+HEADLESS = False
+
+
+# Load all images when launching the browser
+LOAD_IMAGES = True
+
+# Load JS codes when launching the browser
+LOAD_JS = True
