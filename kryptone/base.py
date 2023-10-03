@@ -66,7 +66,7 @@ def collect_images_receiver(sender, current_url=None, **kwargs):
         # cache.extend_list('images', instance.urls)
 
 
-def get_selenium_browser_instance(browser_name=None):
+def get_selenium_browser_instance(browser_name=None, headless=False, load_images=True, load_js=True):
     """Creates a new selenium browser instance
 
     >>> browser = get_selenium_browser_instance()
@@ -81,6 +81,23 @@ def get_selenium_browser_instance(browser_name=None):
     options = options_klass()
     options.add_argument('--remote-allow-origins=*')
     options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+
+    # Allow Selenium to be launched
+    # in headless mode
+    if headless:
+        options.headless = True
+
+    # 0 = Default, 1 = Allow, 2 = Block
+    preferences = {
+        'profile.default_content_setting_values': {
+            'images': 0 if load_images else 2,
+            'javascript': 0 if load_js else 2,
+            'popups': 2,
+            'geolocation': 2,
+            'notifications': 2
+        }
+    }
+    # options.add_experimental_option('prefs', preferences)
 
     service = Service(manager_instance().install())
     return browser(service=service, options=options)
