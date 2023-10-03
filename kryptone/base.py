@@ -194,7 +194,10 @@ class BaseCrawler(metaclass=Crawler):
     def __init__(self, browser_name=None):
         self._start_url_object = None
         self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
+            browser_name=browser_name or self.browser_name,
+            headless=settings.HEADLESS,
+            load_images=settings.LOAD_IMAGES,
+            load_js=settings.LOAD_JS
         )
 
         # navigation.connect(collect_images_receiver, sender=self)
