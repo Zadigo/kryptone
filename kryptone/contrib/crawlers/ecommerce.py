@@ -41,6 +41,7 @@ class EcommerceCrawlerMixin:
         >>> instance.add_product([{...}], track_id=False)
         ... (True, Product)
         """
+        data = clean_dictionnary(data)
         product = self.model(**data)
 
         if avoid_duplicates:
@@ -56,7 +57,7 @@ class EcommerceCrawlerMixin:
             product.set_collection_id(collection_id_regex)
 
         self.product_objects.append(product)
-        self.products.append(clean_dictionnary(product.as_json()))
+        self.products.append(product.as_json())
         return True, product
 
     def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
