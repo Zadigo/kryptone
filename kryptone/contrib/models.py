@@ -67,6 +67,9 @@ class Product(BaseModel):
     description: str
     price: int
     url: str
+    material: str = None
+    old_price: int = None
+    breadcrumb: str = None
     collection_id: str = None
     number_of_colors: int = 1
     id_or_reference: str = None
@@ -121,6 +124,13 @@ class Product(BaseModel):
             group_dict = result.groupdict()
             self.collection_id = group_dict.get(
                 'collection_id', result.group(1))
+
+    def complex_name(self):
+        name = self.name.lower()
+        name = name.replace(' ', '_')
+        if self.id_or_reference is not None:
+            return f'{name}_{self.id_or_reference}'
+        return name
 
 
 @dataclasses.dataclass
