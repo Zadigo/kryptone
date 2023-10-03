@@ -97,7 +97,7 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
             'notifications': 2
         }
     }
-    # options.add_experimental_option('prefs', preferences)
+    options.add_experimental_option('prefs', preferences)
 
     service = Service(manager_instance().install())
     return browser(service=service, options=options)

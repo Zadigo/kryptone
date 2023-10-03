@@ -144,7 +144,8 @@ class EcommerceCrawlerMixin:
                         directory_path.mkdir(parents=True)
 
                     final_path = directory_path.joinpath(
-                        f'{name}_{index}{extension}')
+                        f'{name}_{index}{extension}'
+                    )
                     with open(final_path, mode='wb') as f:
                         if content is not None:
                             f.write(content)

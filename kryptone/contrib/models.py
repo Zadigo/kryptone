@@ -7,7 +7,7 @@ from urllib.parse import unquote, urlparse
 
 import pandas
 
-from kryptone.utils.text import remove_accents, remove_punctuation
+from kryptone.utils.text import remove_accents, remove_punctuation, clean_text
 
 
 class BaseModel:
@@ -104,7 +104,7 @@ class Product(BaseModel):
 
         def clean_token(token):
             result = token.replace('-', '_')
-            return remove_accents(remove_punctuation(result))
+            return remove_accents(remove_punctuation(result.lower()))
         tokens = list(map(clean_token, tokens))
 
         tokens.pop(-1)
@@ -126,7 +126,7 @@ class Product(BaseModel):
                 'collection_id', result.group(1))
 
     def complex_name(self):
-        name = self.name.lower()
+        name = clean_text(self.name.lower())
         name = name.replace(' ', '_')
         if self.id_or_reference is not None:
             return f'{name}_{self.id_or_reference}'
