@@ -135,6 +135,18 @@ class URL:
             return result
         return False
 
+    def test_url(self, regex):
+        """Test if an element in the url passes test
+
+        >>> instance = URL('http://example.com/a')
+        ... instance.test_url('a')
+        ... True
+        """
+        whole_url_search = re.search(regex, self.raw_url)
+        if whole_url_search:
+            return True
+        return False
+
     def test_path(self, regex):
         """Test if the url's path passes test
 
@@ -142,8 +154,8 @@ class URL:
         ... instance.test_path(r'\/a')
         ... True
         """
-        result = re.search(regex, self.raw_url)
-        if result:
+        path_search = re.search(regex, self.url_object.path)
+        if path_search:
             return True
         return False
 
@@ -198,6 +210,10 @@ class TestUrl:
 
     def __bool__(self):
         return self.test_result
+
+
+class BaseURLTestsMixin:
+    blacklist = []
 
 
 class URLPassesTest:
@@ -268,7 +284,8 @@ class UrlPassesRegexTest:
         self.regex = re.compile(regex)
 
     def __call__(self, url):
-        if self.regex.search(url):
+        result = self.regex.search(url)
+        if result:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
@@ -472,7 +489,7 @@ class URLGenerator:
 
 class URLsLoader:
     """Loads a set of urls from a file"""
-    
+
     def __init__(self):
         self.data = {}
         self._urls_to_visit = []
