@@ -49,7 +49,7 @@ def parse_price(text):
     price = price.replace(',', '.')
     return float(price)
 
-
+# TODO: Deprecate in favor or Text
 def clean_text(text):
     if not isinstance(text, str):
         return text
@@ -64,10 +64,18 @@ def clean_text(text):
 class Text:
     """Represents a text string"""
 
-    def __init__(self, text):
+    def __init__(self, text, punctation=False, accents=False):
         text = self.simple_clean(text)
         self.tokens = list(drop_null(text.split(' ')))
-        self.text = ' '.join(self.tokens)
+        text = ' '.join(self.tokens)
+
+        if punctation:
+            text = remove_punctuation(text)
+        
+        if accents:
+            text = remove_accents(text)
+        
+        self.text = text
 
     def __str__(self):
         return self.text
@@ -110,6 +118,7 @@ def remove_accents(text):
 
 
 def clean_dictionnary(item, remove_accents=False, remove_punctuation=False):
+    """Clean each text values of a dictionnary"""
     new_item = {}
     for key, value in item.items():
         if isinstance(value, str):
@@ -117,4 +126,6 @@ def clean_dictionnary(item, remove_accents=False, remove_punctuation=False):
             tokens = result1.split(' ')
             result2 = ' '.join(drop_null(tokens))
             new_item[key] = result2
+        else:
+            new_item[key] = value
     return new_item
