@@ -1,11 +1,8 @@
 import asyncio
 import bisect
 import datetime
-import json
 import os
 import random
-import re
-import string
 import time
 from collections import defaultdict, namedtuple
 from urllib.parse import unquote, urljoin, urlparse, urlunparse
@@ -25,21 +22,18 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import exceptions, logger
-# from kryptone.cache import Cache
 from kryptone.conf import settings
 from kryptone.db import backends
-from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date, is_expired
-from kryptone.utils.file_readers import (read_csv_document,
-                                         read_json_document,
+from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLsLoader, URLGenerator
+from kryptone.utils.urls import URL, URLGenerator, URLsLoader
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -211,28 +205,6 @@ class BaseCrawler(metaclass=Crawler):
         return f'<{self.__class__.__name__}>'
 
     @property
-    def get_html_page_content(self):
-        """Returns HTML elements of the
-        current page"""
-        return self.driver.page_source
-
-    @property
-    def get_page_link_elements(self):
-        """Returns all the selenium `<a></a>` anchor tags
-        of the current page"""
-        return self.driver.find_elements(By.TAG_NAME, 'a')
-
-    @property
-    def name(self):
-        return 'site_crawler'
-
-    @property
-    def get_html_page_content(self):
-        """Returns HTML elements of the
-        current page"""
-        return self.driver.page_source
-
-    @property
     def get_page_link_elements(self):
         """Returns all the selenium `<a></a>` anchor tags
         of the current page"""
@@ -253,11 +225,6 @@ class BaseCrawler(metaclass=Crawler):
             None
         ))
     
-    def join_path(self, path):
-        if path.startswith('/'):
-            return urljoin(self.get_origin, path)
-        return path
-
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
@@ -299,21 +266,6 @@ class BaseCrawler(metaclass=Crawler):
             None
         ))
         return unquote(result)
-
-    def create_filename(self, length=5, extension=None):
-        characters = string.ascii_lowercase + string.digits
-        name = ''.join(random.choice(characters) for _ in range(length))
-        if extension is not None:
-            return f'{name}.{extension}'
-        return name
-
-    def build_headers(self, options):
-        headers = {
-            'User-Agent': RANDOM_USER_AGENT(),
-            'Accept-Language': 'en-US,en;q=0.9'
-        }
-        items = [f"--header={key}={value})" for key, value in headers.items()]
-        options.add_argument(' '.join(items))
 
     def run_filters(self):
         """Excludes urls in the list of urls to visit based
@@ -397,8 +349,8 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             # If the link is similar to the initially
-            # visited url, skip it. NOTE: This is essentially
-            # a  security measure
+            # visited url, skip it.
+            # NOTE: This is essentially a  security measure
             if link_object.netloc != self._start_url_object.netloc:
                 continue
 
@@ -437,10 +389,7 @@ class BaseCrawler(metaclass=Crawler):
         # urls that the user does not want to visit
         # from the list of urls. NOTE: This re-initializes
         # the list of urls to visit
-        # previous_state = self.urls_to_visit.copy()
         self.urls_to_visit = set(self.run_filters())
-        # excluded_urls = previous_state.difference(self.urls_to_visit)
-        # logger.info(f'Ignored {len(excluded_urls)} urls')
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
@@ -490,23 +439,7 @@ class BaseCrawler(metaclass=Crawler):
             # error from being raised
             if wait_time is not None:
                 time.sleep(wait_time)
-
-    def evaluate_xpath(self, path):
-        script = """
-        const result = document.evaluate('{path}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-        return result.singleNodeValue
-        """.format(path=path)
-        return self.driver.execute_script(script)
-    
-    def string_value_from_xpath(self, path):
-        """Use an xpath to return a string value from the
-        parsed element"""
-        script = """
-        const result = document.evaluate('{path}', document, null, XPathResult.ANY_TYPE, null)
-        return result.stringValue
-        """.format(path=path)
-        return self.driver.execute_script(script)
-
+                
     def scroll_page_section(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
         if css_selector:
@@ -601,10 +534,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.statistics = {}
 
-    # def update_statistics(self):
-    #     current_date = self.get_current_date().date()
-    #     self.date_history[current_date] = self.date_history[current_date] + 1
-
     def resume(self, **kwargs):
         """From a previous list of urls to visit
         and visited urls, resume a previous
@@ -614,11 +543,11 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             * Memcache is checked afterwards if no connection
             * Finally, the file cache is used as a final resort
         """
-        redis = redis_connection()
+        redis = backends.redis_connection()
         if redis:
             data = redis.get('cache')
         else:
-            memcache = memcache_connection()
+            memcache = backends.memcache_connection()
             if memcache:
                 data = memcache.get('cache', [])
             else:
@@ -965,8 +894,3 @@ class JSONCrawler:
                 await asyncio.sleep(60)
 
         await asyncio.gather(sender(), receiver())
-
-
-# c = JSONCrawler()
-# c.base_url = 'https://jsonplaceholder.typicode.com/todos'
-# asyncio.run(c.start(interval=1))
