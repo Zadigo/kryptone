@@ -74,7 +74,7 @@ class Product(BaseModel):
     number_of_colors: int = 1
     id_or_reference: str = None
     id: int = None
-    images: str = dataclasses.field(default_factory=[])
+    images: list = dataclasses.field(default_factory=list)
     composition: str = None
     color: str = None
 
