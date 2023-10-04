@@ -2,12 +2,13 @@ import asyncio
 import bisect
 import datetime
 import json
+import os
 import random
 import re
 import string
 import time
 from collections import defaultdict, namedtuple
-from urllib.parse import unquote, urlparse, urlunparse
+from urllib.parse import unquote, urljoin, urlparse, urlunparse
 
 import pandas
 import pytz
@@ -240,6 +241,22 @@ class BaseCrawler(metaclass=Crawler):
     @property
     def get_title_element(self):
         return self.driver.find_element(By.TAG_NAME, 'title')
+
+    @property
+    def get_origin(self):
+        return urlunparse((
+            self._start_url_object.scheme,
+            self._start_url_object.netloc,
+            self._start_url_object.path,
+            None,
+            None,
+            None
+        ))
+    
+    def join_path(self, path):
+        if path.startswith('/'):
+            return urljoin(self.get_origin, path)
+        return path
 
     def _backup_urls(self):
         """Backs up the urls both in memory
