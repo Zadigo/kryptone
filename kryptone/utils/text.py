@@ -1,9 +1,9 @@
 import re
-import string
 import secrets
-import unidecode
+import string
 import unicodedata
-from kryptone.utils.iterators import drop_while
+
+import unidecode
 
 from kryptone.utils.iterators import drop_null
 
@@ -49,7 +49,9 @@ def parse_price(text):
     price = price.replace(',', '.')
     return float(price)
 
-# TODO: Deprecate in favor or Text
+# TODO: Deprecate in favor of Text
+
+
 def clean_text(text):
     if not isinstance(text, str):
         return text
@@ -71,10 +73,10 @@ class Text:
 
         if punctation:
             text = remove_punctuation(text)
-        
+
         if accents:
             text = remove_accents(text)
-        
+
         self.text = text
 
     def __str__(self):
@@ -129,3 +131,12 @@ def clean_dictionnary(item, remove_accents=False, remove_punctuation=False):
         else:
             new_item[key] = value
     return new_item
+
+
+def normalize_spaces(text_or_tokens):
+    """Remove excess spaces from a given text"""
+    if isinstance(text_or_tokens, str):
+        tokens = text_or_tokens.split(' ')
+    else:
+        tokens = text_or_tokens
+    return ' '.join(drop_null(tokens))
