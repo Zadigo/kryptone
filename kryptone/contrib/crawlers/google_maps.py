@@ -10,8 +10,9 @@ from kryptone import logger
 from kryptone.base import SiteCrawler
 from kryptone.contrib.models import GoogleBusiness
 from kryptone.utils.file_readers import write_csv_document, write_json_document
+from kryptone.utils.functions import create_filename
 from kryptone.utils.iterators import drop_null
-from kryptone.utils.text import clean_text, create_filename
+from kryptone.utils.text import clean_text
 
 
 def generate_search_url(search):
@@ -27,7 +28,7 @@ class GoogleMapsMixin:
 
     class Meta:
         crawl = False
-    
+
     @staticmethod
     def transform_to_json(items):
         return list(map(lambda x: x.as_json(), items))
@@ -78,7 +79,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
     def create_dump(self):
         write_json_document(
-            'dump.json', 
+            'dump.json',
             self.transform_to_json(self.final_result)
         )
 
@@ -369,7 +370,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 """
                 clean_comments = []
                 try:
-                    comments = self.driver.execute_script(retrieve_comments_script)
+                    comments = self.driver.execute_script(
+                        retrieve_comments_script)
                 except Exception as e:
                     comments = ''
                     logger.error(f'Comments not found for {name}: {e.args}')

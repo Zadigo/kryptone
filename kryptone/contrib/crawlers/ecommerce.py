@@ -1,8 +1,6 @@
+import pandas
 import asyncio
 import mimetypes
-import pathlib
-import re
-from collections import deque
 from urllib.parse import urlparse
 
 import requests
@@ -28,16 +26,17 @@ class EcommerceCrawlerMixin:
     def seen_products(self, using='id_or_reference'):
         """Returns a list of all products that were seen"""
         return set(map(lambda x: x[using], self.product_objects))
-    
+
     def product_exists(self, product, using='id_or_reference'):
         """Checks if a product was already seen in the database"""
         if not isinstance(product, (dict, self.model)):
-            raise ValueError(f'Value should be an instance of dict or {self.model}')
+            raise ValueError(
+                f'Value should be an instance of dict or {self.model}')
         return product[using] in self.seen_products(using=using)
 
     def add_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds a product to the internal product container
-        
+
         >>> instance.add_product([{...}], track_id=False)
         ... (True, Product)
         """
@@ -49,7 +48,7 @@ class EcommerceCrawlerMixin:
             # general product list
             if self.product_exists(data, using=duplicate_key):
                 return False, product
-        
+
         if track_id:
             product.id = self.products.count() + 1
 
@@ -62,7 +61,7 @@ class EcommerceCrawlerMixin:
 
     def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds an saves a product to the backends
-        
+
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
         """
@@ -76,13 +75,14 @@ class EcommerceCrawlerMixin:
             # for item in previous_products_data:
             #     if isinstance(item, dict):
             #         self.product_objects.append(self.model(**item))
-            self.product_objects = list(map(lambda x: self.model(**x), previous_products_data))
+            self.product_objects = list(
+                map(lambda x: self.model(**x), previous_products_data))
             message = f"Loaded {len(self.products)} products from 'products.json'"
             logger.info(message)
 
         new_product = self.add_product(
-            data, 
-            track_id=track_id, 
+            data,
+            track_id=track_id,
             collection_id_regex=collection_id_regex,
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
@@ -99,7 +99,7 @@ class EcommerceCrawlerMixin:
             products.append(product)
         return products
 
-    def save_images(self, product, path, filename=None):
+    def save_images(self, product, path, filename=None, debug=False):
         """Asynchronously save images to the project's
         media folder"""
         async def main():
@@ -124,7 +124,9 @@ class EcommerceCrawlerMixin:
                             # want to save locally
                             mimetype, _ = mimetypes.guess_type(url_object.path)
                             extension = mimetypes.guess_extension(
-                                mimetype, strict=True)
+                                mimetype,
+                                strict=True
+                            )
 
                             await queue.put((extension, response.content))
                         else:
@@ -157,7 +159,7 @@ class EcommerceCrawlerMixin:
                             f.write(content)
                         index = index + 1
 
-                    logger.info(f"Downloaded image for: '{product.name}'")
+                    logger.info(f"Downloaded image: '{final_path}'")
                     # Delay this task slightly more than the
                     # one above to allow requests to populate
                     # the queue on time
@@ -167,23 +169,12 @@ class EcommerceCrawlerMixin:
 
         asyncio.run(main())
 
-    # def scroll_page(self):
-    #     can_scroll = True
-    #     previous_scroll_position = None
-    #     while can_scroll:
-    #         script = f"""
-    #         // Scrolls the whole page of a website
-    #         const documentHeight = document.documentElement.offsetHeight
-    #         let currentPosition = document.documentElement.scrollTop
-
-    #         const scrollStep = Math.ceil(documentHeight / {self.scroll_step})
-    #         currentPosition += scrollStep
-    #         document.documentElement.scroll(0, currentPosition)
-    #         return [documentHeight, currentPosition]
-    #         """
-    #         result = self.driver.execute_script(script)
-    #         document_height, scroll_position = result
-    #         if scroll_position is not None and scroll_position == previous_scroll_position:
-    #             can_scroll = False
-    #         previous_scroll_position = scroll_position
-    #         time.sleep(2)
+    def as_dataframe(self, sort_by=None):
+        columns_to_keep = [
+            'name', 'description', 'price', 'url', 'material', 'old_price',
+            'breadcrumb', 'collection_id', 'number_of_colors',
+            'id_or_reference', 'composition', 'color'
+        ]
+        df = pandas.DataFrame(self.products, columns=columns_to_keep)
+        df = df.sort_values(sort_by or 'name')
+        return df.drop_duplicates()

@@ -3,59 +3,10 @@ import pathlib
 import re
 from dataclasses import field
 from functools import cached_property
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
-import pandas
-
+from kryptone.db.models import BaseModel
 from kryptone.utils.text import clean_text, remove_accents, remove_punctuation
-
-
-class BaseModel:
-    """Base class for all models"""
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    @cached_property
-    def fields(self):
-        """Get the fields present on the model"""
-        fields = dataclasses.fields(self)
-        return list(map(lambda x: x.name, fields))
-
-    @cached_property
-    def url_object(self):
-        result = unquote(getattr(self, 'url', ''))
-        return urlparse(str(result))
-
-    @cached_property
-    def get_url_object(self):
-        return urlparse(str(self.url))
-
-    @cached_property
-    def url_stem(self):
-        return pathlib.Path(str(self.url)).stem
-
-    def as_dataframe(self, sort_by=None):
-        df = pandas.read_json(self.as_json())
-        if sort_by is not None:
-            df = df.sort_values(sort_by)
-        df = df.drop_duplicates()
-        return df
-
-    def as_json(self):
-        """Return the object as dictionnary"""
-        item = {}
-        for field in self.fields:
-            item[field] = getattr(self, field)
-        return item
-
-    def as_csv(self):
-        def convert_values(field):
-            value = getattr(self, field)
-            if isinstance(value, (list, tuple)):
-                return ' / '.join(value)
-            return value
-        return list(map(convert_values, self.fields))
 
 
 @dataclasses.dataclass
@@ -109,7 +60,7 @@ class Product(BaseModel):
         tokens = list(map(clean_token, tokens))
 
         tokens.pop(-1)
-        return pathlib.Path('/'.join(tokens))        
+        return pathlib.Path('/'.join(tokens))
 
     def set_collection_id(self, regex):
         """Set the product's collection ID from the url
@@ -159,8 +110,10 @@ class GoogleBusiness(BaseModel):
         return rows.insert(0, header)
 
     def get_gps_coordinates_from_url(self, substitute_url=None):
-        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)',
-                           substitute_url or self.feed_url)
+        result = re.search(
+            r'\@(\d+\.?\d+)\,?(\d+\.?\d+)',
+            substitute_url or self.feed_url
+        )
         if result:
             self.latitude = result.group(1)
             self.longitude = result.group(2)

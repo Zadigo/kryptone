@@ -56,7 +56,10 @@ class URL:
 
     @property
     def is_valid(self):
-        return self.raw_url.startswith('http')
+        return any([
+            self.raw_url.startswith('http://'),
+            self.raw_url.startswith('https://')
+        ])
 
     @property
     def has_fragment(self):
@@ -136,7 +139,8 @@ class URL:
         return False
 
     def test_url(self, regex):
-        """Test if an element in the url passes test
+        """Test if an element in the url passes test. The
+        whole url is used to perform the test
 
         >>> instance = URL('http://example.com/a')
         ... instance.test_url('a')
@@ -148,7 +152,8 @@ class URL:
         return False
 
     def test_path(self, regex):
-        """Test if the url's path passes test
+        """Test if the url's path passes test. Only the
+        path is used to perform the test
 
         >>> instance = URL('http://example.com/a')
         ... instance.test_path(r'\/a')
@@ -176,7 +181,7 @@ class URL:
             return False
         return list(drop_while(clean_values, result))
 
-    def paginate(self, regex_path=None, param=None):
+    def paginate(self, k=10, regex_path=None, param=None):
         """Increase the pagination number provided
         on a given url"""
         if regex_path is None and param is None:
@@ -186,9 +191,8 @@ class URL:
         return 1
 
 
-class TestUrl:
-    """Test two different urls by checking path
-    similarity
+class CompareUrls:
+    """Check the similarity between two different urls
 
     >>> TestUrl('https://example.com', 'http://example.com/')
     ... True

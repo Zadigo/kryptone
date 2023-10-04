@@ -1,5 +1,9 @@
+import random
+import string
 import pathlib
-from kryptone.utils.text import normalize_spaces, remove_punctuation, remove_accents
+
+from kryptone.utils.text import (normalize_spaces, remove_accents,
+                                 remove_punctuation)
 
 
 def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]):
@@ -31,7 +35,8 @@ def directory_from_url(path, exclude=[]):
     """Build the logical local directory in the local project
     using the natural structure of the product url
 
-    >>> self.build_directory_from_url('/ma/woman/clothing/dresses/short-dresses/shirt-dress-1.html', exclude=['ma'])
+    >>> path = '/ma/woman/clothing/dresses/short-dresses/shirt-dress-1.html'
+    ... directory_from_url(path, exclude=['ma'])
     ... "/woman/clothing/dresses/short-dresses"
     """
     tokens = path.split('/')
@@ -44,3 +49,11 @@ def directory_from_url(path, exclude=[]):
 
     tokens.pop(-1)
     return pathlib.Path('/'.join(tokens))
+
+
+def create_filename(length=5, extension=None):
+    characters = string.ascii_lowercase + string.digits
+    name = ''.join(random.choice(characters) for _ in range(length))
+    if extension is not None:
+        return f'{name}.{extension}'
+    return name
