@@ -12,9 +12,10 @@ from kryptone.utils.text import remove_accents, remove_punctuation, clean_text
 
 class BaseModel:
     """Base class for all models"""
+
     def __getitem__(self, key):
         return getattr(self, key)
-    
+
     @cached_property
     def fields(self):
         """Get the fields present on the model"""
@@ -34,7 +35,6 @@ class BaseModel:
     def url_stem(self):
         return pathlib.Path(str(self.url)).stem
 
-    
     def as_dataframe(self, sort_by=None):
         df = pandas.read_json(self.as_json())
         if sort_by is not None:
@@ -157,8 +157,9 @@ class GoogleBusiness(BaseModel):
         header = [*self.fields, 'comment_period', 'comment_text']
         return rows.insert(0, header)
 
-    def get_gps_coordinates_from_url(self, substitute_url=None):        
-        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)', substitute_url or self.feed_url)
+    def get_gps_coordinates_from_url(self, substitute_url=None):
+        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)',
+                           substitute_url or self.feed_url)
         if result:
             self.latitude = result.group(1)
             self.longitude = result.group(2)
