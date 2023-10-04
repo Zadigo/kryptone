@@ -3,6 +3,7 @@ from typing import Callable, List, OrderedDict, Self, Tuple, Union
 from kryptone.base import SiteCrawler
 from kryptone.utils.urls import URL
 
+
 class Route:
     path: str = ...
     regex: str = ...
@@ -23,12 +24,19 @@ class Route:
     ) -> Tuple[Self, Callable[[str, SiteCrawler], bool]]: ...
 
 
-route: Route = ...
+def route(
+    function_name: str,
+    *,
+    path: str = ...,
+    regex: str = ...,
+    name: str = ...
+) -> Route: ...
 
 
 class Router:
-    routes: OrderedDict[str, Callable[[
-        str, SiteCrawler], bool]] = OrderedDict()
+    routes: OrderedDict[str, Callable[
+        [str, SiteCrawler], bool]
+    ] = OrderedDict()
 
     def __init__(self: Self, routes: List[Route]) -> None: ...
     def __repr__(self: Self) -> str: ...
