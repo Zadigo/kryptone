@@ -7,7 +7,7 @@ from urllib.parse import unquote, urlparse
 
 import pandas
 
-from kryptone.utils.text import remove_accents, remove_punctuation, clean_text
+from kryptone.utils.text import clean_text, remove_accents, remove_punctuation
 
 
 class BaseModel:
@@ -92,6 +92,7 @@ class Product(BaseModel):
     def number_of_images(self):
         return len(self.images)
 
+    # TODO: Deprecate in favor of directory_from_url
     def build_directory_from_url(self, exclude=[]):
         """Build the logical local directory in the local project
         using the natural structure of the product url
@@ -108,7 +109,7 @@ class Product(BaseModel):
         tokens = list(map(clean_token, tokens))
 
         tokens.pop(-1)
-        return pathlib.Path('/'.join(tokens))
+        return pathlib.Path('/'.join(tokens))        
 
     def set_collection_id(self, regex):
         """Set the product's collection ID from the url
