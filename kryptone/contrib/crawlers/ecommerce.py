@@ -99,11 +99,15 @@ class EcommerceCrawlerMixin:
             products.append(product)
         return products
 
-    def save_images(self, product, path, filename=None, debug=False):
+    def save_images(self, product, path, filename=None, debug=False, quantity=None):
         """Asynchronously save images to the project's
         media folder"""
         async def main():
             urls_to_use = product.images.copy()
+
+            if quantity is not None:
+                urls_to_use = [:quantity]
+            
             queue = asyncio.Queue()
 
             async def request_image():

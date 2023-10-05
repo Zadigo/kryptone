@@ -635,7 +635,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 "No start url provided. Provide either a "
                 "start url or start urls in the Meta"
             )
-        else:
+
+        if self.start_url is None and start_urls:
             self.start_url = start_urls.pop()
 
         # If we have no urls to visit in
