@@ -33,7 +33,7 @@ from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLGenerator, URLsLoader
+from kryptone.utils.urls import URL, URLGenerator
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -124,7 +124,7 @@ class CrawlerOptions:
     @property
     def has_start_urls(self):
         return len(self.start_urls) > 0
-    
+
     def add_meta_options(self, options):
         for name, value in options:
             if name not in DEFAULT_META_OPTIONS:
@@ -224,7 +224,7 @@ class BaseCrawler(metaclass=Crawler):
             None,
             None
         ))
-    
+
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
@@ -439,7 +439,7 @@ class BaseCrawler(metaclass=Crawler):
             # error from being raised
             if wait_time is not None:
                 time.sleep(wait_time)
-                
+
     def scroll_page_section(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
         if css_selector:
@@ -650,8 +650,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 # Add the start_url to the list of
                 # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
-            else:
-                start_urls = self.start_from_sitemap_xml(self.start_url)
         self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
@@ -888,20 +886,21 @@ class JSONCrawler:
                         df = pandas.DataFrame(data=response.json())
                         data_or_dataframe = await self.clean(df)
                         if isinstance(data_or_dataframe, pandas.DataFrame):
-                            data = data_or_dataframe.to_json(orient='records', force_ascii=False)
+                            data = data_or_dataframe.to_json(
+                                orient='records', force_ascii=False)
                         else:
                             data = data_or_dataframe
 
-                        if self.paginate_data: 
+                        if self.paginate_data:
                             self.max_pages = data[self.max_pages_key]
                             self.current_page = data[self.current_page]
 
                         end_time = round(time.time() - start_time, 1)
                         await queue.put(data)
-                    
+
                     next_date = next_date + interval
                     self.request_sent = self.request_sent + 1
-                    
+
                     logger.info(f'Request completed in {end_time}s')
 
                 await asyncio.sleep(60)
