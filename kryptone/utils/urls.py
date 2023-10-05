@@ -219,8 +219,16 @@ class CompareUrls:
 class BaseURLTestsMixin:
     blacklist = []
 
+    def __call__(self, url):
+        pass
 
-class URLPassesTest:
+    def convert_url(self, url):
+        if isinstance(url, URL):
+            return url
+        return URL(url)
+
+
+class URLPassesTest(BaseURLTestsMixin):
     """Checks if an url is able to pass
     a given test
 
@@ -235,17 +243,17 @@ class URLPassesTest:
             ]
     """
 
-    def __init__(self, name, *, paths=[], ignore_files=[]):
+    def __init__(self, name, *, paths=[], ignore_files=[], reverse=False):
         self.name = name
         self.paths = set(paths)
         self.failed_paths = []
         self.ignore_files = ignore_files
+        self.reverve = reverse
 
     def __call__(self, url):
         result = []
 
-        if isinstance(url, str):
-            url = URL(url)
+        url = self.convert_url(url)
 
         for path in self.paths:
             if path in url.url_object.path:
@@ -270,22 +278,27 @@ class URLPassesTest:
         return list(drop_while(lambda x: x == '', sorted_values))
 
 
-class UrlPassesRegexTest:
+class URLPassesRegexTest(BaseURLTestsMixin):
     """Checks if an url is able to pass a
     a given test
 
     >>> class Spider(BaseCrawler):
             url_passes_tests = [
-                UrlPassesRegexTest(
+                URLPassesRegexTest(
                     'simple_test',
                     regex=r'\/a$'
                 )
             ]
     """
 
-    def __init__(self, name, *, regex=None):
+    def __init__(self, name, *, regex=None, reverse_test=False):
         self.name = name
         self.regex = re.compile(regex)
+        # Reverse test means that if the url
+        # succeeds the test, it should be kept
+        # as opposed to being excluded (defaul
+        # behaviour)
+        self.reverse_test = reverse_test
 
     def __call__(self, url):
         result = self.regex.search(url)
