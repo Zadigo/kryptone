@@ -424,7 +424,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
             business_information.name = name
             business_information.url = url
-            business_information.address = clean_information_list(
+            business_information.additional_information = clean_information_list(
                 list(clean_information)
             )
 
