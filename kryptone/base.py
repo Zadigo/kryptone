@@ -39,7 +39,7 @@ from kryptone.webhooks import Webhooks
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router', 'crawl'
+    'gather_emails', 'router', 'crawl', 'start_urls'
 }
 
 
@@ -623,9 +623,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             logger.info('Starting Kryptone...')
 
         start_urls = start_urls or self._meta.start_urls
-        if isinstance(start_urls, URLsLoader):
-            self.urls_to_visit = start_urls.urls_to_visit
-            self.visited_urls = start_urls.visited_urls
+        # if isinstance(start_urls, URLsLoader):
+        #     self.urls_to_visit = start_urls.urls_to_visit
+        #     self.visited_urls = start_urls.visited_urls
 
         # If we have absolutely no start url and at the
         # same time we have no start urls to start from
