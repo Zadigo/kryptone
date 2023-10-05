@@ -622,12 +622,21 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
+        start_urls = start_urls or self._meta.start_urls
         if isinstance(start_urls, URLsLoader):
             self.urls_to_visit = start_urls.urls_to_visit
             self.visited_urls = start_urls.visited_urls
 
-        if self.start_url is None:
-            raise ValueError('No start url provided')
+        # If we have absolutely no start url and at the
+        # same time we have no start urls to start from
+        # as a start url, raise an error
+        if self.start_url is None and not start_urls:
+            raise ValueError(
+                "No start url provided. Provide either a "
+                "start url or start urls in the Meta"
+            )
+        else:
+            self.start_url = start_urls.pop()
 
         # If we have no urls to visit in
         # the array, try to eventually
@@ -635,7 +644,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         if not self.urls_to_visit:
             # Start spider from .xml page
             is_xml_page = self.start_url.endswith('.xml')
-            if not is_xml_page:
+            if is_xml_page:
+                start_urls = self.start_from_sitemap_xml(self.start_url)
+            else:
                 # Add the start_url to the list of
                 # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
@@ -689,6 +700,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.visited_urls.add(current_url)
 
             # TODO: Check performance issues here
+            # where the url gathering and processing
+            # might be a little slow
             if self._meta.crawl:
                 self.get_page_urls()
                 self._backup_urls()
