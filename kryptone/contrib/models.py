@@ -95,6 +95,7 @@ class GoogleBusiness(BaseModel):
     latitude: int = None
     longitude: int = None
     number_of_reviews: int = None
+    additional_information: list = field(default_factory=list)
     comments: str = field(default_factory=list)
 
     def as_csv(self):
