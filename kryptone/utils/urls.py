@@ -504,39 +504,45 @@ class URLGenerator:
         return len(self.urls)
 
 
-class URLsLoader:
-    """Loads a set of urls from a file"""
+# class URLsLoader:
+#     """
+#     Loads a set of urls from a file
+    
+#     >>> class Spider:
+#     ...     class Meta:
+#     ...         start_urls = URLsLoader()
+#     """
 
-    def __init__(self):
-        self.data = {}
-        self._urls_to_visit = []
-        self._visited_urls = []
+#     def __init__(self):
+#         self.data = {}
+#         self._urls_to_visit = []
+#         self._visited_urls = []
 
-    def __repr__(self) -> str:
-        statistics = f'urls_to_visit={len(self._urls_to_visit)} '
-        f'visited_urls={len(self._visited_urls)}'
-        return f'<URLCache: {statistics}>'
+#     def __repr__(self) -> str:
+#         statistics = f'urls_to_visit={len(self._urls_to_visit)} '
+#         f'visited_urls={len(self._visited_urls)}'
+#         return f'<URLCache: {statistics}>'
 
-    @property
-    def urls_to_visit(self):
-        return set(self._urls_to_visit)
+#     @property
+#     def urls_to_visit(self):
+#         return set(self._urls_to_visit)
 
-    @property
-    def visited_urls(self):
-        return set(self._visited_urls)
+#     @property
+#     def visited_urls(self):
+#         return set(self._visited_urls)
 
-    def load_from_file(self):
-        from kryptone.utils.file_readers import read_json_document
+#     def load_from_file(self):
+#         from kryptone.utils.file_readers import read_json_document
 
-        data = read_json_document('cache.json')
-        self._urls_to_visit = data['urls_to_visit']
-        self._visited_urls = data['visited_urls']
-        logger.info(f'Loaded {len(self._urls_to_visit)} urls')
-        self.data = data
+#         data = read_json_document('cache.json')
+#         self._urls_to_visit = data['urls_to_visit']
+#         self._visited_urls = data['visited_urls']
+#         logger.info(f'Loaded {len(self._urls_to_visit)} urls')
+#         self.data = data
 
-    def load_from_dict(self, data):
-        if not isinstance(data, dict):
-            raise ValueError('Data should be a dictionnary')
-        self._urls_to_visit = data['urls_to_visit']
-        self._visited_urls = data['visited_urls']
-        self.data = data
+#     def load_from_dict(self, data):
+#         if not isinstance(data, dict):
+#             raise ValueError('Data should be a dictionnary')
+#         self._urls_to_visit = data['urls_to_visit']
+#         self._visited_urls = data['visited_urls']
+#         self.data = data
