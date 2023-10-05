@@ -108,7 +108,7 @@ def clean_dictionnary(item, accents=False, punctation=False):
     new_item = {}
     for key, value in item.items():
         if isinstance(value, str):
-            if remove_accents:
+            if accents:
                 value = remove_accents(accents)
 
             if punctation:
