@@ -427,6 +427,12 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             business_information.address = clean_information_list(
                 list(clean_information)
             )
+
+            try:
+                business_information.address = business_information.additional_information[1]
+            except:
+                pass
+
             business_information.rating = rating
             business_information.number_of_reviews = number_of_reviews
             businesses.append(business_information)
