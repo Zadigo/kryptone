@@ -5,7 +5,7 @@ import os
 import random
 import time
 from collections import defaultdict, namedtuple
-from urllib.parse import unquote, urljoin, urlparse, urlunparse
+from urllib.parse import unquote, urlparse, urlunparse
 
 import pandas
 import pytz
@@ -25,9 +25,8 @@ from kryptone import exceptions, logger
 from kryptone.conf import settings
 from kryptone.db import backends
 from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone.signals import Signal
 from kryptone.utils import file_readers
-from kryptone.utils.date_functions import get_current_date, is_expired
+from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_csv_document,
                                          write_json_document)
@@ -41,24 +40,6 @@ DEFAULT_META_OPTIONS = {
     'debug_mode', 'site_language', 'default_scroll_step',
     'gather_emails', 'router', 'crawl', 'start_urls'
 }
-
-
-post_init = Signal()
-navigation = Signal()
-db_signal = Signal()
-
-
-def collect_images_receiver(sender, current_url=None, **kwargs):
-    """Collects every images present on the
-    actual webpage and classifies them"""
-    try:
-        image_elements = sender.driver.find_elements(By.TAG_NAME, 'img')
-    except:
-        pass
-    else:
-        instance = JPEGImagesIterator(current_url, image_elements)
-        logger.info(f'Collected {len(instance)} images')
-        # cache.extend_list('images', instance.urls)
 
 
 def get_selenium_browser_instance(browser_name=None, headless=False, load_images=True, load_js=True):

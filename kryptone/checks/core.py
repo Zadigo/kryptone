@@ -1,5 +1,4 @@
-import warnings
-from collections import OrderedDict, deque
+from collections import OrderedDict
 
 from kryptone.conf import settings
 from kryptone.exceptions import ProjectExistsError
@@ -111,4 +110,3 @@ class ApplicationChecks(GlobalMixins):
 
 
 checks_registry = ApplicationChecks()
-# register = checks_registry.register

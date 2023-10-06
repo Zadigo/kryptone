@@ -5,6 +5,16 @@ class ProjectExistsError(Exception):
 
 
 class SpiderExecutionError(Exception):
-    def __init__(self):
-        message = 'Spider failed to complete'
+    def __init__(self, error):
+        super().__init__(error)
+
+
+class SpiderExistsError(Exception):
+    def __init__(self, name, spiders):
+        names = ', '.join(spiders.keys())
+        message = (
+            f"The spider with the name '{name}' does not "
+            f"exist in the registry. Available spiders are {names}. "
+            f"If you forgot to register '{name}', check your settings file."
+        )
         super().__init__(message)

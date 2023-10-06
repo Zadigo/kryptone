@@ -10,11 +10,6 @@ GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 PROJECT_PATH = None
 
 
-# Register spiders to crawl
-# pages on a website
-SPIDERS = []
-
-
 # Indicates the Selenium
 # browser to use
 WEBDRIVER = 'Chrome'

@@ -8,7 +8,11 @@ from kryptone.registry import logger, registry
 
 class Command(ProjectCommand):
     def add_arguments(self, parser):
-        pass
+        parser.add_argument(
+            'name',
+            help='Spider name to execute',
+            type=str
+        )
 
     def execute(self, namespace):
         kryptone.setup()
@@ -23,9 +27,5 @@ class Command(ProjectCommand):
         params = {}
 
         os.environ.setdefault('KYRPTONE_TEST_RUN', 'True')
-        # if namespace.name is not None:
-        #     spider_config = registry.get_spider(namespace.name)
-        #     spider_config.run(**params)
-        # else:
-        registry.run_all_spiders(**params)
-        logger.info('Test run completed')
+        spider_config = registry.get_spider(namespace.name)
+        spider_config.run(**params)
