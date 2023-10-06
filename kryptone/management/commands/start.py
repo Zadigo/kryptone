@@ -10,7 +10,6 @@ from kryptone.registry import registry
 class Command(ProjectCommand):
     def add_arguments(self, parser):
         parser.add_argument(
-            'n',
             'name',
             help='Spider name to execute',
             type=str
