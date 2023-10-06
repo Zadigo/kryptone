@@ -1,29 +1,19 @@
-import asyncio
-import mimetypes
-import pathlib
-import re
-from collections import deque
-from urllib.parse import urlparse
+from typing import List, Literal, Tuple, dataclass_transform
 
-import requests
+import pandas
 
-from kryptone import logger
-from kryptone.conf import settings
-from typing import List, NoReturn, dataclass_transform
 from kryptone.contrib.models import Product
-from kryptone.utils.file_readers import read_json_document, write_json_document
-from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
 class EcommerceCrawlerMixin:
-    scroll_step = 30
-    products = []
-    product_objects = []
-    seen_products = []
-    model = Product
+    scroll_step: int = Literal[30]
+    products: list = ...
+    product_objects: list = ...
+    seen_products: list = ...
+    model: Product = ...
 
     def product_exists(
-        self, 
+        self,
         product: dataclass_transform,
         using: str = 'id_or_reference'
     ) -> bool: ...
@@ -33,25 +23,28 @@ class EcommerceCrawlerMixin:
         data,
         track_id: bool = ...,
         collection_id_regex: str = ...
-    ) -> dataclass_transform: ...
+    ) -> Tuple[bool, dataclass_transform]: ...
 
     def save_product(
-        self, 
-        data: dict, 
+        self,
+        data: dict,
         track_id: bool = False,
         collection_id_regex: str = ...
-    ) -> dataclass_transform: ...
+    ) -> Tuple[bool, dataclass_transform]: ...
 
     def bulk_save_products(
-        self, 
-        data, 
+        self,
+        data,
         track_id: bool = False,
         collection_id_regex: str = ...
     ) -> List[dataclass_transform]: ...
 
     def save_images(
-        self, 
+        self,
         product: dataclass_transform,
-        path: str, 
+        path: str,
         filename: str = ...
-    ) -> NoReturn: ...
+    ) -> None: ...
+
+    def as_dataframe(self, sort_by: str = ...) -> pandas.DataFrame: ...
+    

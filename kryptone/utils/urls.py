@@ -56,7 +56,10 @@ class URL:
 
     @property
     def is_valid(self):
-        return self.raw_url.startswith('http')
+        return any([
+            self.raw_url.startswith('http://'),
+            self.raw_url.startswith('https://')
+        ])
 
     @property
     def has_fragment(self):
@@ -135,15 +138,29 @@ class URL:
             return result
         return False
 
+    def test_url(self, regex):
+        """Test if an element in the url passes test. The
+        whole url is used to perform the test
+
+        >>> instance = URL('http://example.com/a')
+        ... instance.test_url('a')
+        ... True
+        """
+        whole_url_search = re.search(regex, self.raw_url)
+        if whole_url_search:
+            return True
+        return False
+
     def test_path(self, regex):
-        """Test if the url's path passes test
+        """Test if the url's path passes test. Only the
+        path is used to perform the test
 
         >>> instance = URL('http://example.com/a')
         ... instance.test_path(r'\/a')
         ... True
         """
-        result = re.search(regex, self.raw_url)
-        if result:
+        path_search = re.search(regex, self.url_object.path)
+        if path_search:
             return True
         return False
 
@@ -164,7 +181,7 @@ class URL:
             return False
         return list(drop_while(clean_values, result))
 
-    def paginate(self, regex_path=None, param=None):
+    def paginate(self, k=10, regex_path=None, param=None):
         """Increase the pagination number provided
         on a given url"""
         if regex_path is None and param is None:
@@ -174,9 +191,8 @@ class URL:
         return 1
 
 
-class TestUrl:
-    """Test two different urls by checking path
-    similarity
+class CompareUrls:
+    """Check the similarity between two different urls
 
     >>> TestUrl('https://example.com', 'http://example.com/')
     ... True
@@ -200,7 +216,19 @@ class TestUrl:
         return self.test_result
 
 
-class URLPassesTest:
+class BaseURLTestsMixin:
+    blacklist = []
+
+    def __call__(self, url):
+        pass
+
+    def convert_url(self, url):
+        if isinstance(url, URL):
+            return url
+        return URL(url)
+
+
+class URLPassesTest(BaseURLTestsMixin):
     """Checks if an url is able to pass
     a given test
 
@@ -215,17 +243,17 @@ class URLPassesTest:
             ]
     """
 
-    def __init__(self, name, *, paths=[], ignore_files=[]):
+    def __init__(self, name, *, paths=[], ignore_files=[], reverse=False):
         self.name = name
         self.paths = set(paths)
         self.failed_paths = []
         self.ignore_files = ignore_files
+        self.reverve = reverse
 
     def __call__(self, url):
         result = []
 
-        if isinstance(url, str):
-            url = URL(url)
+        url = self.convert_url(url)
 
         for path in self.paths:
             if path in url.url_object.path:
@@ -250,25 +278,31 @@ class URLPassesTest:
         return list(drop_while(lambda x: x == '', sorted_values))
 
 
-class UrlPassesRegexTest:
+class URLPassesRegexTest(BaseURLTestsMixin):
     """Checks if an url is able to pass a
     a given test
 
     >>> class Spider(BaseCrawler):
             url_passes_tests = [
-                UrlPassesRegexTest(
+                URLPassesRegexTest(
                     'simple_test',
                     regex=r'\/a$'
                 )
             ]
     """
 
-    def __init__(self, name, *, regex=None):
+    def __init__(self, name, *, regex=None, reverse_test=False):
         self.name = name
         self.regex = re.compile(regex)
+        # Reverse test means that if the url
+        # succeeds the test, it should be kept
+        # as opposed to being excluded (defaul
+        # behaviour)
+        self.reverse_test = reverse_test
 
     def __call__(self, url):
-        if self.regex.search(url):
+        result = self.regex.search(url)
+        if result:
             return True
         logger.warning(f"{url} failed test: '{self.name}'")
         return False
@@ -470,39 +504,45 @@ class URLGenerator:
         return len(self.urls)
 
 
-class URLsLoader:
-    """Loads a set of urls from a file"""
+# class URLsLoader:
+#     """
+#     Loads a set of urls from a file
     
-    def __init__(self):
-        self.data = {}
-        self._urls_to_visit = []
-        self._visited_urls = []
+#     >>> class Spider:
+#     ...     class Meta:
+#     ...         start_urls = URLsLoader()
+#     """
 
-    def __repr__(self) -> str:
-        statistics = f'urls_to_visit={len(self._urls_to_visit)} '
-        f'visited_urls={len(self._visited_urls)}'
-        return f'<URLCache: {statistics}>'
+#     def __init__(self):
+#         self.data = {}
+#         self._urls_to_visit = []
+#         self._visited_urls = []
 
-    @property
-    def urls_to_visit(self):
-        return set(self._urls_to_visit)
+#     def __repr__(self) -> str:
+#         statistics = f'urls_to_visit={len(self._urls_to_visit)} '
+#         f'visited_urls={len(self._visited_urls)}'
+#         return f'<URLCache: {statistics}>'
 
-    @property
-    def visited_urls(self):
-        return set(self._visited_urls)
+#     @property
+#     def urls_to_visit(self):
+#         return set(self._urls_to_visit)
 
-    def load_from_file(self):
-        from kryptone.utils.file_readers import read_json_document
+#     @property
+#     def visited_urls(self):
+#         return set(self._visited_urls)
 
-        data = read_json_document('cache.json')
-        self._urls_to_visit = data['urls_to_visit']
-        self._visited_urls = data['visited_urls']
-        logger.info(f'Loaded {len(self._urls_to_visit)} urls')
-        self.data = data
+#     def load_from_file(self):
+#         from kryptone.utils.file_readers import read_json_document
 
-    def load_from_dict(self, data):
-        if not isinstance(data, dict):
-            raise ValueError('Data should be a dictionnary')
-        self._urls_to_visit = data['urls_to_visit']
-        self._visited_urls = data['visited_urls']
-        self.data = data
+#         data = read_json_document('cache.json')
+#         self._urls_to_visit = data['urls_to_visit']
+#         self._visited_urls = data['visited_urls']
+#         logger.info(f'Loaded {len(self._urls_to_visit)} urls')
+#         self.data = data
+
+#     def load_from_dict(self, data):
+#         if not isinstance(data, dict):
+#             raise ValueError('Data should be a dictionnary')
+#         self._urls_to_visit = data['urls_to_visit']
+#         self._visited_urls = data['visited_urls']
+#         self.data = data

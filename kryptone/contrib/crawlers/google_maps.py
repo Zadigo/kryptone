@@ -1,7 +1,6 @@
 import csv
 import json
 import time
-import unicodedata
 from urllib.parse import quote_plus, urljoin
 
 from selenium.webdriver.common.by import By
@@ -9,9 +8,11 @@ from selenium.webdriver.common.by import By
 from kryptone import logger
 from kryptone.base import SiteCrawler
 from kryptone.contrib.models import GoogleBusiness
+from kryptone.core.js.scripts import google_comments
 from kryptone.utils.file_readers import write_csv_document, write_json_document
+from kryptone.utils.functions import create_filename
 from kryptone.utils.iterators import drop_null
-from kryptone.utils.text import clean_text, create_filename
+from kryptone.utils.text import clean_dictionnary, clean_text
 
 
 def generate_search_url(search):
@@ -27,7 +28,7 @@ class GoogleMapsMixin:
 
     class Meta:
         crawl = False
-    
+
     @staticmethod
     def transform_to_json(items):
         return list(map(lambda x: x.as_json(), items))
@@ -58,16 +59,43 @@ class GoogleMapsMixin:
                     writer.writerow(row)
 
     def apply_sort_to_comments(self):
-        script = """
-        const sortButton = document.querySelector('button[aria-label*="Sort reviews"][data-value^="Sort"]')
-        const menu = document.querySelector('div[id="action-menu"][role="menu"]').querySelectorAll('div[role="menuitemradio"]')
-        const newestRadio = menu[0]
-
-        sortButton && sortButton.click()
-        newestRadio && newestRadio.click()
+        open_menu = """
+        try {
+            function sortComments() {
+                let sortButton = (
+                    document.querySelector('button[aria-label*="Sort reviews"][data-value^="Sort"]') ||
+                    document.querySelector('button[aria-label*="Trier les avis"][data-value^="Trier"]')
+                )
+                sortButton && sortButton.click()
+            }
+            sortComments()
+        } catch (e) {
+            console.error(e)
+        }
         """
-        self.driver.execute_script(script)
-        time.sleep(5)
+
+        click_radio = """
+        try {
+            function clickRadio () {
+                let menu = document.querySelector('div[id="action-menu"][role="menu"]')
+                let menuOption = menu && menu.querySelectorAll('div[role="menuitemradio"]')
+
+                let newestRadio = menuOption[1]
+                newestRadio && newestRadio.click()
+            }
+            clickRadio()
+        } catch (e) {
+            console.error(e)
+        }
+        """
+        try:
+            self.driver.execute_script(open_menu)
+            time.sleep(2)
+            self.driver.execute_script(click_radio)
+        except:
+            logger.error('Could not sort comments')
+        else:
+            time.sleep(3)
 
 
 class GoogleMaps(GoogleMapsMixin, SiteCrawler):
@@ -78,7 +106,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
     def create_dump(self):
         write_json_document(
-            'dump.json', 
+            'dump.json',
             self.transform_to_json(self.final_result)
         )
 
@@ -106,19 +134,19 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
         results_is_scrollable = True
 
         scroll_script = """
-            const element = document.evaluate("{results_xpath}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-            const elementToScroll = element.singleNodeValue
+        const element = document.evaluate("{results_xpath}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
+        const elementToScroll = element.singleNodeValue
 
-            const elementHeight = elementToScroll.scrollHeight
-            let currentPosition = elementToScroll.scrollTop
+        const elementHeight = elementToScroll.scrollHeight
+        let currentPosition = elementToScroll.scrollTop
 
-            // Indicates the scrolling speed
-            const scrollStep = Math.ceil(elementHeight / 20)
+        // Indicates the scrolling speed
+        const scrollStep = Math.ceil(elementHeight / 20)
 
-            currentPosition += scrollStep
-            elementToScroll.scroll(0, currentPosition)
+        currentPosition += scrollStep
+        elementToScroll.scroll(0, currentPosition)
 
-            return [ currentPosition, elementHeight ]
+        return [ currentPosition, elementHeight ]
         """
 
         saved_position = None
@@ -145,6 +173,9 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             time.sleep(2)
 
         businesses = []
+
+        # Alternate xpath to select feed results: '//div[contains(@class, "TFQHme ")]//preceding-sibling::div[not(@class)]'
+
         # 1. Get the results feed
         feed = self.driver.find_element(By.CSS_SELECTOR, 'div[role="feed"]')
         # Remove all the DIVs that do not actually have a class
@@ -171,13 +202,15 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
             except:
-                logger.info('Business information not found')
+                logger.info('Business information not found or not existant')
             else:
                 rows.append([name, url])
-        write_csv_document('business_urls_save.csv', rows)
+        
+        filename = create_filename()
+        write_csv_document(f'buisiness_places_{filename}.csv', rows)
 
         # For each item, we need to click on the card in
-        # order to get the pieces of information for the business
+        # order to get the pieces of informationwe need
         items_copy = items.copy()
         comments_saved_position = None
         counter = 1
@@ -244,7 +277,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 )
             except Exception as e:
                 counter = counter + 1
-                logger.critical(f'Could not parse business information: {url}')
+                logger.critical(f'Could not parse business information from brute force: {url}')
                 continue
             else:
                 clean_information = set(list(drop_null(information)))
@@ -261,7 +294,10 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                     continue
                 time.sleep(2)
 
-                # Scroll the comment section by using
+                if self.sort_comments:
+                    self.apply_sort_to_comments()
+
+                # Gets the side panel and scrolls the comment section by using
                 # the exact same above process
                 comments_is_scrollable = True
                 comments_scroll_script = """
@@ -306,70 +342,9 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 # raise a small pause here
                 time.sleep(2)
 
-                retrieve_comments_script = """
-                const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
-                
-                return Array.from(commentsWrapper).map((item) => {
-                    let dataReviewId = item.dataset['reviewId']
-
-                    let text = ''
-                    let period = null
-                    let rating = null
-                    const textSection = item.querySelector("*[class='MyEned']")
-
-                    try {
-                        // Sometimes there is a read more button
-                        // that we have to click
-                        
-                        moreButton = (
-                            // Try the "Voir plus" button"
-                            item.querySelector('button[aria-label="Voir plus"]') ||
-                            // Try the "See more" button"
-                            item.querySelector('button[aria-label="See more"]') ||
-                            // On last resort try "aria-expanded"
-                            item.querySelector('button[aria-expanded="false"]')
-                        )
-                        moreButton.click()
-                    } catch (e) {
-                        console.log('No additional data for', dataReviewId)
-                    }
-                    
-                    try {
-                        // Or, item.querySelector('.rsqaWe').innerText
-                        period = item.querySelector('.DU9Pgb').innerText
-                    } catch (e) {
-                        // pass
-                    }
-
-                    try {
-                        rating = item.querySelector('span[role="img"]').ariaLabel
-                    } catch (e) {
-                        // pass
-                    }
-
-                    try {
-                        text = textSection.innerText
-                    } catch (e) {
-                        // pass
-                    }
-
-                    try {
-                        reviewerName = item.querySelector('class*="d4r55"').innerText
-                        reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
-                    } catch (e) {
-                        // pass
-                    }
-
-                    return {
-                        text: text,
-                        rating: rating,
-                        period: period
-                    }
-                })
-                """
                 clean_comments = []
                 try:
-                    comments = self.driver.execute_script(retrieve_comments_script)
+                    comments = self.driver.execute_script(google_comments.content)
                 except Exception as e:
                     comments = ''
                     logger.error(f'Comments not found for {name}: {e.args}')
@@ -378,12 +353,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                     for comment in comments:
                         if not isinstance(comment, dict):
                             continue
-
-                        clean_dict = {}
-                        for key, value in comment.items():
-                            cleaned_text = clean_text(value)
-                            clean_dict[key] = cleaned_text
-                        clean_comments.append(clean_dict)
+                        clean_comments.append(clean_dictionnary(comment))
+                        
                     business_information.comments = clean_comments
                     logger.info(f'Found {len(clean_comments)} reviews')
 
@@ -403,6 +374,9 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                     logic = [
                         'Commander' in text,
                         'ubereats.com' in text,
+                        'Envoyer vers votre téléphone' in text,
+                        'Suggérer de nouveaux horaires' in text,
+                        'Ouvert' in text or 'Ferme' in text,
                         text.startswith('lundi'),
                         text.startswith('mardi'),
                         text.startswith('mercredi'),
@@ -422,9 +396,15 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 
             business_information.name = name
             business_information.url = url
-            business_information.address = clean_information_list(
+            business_information.additional_information = clean_information_list(
                 list(clean_information)
             )
+
+            try:
+                business_information.address = business_information.additional_information[1]
+            except:
+                pass
+
             business_information.rating = rating
             business_information.number_of_reviews = number_of_reviews
             businesses.append(business_information)
@@ -435,7 +415,6 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             time.sleep(2)
 
         data = list(map(lambda x: x.as_json(), businesses))
-        filename = create_filename()
         write_json_document(filename, data)
         logger.info(f'File created: {filename}')
 

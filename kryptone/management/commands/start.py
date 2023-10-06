@@ -2,6 +2,7 @@ import multiprocessing
 
 import kryptone
 from kryptone.checks.core import checks_registry
+from kryptone.core.process import BaseProcess
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 
@@ -47,26 +48,11 @@ class Command(ProjectCommand):
 
         if namespace.name is not None:
             spider_config = registry.get_spider(namespace.name)
+
+            # Starts the Twisted server
+            # process = BaseProcess()
+            # process.start(spider_config=spider_config)
+            
             spider_config.run(**params)
-            # process = multiprocessing.Process(
-            #     target=spider_config.run,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()
         else:
             registry.run_all_spiders(**params)
-            # process = multiprocessing.Process(
-            #     target=registry.run_all_spiders,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()

@@ -3,59 +3,10 @@ import pathlib
 import re
 from dataclasses import field
 from functools import cached_property
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
-import pandas
-
-from kryptone.utils.text import remove_accents, remove_punctuation
-
-
-class BaseModel:
-    """Base class for all models"""
-    def __getitem__(self, key):
-        return getattr(self, key)
-    
-    @cached_property
-    def fields(self):
-        """Get the fields present on the model"""
-        fields = dataclasses.fields(self)
-        return list(map(lambda x: x.name, fields))
-
-    @cached_property
-    def url_object(self):
-        result = unquote(getattr(self, 'url', ''))
-        return urlparse(str(result))
-
-    @cached_property
-    def get_url_object(self):
-        return urlparse(str(self.url))
-
-    @cached_property
-    def url_stem(self):
-        return pathlib.Path(str(self.url)).stem
-
-    
-    def as_dataframe(self, sort_by=None):
-        df = pandas.read_json(self.as_json())
-        if sort_by is not None:
-            df = df.sort_values(sort_by)
-        df = df.drop_duplicates()
-        return df
-
-    def as_json(self):
-        """Return the object as dictionnary"""
-        item = {}
-        for field in self.fields:
-            item[field] = getattr(self, field)
-        return item
-
-    def as_csv(self):
-        def convert_values(field):
-            value = getattr(self, field)
-            if isinstance(value, (list, tuple)):
-                return ' / '.join(value)
-            return value
-        return list(map(convert_values, self.fields))
+from kryptone.db.models import BaseModel
+from kryptone.utils.text import clean_text, remove_accents, remove_punctuation
 
 
 @dataclasses.dataclass
@@ -67,11 +18,14 @@ class Product(BaseModel):
     description: str
     price: int
     url: str
+    material: str = None
+    old_price: int = None
+    breadcrumb: str = None
     collection_id: str = None
     number_of_colors: int = 1
     id_or_reference: str = None
     id: int = None
-    images: str = dataclasses.field(default_factory=[])
+    images: list = dataclasses.field(default_factory=list)
     composition: str = None
     color: str = None
 
@@ -89,6 +43,7 @@ class Product(BaseModel):
     def number_of_images(self):
         return len(self.images)
 
+    # TODO: Deprecate in favor of directory_from_url
     def build_directory_from_url(self, exclude=[]):
         """Build the logical local directory in the local project
         using the natural structure of the product url
@@ -101,7 +56,7 @@ class Product(BaseModel):
 
         def clean_token(token):
             result = token.replace('-', '_')
-            return remove_accents(remove_punctuation(result))
+            return remove_accents(remove_punctuation(result.lower()))
         tokens = list(map(clean_token, tokens))
 
         tokens.pop(-1)
@@ -122,6 +77,13 @@ class Product(BaseModel):
             self.collection_id = group_dict.get(
                 'collection_id', result.group(1))
 
+    def complex_name(self):
+        name = clean_text(self.name.lower())
+        name = name.replace(' ', '_')
+        if self.id_or_reference is not None:
+            return f'{name}_{self.id_or_reference}'
+        return name
+
 
 @dataclasses.dataclass
 class GoogleBusiness(BaseModel):
@@ -133,6 +95,7 @@ class GoogleBusiness(BaseModel):
     latitude: int = None
     longitude: int = None
     number_of_reviews: int = None
+    additional_information: list = field(default_factory=list)
     comments: str = field(default_factory=list)
 
     def as_csv(self):
@@ -147,8 +110,11 @@ class GoogleBusiness(BaseModel):
         header = [*self.fields, 'comment_period', 'comment_text']
         return rows.insert(0, header)
 
-    def get_gps_coordinates_from_url(self, substitute_url=None):        
-        result = re.search(r'\@(\d+\.?\d+)\,?(\d+\.?\d+)', substitute_url or self.feed_url)
+    def get_gps_coordinates_from_url(self, substitute_url=None):
+        result = re.search(
+            r'\@(\d+\.?\d+)\,?(\d+\.?\d+)',
+            substitute_url or self.feed_url
+        )
         if result:
             self.latitude = result.group(1)
             self.longitude = result.group(2)

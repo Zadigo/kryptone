@@ -165,3 +165,4 @@ const scrollDocument = function () {
     document.documentElement.scroll(0, currentPosition)
     return [documentHeight, currentPosition]
 }
+

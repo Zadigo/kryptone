@@ -1,8 +1,9 @@
 import itertools
 import csv
 import json
-from functools import lru_cache, wraps
+from functools import cached_property, lru_cache, wraps
 from io import FileIO
+import pathlib
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -107,3 +108,25 @@ def write_text_document(filename, data, encoding='utf-8'):
     path = get_media_folder(filename)
     with open(path, mode='w', encoding=encoding) as f:
         f.write(data)
+
+
+class LoadJS:
+    def __init__(self, filename):
+        self.filename = filename
+        self._project_path = settings.PROJECT_PATH
+        self.files = []
+        if self._project_path is not None:
+            self.files = list(self._project_path.joinpath('js').glob('**/*.js'))
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} "{self.filename}">'
+    
+    @cached_property
+    def content(self):
+        file = list(filter(lambda x: x.name == self.filename, self.files))
+        if file:
+            with open(file[-1], mode='r') as f:
+                data = f.read()
+                return data
+        logger.warning('No JS file named {self.filename} found in the project')
+        return ''

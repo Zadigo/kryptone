@@ -1,9 +1,9 @@
 import re
 import string
-import secrets
-import unidecode
 import unicodedata
-from kryptone.utils.iterators import drop_while
+from functools import cached_property
+
+import unidecode
 
 from kryptone.utils.iterators import drop_null
 
@@ -11,15 +11,6 @@ from kryptone.utils.iterators import drop_null
 PRICE = re.compile(r'(\d+\,?\d+)')
 
 PRICE_EURO = re.compile(r'\d+\€\d+')
-
-
-def random_string(n=10):
-    return secrets.token_hex(nbytes=n)
-
-
-def create_filename(extension='json'):
-    """Generates a new filename with an extension"""
-    return f'{random_string()}.{extension}'
 
 
 def parse_price(text):
@@ -50,48 +41,51 @@ def parse_price(text):
     return float(price)
 
 
-def clean_text(text):
+def clean_text(text, encoding='utf-8'):
     if not isinstance(text, str):
         return text
-    items = text.split('\n')
-    text = ' '.join(items)
 
+    text = text.replace('\n', '')
     text = unicodedata.normalize('NFKD', text)
-    items = drop_null(text.split(' '))
-    return ' '.join(items)
+    text = text.encode(encoding).decode()
+    return normalize_spaces(text)
 
 
 class Text:
     """Represents a text string"""
 
-    def __init__(self, text):
-        text = self.simple_clean(text)
-        self.tokens = list(drop_null(text.split(' ')))
-        self.text = ' '.join(self.tokens)
+    def __init__(self, text, punctation=False, accents=False):
+        self.raw_text = text
+        self.tokens = []
+        self.punctation = punctation
+        self.accents = accents
+        self.encoding = 'utf-8'
 
     def __str__(self):
-        return self.text
+        cleaned_text = clean_text(self.raw_text, encoding=self.encoding)
+        cleaned_text = cleaned_text.lower()
+
+        if self.punctation:
+            text = remove_punctuation(cleaned_text)
+
+        if self.accents:
+            text = remove_accents(cleaned_text)
+
+        return cleaned_text
 
     def __add__(self, obj):
-        return ' '.join([self.text, str(obj)])
+        return ' '.join([self.__str__(), str(obj)])
 
     def __len__(self):
-        return len(self.text)
+        return len(self.__str__())
 
     def __iter__(self):
         for token in self.tokens:
             yield token
 
-    @staticmethod
-    def simple_clean(text, encoding='utf-8'):
-        """Applies simple cleaning techniques on the
-        text by removing newlines, lowering the characters
-        and removing extra spaces"""
-        clean_text = re.sub('\W', ' ', text)
-        lowered_text = str(clean_text).lower().strip()
-        text = lowered_text.encode(encoding).decode(encoding)
-        normalized_text = text.replace('\n', ' ')
-        return normalized_text.strip()
+    @cached_property
+    def tokens(self):
+        return self.__str__().split(' ')
 
 
 def remove_punctuation(text, email_exception=False):
@@ -105,5 +99,30 @@ def remove_punctuation(text, email_exception=False):
 
 
 def remove_accents(text):
-    """Remove accents from the text"""
+    """Remove accents from a given text"""
     return unidecode.unidecode(text)
+
+
+def clean_dictionnary(item, accents=False, punctation=False):
+    """Cleans each text values of a dictionnary"""
+    new_item = {}
+    for key, value in item.items():
+        if isinstance(value, str):
+            if accents:
+                value = remove_accents(accents)
+
+            if punctation:
+                value = remove_punctuation(value)
+            new_item[key] = clean_text(value)
+        else:
+            new_item[key] = value
+    return new_item
+
+
+def normalize_spaces(text_or_tokens):
+    """Remove excess spaces from a given text"""
+    if isinstance(text_or_tokens, str):
+        tokens = text_or_tokens.split(' ')
+    else:
+        tokens = text_or_tokens
+    return ' '.join(drop_null(tokens))
