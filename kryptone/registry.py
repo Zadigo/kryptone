@@ -186,7 +186,7 @@ class MasterRegistry:
             spiders_module = import_module(f'{dotted_path}.{SPIDERS_MODULE}')
         except Exception as e:
             raise ExceptionGroup(
-                f"An error occured when trying to load '{self.project_name}'",
+                f"An error occured when trying to load the project '{self.project_name}'",
                 [
                     Exception(e),
                     ImportError(
@@ -209,7 +209,11 @@ class MasterRegistry:
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
 
+        invalid_names = ['SiteCrawler']
         for name in valid_spider_names:
+            if name in invalid_names:
+                continue
+            
             instance = SpiderConfig.create(
                 name,
                 spiders_module,
