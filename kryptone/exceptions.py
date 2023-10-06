@@ -5,8 +5,9 @@ class ProjectExistsError(Exception):
 
 
 class SpiderExecutionError(Exception):
-    def __init__(self, error):
-        super().__init__(error)
+    def __init__(self):
+        message = 'An error occured during the execution of the crawl'
+        super().__init__(message)
 
 
 class SpiderExistsError(Exception):
