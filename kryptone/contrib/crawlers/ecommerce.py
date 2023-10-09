@@ -105,8 +105,8 @@ class EcommerceCrawlerMixin:
         async def main():
             urls_to_use = product.images.copy()
 
-            if quantity is not None:
-                urls_to_use = [:quantity]
+            # if quantity is not None:
+            #     urls_to_use = [0:quantity]
             
             queue = asyncio.Queue()
 
