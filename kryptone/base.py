@@ -1,6 +1,7 @@
 import asyncio
 import bisect
 import datetime
+from functools import cached_property
 import os
 import random
 import time
@@ -32,13 +33,14 @@ from kryptone.utils.file_readers import (read_csv_document, read_json_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLGenerator
+from kryptone.utils.urls import URL, URLGenerator, pathlib, read_document
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router', 'crawl', 'start_urls'
+    'gather_emails', 'router', 'crawl', 'start_urls',
+    'ignore_queries', 'ignore_images'
 }
 
 
@@ -98,6 +100,9 @@ class CrawlerOptions:
         self.router = None
         self.crawl = True
         self.start_urls = []
+        # Ignore urls with query strings
+        self.ignore_queries = False
+        self.ignore_images = False
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -206,7 +211,7 @@ class BaseCrawler(metaclass=Crawler):
             None,
             None
         ))
-
+    
     def _backup_urls(self):
         """Backs up the urls both in memory
         cache and file cache"""
@@ -234,6 +239,13 @@ class BaseCrawler(metaclass=Crawler):
         #     data_type='urls',
         #     urls_data=urls_data
         # )
+
+    @cached_property
+    def default_image_extensions(self):
+        path = settings.GLOBAL_KRYPTONE_PATH / 'data/image_extensions.txt'
+        with open(path, mode='r', encoding='utf-8') as f:
+            text = f.read()
+            return text.split('\n')
 
     def urljoin(self, path):
         """Returns the domain of the current
@@ -371,6 +383,16 @@ class BaseCrawler(metaclass=Crawler):
                     None,
                     None
                 ))
+
+            if self._meta.ignore_queries:
+                if link_object.query != '':
+                    continue
+
+            if self._meta.ignore_images:
+                path = pathlib.Path(link)
+                if path != '':
+                    if path in self.default_image_extensions:
+                        continue
 
             self.urls_to_visit.add(link)
 
@@ -696,10 +718,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 # TODO: Check performance issues here
                 # where the url gathering and processing
                 # might be a little slow
-                s = time.time()
+                # s = time.time()
                 self.get_page_urls()
-                e = round(time.time() - s, 2)
-                print(f'Completed urls scrap in {e}s')
+                # e = round(time.time() - s, 2)
+                # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
             if self._meta.audit_page:
