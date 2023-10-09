@@ -228,9 +228,9 @@ class BaseURLTestsMixin:
         return URL(url)
 
 
-class URLPassesTest(BaseURLTestsMixin):
-    """Checks if an url is able to pass
-    a given test
+class URLIgnoreTest(BaseURLTestsMixin):
+    """Excludes any url that match the provided paths
+    in the `paths` parameter
 
     >>> class Spider(BaseCrawler):
             url_passes_tests = [
@@ -243,30 +243,32 @@ class URLPassesTest(BaseURLTestsMixin):
             ]
     """
 
-    def __init__(self, name, *, paths=[], ignore_files=[], reverse=False):
+    def __init__(self, name, *, paths=[], ignore_files=[]):
         self.name = name
         self.paths = set(paths)
         self.failed_paths = []
         self.ignore_files = ignore_files
-        self.reverve = reverse
 
     def __call__(self, url):
-        result = []
+        exclusion_truth_array = []
 
         url = self.convert_url(url)
-
+        
+        # Include all the urls that match
+        # the path to exclude as True and the
+        # others as False
         for path in self.paths:
             if path in url.url_object.path:
                 self.failed_paths.append(path)
-                result.append(True)
+                exclusion_truth_array.append(True)
             else:
-                result.append(False)
+                exclusion_truth_array.append(False)
 
             # if url.is_file and self.ignore_files:
             #     if url.get_extension in self.ignore_files:
             #         result.append(False)
 
-        if any(result):
+        if any(exclusion_truth_array):
             logger.warning(f"{url} failed test '{self.name}'")
             return False
         return True
@@ -278,7 +280,7 @@ class URLPassesTest(BaseURLTestsMixin):
         return list(drop_while(lambda x: x == '', sorted_values))
 
 
-class URLPassesRegexTest(BaseURLTestsMixin):
+class URLIgnoreRegexTest(BaseURLTestsMixin):
     """Checks if an url is able to pass a
     a given test
 
@@ -298,8 +300,43 @@ class URLPassesRegexTest(BaseURLTestsMixin):
     def __call__(self, url):
         result = self.regex.search(url)
         if result:
-            return True
+            return False
         logger.warning(f"{url} failed test: '{self.name}'")
+        return True
+
+
+class URLPassesRegexTest(BaseURLTestsMixin):
+    """Only include and keep urls that successfully pass
+    the provided regex test
+    """
+
+    def __init__(self, name, *, regex=None):
+        self.name = name
+        self.regex = re.compile(regex)
+
+    def __call__(self, url):
+        result = self.regex.search(url)
+        if result:
+            logger.warning(f"{url} succeeded test: '{self.name}'")
+            return True
+        return False
+
+
+class Some:
+    """Receive the results of all tests and
+    if any one of them returns `True`, consider
+    the url to be valid for visit"""
+    
+    def __init__(self, *tests):
+        self.tests = tests
+
+    def __call__(self, url):
+        test_result = []
+        for test in self.tests:
+            test_result.append(test)
+
+        if any(test_result):
+            return True
         return False
 
 
@@ -463,7 +500,8 @@ class URLIterator:
 class URLGenerator:
     """Generates a set of urls using a template
 
-    >>> generator = URLGenerator('http://example.com/$id')
+    >>> generator = URLGenerator('http://example.com/$id', params={'id': 'number'}, k=2)
+    ... ['http://example.com/1', 'http://example.com/2']
     """
 
     def __init__(self, template, params={}, k=10, start=0):
@@ -497,47 +535,3 @@ class URLGenerator:
 
     def __len__(self):
         return len(self.urls)
-
-
-# class URLsLoader:
-#     """
-#     Loads a set of urls from a file
-    
-#     >>> class Spider:
-#     ...     class Meta:
-#     ...         start_urls = URLsLoader()
-#     """
-
-#     def __init__(self):
-#         self.data = {}
-#         self._urls_to_visit = []
-#         self._visited_urls = []
-
-#     def __repr__(self) -> str:
-#         statistics = f'urls_to_visit={len(self._urls_to_visit)} '
-#         f'visited_urls={len(self._visited_urls)}'
-#         return f'<URLCache: {statistics}>'
-
-#     @property
-#     def urls_to_visit(self):
-#         return set(self._urls_to_visit)
-
-#     @property
-#     def visited_urls(self):
-#         return set(self._visited_urls)
-
-#     def load_from_file(self):
-#         from kryptone.utils.file_readers import read_json_document
-
-#         data = read_json_document('cache.json')
-#         self._urls_to_visit = data['urls_to_visit']
-#         self._visited_urls = data['visited_urls']
-#         logger.info(f'Loaded {len(self._urls_to_visit)} urls')
-#         self.data = data
-
-#     def load_from_dict(self, data):
-#         if not isinstance(data, dict):
-#             raise ValueError('Data should be a dictionnary')
-#         self._urls_to_visit = data['urls_to_visit']
-#         self._visited_urls = data['visited_urls']
-#         self.data = data

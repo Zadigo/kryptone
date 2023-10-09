@@ -251,7 +251,9 @@ class BaseCrawler(metaclass=Crawler):
 
     def run_filters(self):
         """Excludes urls in the list of urls to visit based
-        on the return value of the function in `url_passes_tests`
+        on the return value of the function in `url_filters`.
+        All conditions should be true for the url to be
+        considered to be visited.
         """
         if self._meta.url_passes_tests:
             results = defaultdict(list)
@@ -265,7 +267,10 @@ class BaseCrawler(metaclass=Crawler):
                 if not all(truth_array):
                     continue
                 filtered_urls.append(url)
-            message = f"Url filter completed"
+            message = (
+                f"Url filter completed. {len(filtered_urls)} "
+                "successfully passed the tests"
+            )
             logger.info(message)
             return filtered_urls
         # Ensure that we return the original

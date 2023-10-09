@@ -1,6 +1,20 @@
 import unittest
 
-from kryptone.utils.urls import URL, CompareUrls, URLPassesTest, UrlPassesRegexTest
+from kryptone.utils.urls import (URL, CompareUrls, URLIgnoreRegexTest,
+                                 URLIgnoreTest, URLPassesRegexTest, URLGenerator, Some)
+
+
+IGNORE_URLS = [
+    '/Customer/Wishlist',
+    '/fr-ma/corporate/contact-us',
+    'new-member'
+]
+
+
+URLS = [
+    'https://www.defacto.com/fr-ma/statik/new-member',
+    'https://www.defacto.com/fr-ma/Customer/Wishlist'
+]
 
 
 class TestUrl(unittest.TestCase):
@@ -79,45 +93,69 @@ class TestUrl(unittest.TestCase):
         url = 'http://example/[1]'
 
 
-# class TestUrlTesting(unittest.TestCase):
-#     def test_result(self):
-#         self.assertTrue(TestUrl('http://example.com', 'http://example.com/'))
-#         self.assertFalse(
-#             TestUrl('http://example.com/1', 'http://example.com/'))
-
-#         url1 = 'https://www.defacto.com/fr-ma'
-#         url2 = 'https://www.defacto.com/fr-ma/fall-in-love-oversize-fit-kisa-kollu-takim-2808204'
-#         self.assertFalse(TestUrl(url1, url2))
-
-
-IGNORE_URLS = [
-    '/Customer/Wishlist',
-    '/fr-ma/corporate/contact-us',
-    'new-member'
-]
-
-URLS = [
-    'https://www.defacto.com/fr-ma/statik/new-member',
-    'https://www.defacto.com/fr-ma/Customer/Wishlist'
-]
-
-
-class TestUrlPassesTest(unittest.TestCase):
+class TestUrlIgnoreTest(unittest.TestCase):
     def test_result(self):
-        instance = URLPassesTest('base_pages', paths=IGNORE_URLS)
+        instance = URLIgnoreTest('base_pages', paths=IGNORE_URLS)
 
         for url in URLS:
             with self.subTest(url=url):
                 self.assertFalse(instance(url))
 
+    def test_regex_result(self):
+        instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
+        self.assertFalse(instance(URLS[0]))
+
     def test_multiple_results(self):
         instances = [
-            URLPassesTest('base_pages', paths=IGNORE_URLS),
-            UrlPassesRegexTest('other_pages', regex=r'\/static\/')
+            URLIgnoreTest('base_pages', paths=IGNORE_URLS),
+            URLIgnoreRegexTest('other_pages', regex=r'\/static\/')
         ]
         for url in URLS:
             with self.subTest(url=url):
                 pass
+
+
+class TestUrlPassesTest(unittest.TestCase):
+    def test_result(self):
+        instance = URLPassesRegexTest('statik_page', regex=r'\/statik')
+
+        self.assertTrue(instance(URLS[0]))
+        self.assertFalse(instance(URLS[1]))
+
+
+class TestSome(unittest.TestCase):
+    def test_result(self):
+        instance = Some(
+            URLIgnoreTest('pages1', paths=['statik'])
+        )
+
+    def test_combination(self):
+        instances = [
+            Some(
+                URLIgnoreTest('pages1', paths=['statik']),
+                URLPassesRegexTest('pages2', regex='\/Customer')
+            )
+        ]
+        results = [
+            instance('https://www.defacto.com/fr-ma/statik/new-member') 
+            for instance in instances
+        ]
+
+
+class TestUrlGenerator(unittest.TestCase):
+    def test_generation(self):
+        instance = URLGenerator(
+            'https://www.defacto.com/fr-ma/ma-all-products?page=$page',
+            params={'page': 1},
+            k=169
+        )
+        print(list(instance))
+
+
+class TestCompareUrls(unittest.TestCase):
+    def test_result(self):
+        instance = CompareUrls('http://example.com/1', 'http://example.com/2')
+        self.assertFalse(instance)
 
 
 if __name__ == '__main__':
