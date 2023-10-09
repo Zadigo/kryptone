@@ -161,6 +161,7 @@ class Crawler(type):
 class BaseCrawler(metaclass=Crawler):
     urls_to_visit = set()
     visited_urls = set()
+    visited_pages_count = 0
     list_of_seen_urls = set()
     browser_name = None
     debug_mode = False
@@ -250,7 +251,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def run_filters(self):
         """Excludes urls in the list of urls to visit based
-        on the return value of the function in `url_filters`
+        on the return value of the function in `url_passes_tests`
         """
         if self._meta.url_passes_tests:
             results = defaultdict(list)
@@ -301,11 +302,17 @@ class BaseCrawler(metaclass=Crawler):
     def get_page_urls(self):
         """Returns all the urls present on the
         actual given page"""
-        elements = self.get_page_link_elements
-        logger.info(f"Found {len(elements)} urls")
+        links = self.driver.execute_script(
+        """
+        const urls = Array.from(document.querySelectorAll('a'))
+        return urls.map(x => x.href)
+        """
+        )
+        # elements = self.get_page_link_elements
+        logger.info(f"Found {len(links)} urls")
 
-        for element in elements:
-            link = element.get_attribute('href')
+        for link in links:
+            # link = element.get_attribute('href')
 
             # Turn the url into a Python object
             # to make it more usable for us
@@ -469,7 +476,8 @@ class BaseCrawler(metaclass=Crawler):
             count_urls_to_visit=len(self.urls_to_visit),
             count_visited_urls=len(self.visited_urls),
             total_urls=total_urls,
-            completion_percentage=percentage
+            completion_percentage=percentage,
+            visited_pages_count=self.visited_pages_count
         )
 
     def get_current_date(self):
@@ -503,6 +511,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self._start_time = time.time()
         self._end_time = None
+
         self.performance_audit = namedtuple(
             'Performance',
             ['days', 'duration']
@@ -510,7 +519,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self.urls_audit = namedtuple(
             'URLsAudit',
             ['count_urls_to_visit', 'count_visited_urls',
-             'completion_percentage', 'total_urls']
+             'completion_percentage', 'total_urls',
+             'visited_pages_count']
         )
 
         self.statistics = {}
@@ -536,9 +546,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
-        self.list_of_seen_urls = set(
-            read_csv_document('seen_urls.csv', flatten=True)
-        )
+
+        previous_seen_urls = read_csv_document('seen_urls.csv', flatten=True)
+        self.list_of_seen_urls = set(previous_seen_urls)
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -604,9 +614,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             logger.info('Starting Kryptone...')
 
         start_urls = start_urls or self._meta.start_urls
-        # if isinstance(start_urls, URLsLoader):
-        #     self.urls_to_visit = start_urls.urls_to_visit
-        #     self.visited_urls = start_urls.visited_urls
 
         # If we have absolutely no start url and at the
         # same time we have no start urls to start from
@@ -662,6 +669,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             logger.info(f'Going to url: {current_url}')
             self.driver.get(current_url)
+            self.visited_pages_count = self.visited_pages_count + 1
 
             # Always wait for the body section of
             # the page to be located  or visible
@@ -679,11 +687,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             self.visited_urls.add(current_url)
 
-            # TODO: Check performance issues here
-            # where the url gathering and processing
-            # might be a little slow
             if self._meta.crawl:
+                # TODO: Check performance issues here
+                # where the url gathering and processing
+                # might be a little slow
+                s = time.time()
                 self.get_page_urls()
+                e = round(time.time() - s, 2)
+                print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
             if self._meta.audit_page:
@@ -707,11 +718,11 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
                 # cache.set_value('page_audit', self.page_audits)
                 # cache.set_value('global_audit', vocabulary)
-                db_signal.send(
-                    self,
-                    page_audit=self.page_audits,
-                    global_audit=vocabulary
-                )
+                # db_signal.send(
+                #     self,
+                #     page_audit=self.page_audits,
+                #     global_audit=vocabulary
+                # )
 
                 logger.info('Audit complete...')
 
@@ -724,10 +735,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 # with the way that the csv writer outputs the rows
                 emails = list(map(lambda x: [x], self.emails_container))
                 write_csv_document('emails.csv', emails)
-                db_signal.send(
-                    self,
-                    emails=self.emails_container
-                )
+                # db_signal.send(
+                #     self,
+                #     emails=self.emails_container
+                # )
 
             # Run custom user actions once
             # everything is completed
@@ -735,11 +746,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             try:
                 self.run_actions(url_instance)
             except TypeError:
-                raise TypeError("run_actions should accept arguments")
-            except Exception:
+                raise TypeError(
+                    "'self.run_actions' should be able to accept arguments")
+            except Exception as e:
                 raise ExceptionGroup(
-                    "An exception occured within 'run_actions'",
+                    "An exception occured while trygin "
+                    "to execute 'self.run_actions'",
                     [
+                        Exception(e),
                         exceptions.SpiderExecutionError()
                     ]
                 )

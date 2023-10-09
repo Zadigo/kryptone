@@ -1,4 +1,5 @@
 
+import sqlite3
 from venv import logger
 
 import airtable
@@ -154,3 +155,89 @@ class GoogleSheets(BaseConnection):
             self.service = build('sheets', 'v4', credentials=self.credentials)
         except HttpError as e:
             logger.error(e.args)
+
+
+class SQL:
+    SELECT = 'select {fields} from {table} where {params}'
+    CREATE_TABLE = 'create table if not exists {table} ({params})'
+
+    def finalize_sql(self, sql):
+        if sql.endswith(';'):
+            return sql
+        return f'{sql};'
+
+
+class SQliteBackend(SQL):
+    def __init__(self, database=None):
+        self.database = database or ':memory:'
+        self.connection = sqlite3.connect(self.database)
+
+    def __getitem__(self, key):
+        sql = self.finalize_sql(
+            self.SELECT.format(fields=key, table=self.name, params='key=?')
+        )
+        print(sql)
+        result = self.connection.execute(sql)
+        if not result:
+            raise KeyError()
+        return result
+
+    def __setitem__(self, key):
+        pass
+
+    def __delitem__(self, key):
+        pass
+
+    def __len__(self):
+        pass
+
+    def __iter__(self):
+        pass
+
+    def __enter__(self, *args, **kwargs):
+        pass
+
+    def __exit__(self):
+        pass
+
+    def __del__(self):
+        pass
+
+    def keys(self):
+        pass
+
+    def values(self):
+        pass
+
+    def items(self):
+        pass
+
+    def update(self, column, value):
+        pass
+
+    def bulk_update(self, columns, values):
+        pass
+
+    def filter(self, *args, **kwargs):
+        pass
+
+    def create(self, **kwargs):
+        pass
+
+
+class Table(SQliteBackend):
+    def __init__(self, name, *, fields=[]):
+        super().__init__()
+        self.fields = fields
+        self.name = name
+        self.connection.execute(self.create_table_sql())
+        self.connection.commit()
+
+    def create_table_sql(self):
+        sql = self.CREATE_TABLE.format(
+            table=self.name, params='key integer primary key, value blob')
+        return self.finalize_sql(sql)
+
+
+# c = Table('seen_urls', fields=[('url', ('integer', 'primary key')), ])
+# print(c['url'])

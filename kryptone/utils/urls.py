@@ -291,14 +291,9 @@ class URLPassesRegexTest(BaseURLTestsMixin):
             ]
     """
 
-    def __init__(self, name, *, regex=None, reverse_test=False):
+    def __init__(self, name, *, regex=None):
         self.name = name
         self.regex = re.compile(regex)
-        # Reverse test means that if the url
-        # succeeds the test, it should be kept
-        # as opposed to being excluded (defaul
-        # behaviour)
-        self.reverse_test = reverse_test
 
     def __call__(self, url):
         result = self.regex.search(url)

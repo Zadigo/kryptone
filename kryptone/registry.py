@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import inspect
 import os
+import sys
 import threading
 from collections import OrderedDict
 from functools import lru_cache
@@ -96,14 +97,10 @@ class SpiderConfig:
             spider_instance.start(**kwargs)
         except KeyboardInterrupt:
             spider_instance.create_dump()
+            sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
-            raise ExceptionGroup(
-                'Some exceptions occurred while trying to start your spider',
-                [
-                    SpiderExecutionError(e)
-                ]
-            )
+            raise Exception(e)
 
 
 class MasterRegistry:
@@ -213,7 +210,7 @@ class MasterRegistry:
         for name in valid_spider_names:
             if name in invalid_names:
                 continue
-            
+
             instance = SpiderConfig.create(
                 name,
                 spiders_module,
