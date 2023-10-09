@@ -159,6 +159,7 @@ class GoogleSheets(BaseConnection):
 
 class SQL:
     SELECT = 'select {fields} from {table} where {params}'
+    WHERE_CLAUSE = 'where {params}'
     CREATE_TABLE = 'create table if not exists {table} ({params})'
 
     def finalize_sql(self, sql):
