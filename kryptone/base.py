@@ -28,10 +28,11 @@ from kryptone.db import backends
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import (read_csv_document, read_json_document,
+from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
+                                         read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
+from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, URLGenerator, pathlib, read_document
 from kryptone.webhooks import Webhooks
@@ -652,6 +653,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
+            if isinstance(start_urls, (LoadStartUrls)):
+                start_urls = list(start_urls)
             self.start_url = start_urls.pop()
 
         # If we have no urls to visit in
