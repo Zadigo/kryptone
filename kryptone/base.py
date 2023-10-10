@@ -705,10 +705,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.driver.get(current_url)
             self.visited_pages_count = self.visited_pages_count + 1
 
-            # Always wait for the body section of
-            # the page to be located  or visible
-            wait = WebDriverWait(self.driver, 8)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            try:
+                # Always wait for the body section of
+                # the page to be located  or visible
+                wait = WebDriverWait(self.driver, 8)
+                wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            except:
+                logger.error('Body of page not detected')
+
             self.post_visit_actions(current_url=current_url)
 
             # Post navigation signal
@@ -779,10 +783,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             url_instance = URL(current_url)
             try:
                 self.run_actions(url_instance)
-            except TypeError:
+            except TypeError :
                 raise TypeError(
-                    "'self.run_actions' should be able to accept arguments")
+                    "'self.run_actions' should be able to accept arguments"
+                )
             except Exception as e:
+                logger.error(e)
                 raise ExceptionGroup(
                     "An exception occured while trygin "
                     "to execute 'self.run_actions'",
