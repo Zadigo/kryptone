@@ -497,8 +497,8 @@ class BaseCrawler(metaclass=Crawler):
         for the current crawl session"""
         total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
         result = len(self.visited_urls) / total_urls
-        percentage = round(result, 5)
-        logger.info(f'{percentage * 100}% of total urls visited')
+        percentage = round(result * 100, 3)
+        logger.info(f'{percentage}% of total urls visited')
         return self.urls_audit(
             count_urls_to_visit=len(self.urls_to_visit),
             count_visited_urls=len(self.visited_urls),
