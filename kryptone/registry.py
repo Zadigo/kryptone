@@ -1,18 +1,13 @@
-import asyncio
 import datetime
 import inspect
 import os
 import sys
-import threading
 from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
 
-from kryptone import logger
-from kryptone.conf import settings
-from kryptone.exceptions import SpiderExecutionError, SpiderExistsError
-from kryptone.signals import Signal
+from kryptone.exceptions import SpiderExistsError
 
 
 SPIDERS_MODULE = 'spiders'
