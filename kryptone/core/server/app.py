@@ -68,6 +68,7 @@ def application(registry, spider_config, port=3459):
     logger.info(f'TCP server listening on port {port}')
 
     # spider_config.run()
+    # registry.active_reactor = reactor
     endpoint.listen(BaseFactory(reactor))
     reactor.run()
 

@@ -4,6 +4,8 @@ from kryptone.core.server.app import application
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
         pass
     

@@ -107,6 +107,7 @@ class MasterRegistry:
         self.absolute_path = None
         self.middlewares = []
         self.has_running_spiders = False
+        self.active_reactor = None
 
     @property
     def has_spiders(self):

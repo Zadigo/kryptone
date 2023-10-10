@@ -8,6 +8,7 @@ from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 from kryptone.db.backends import Table
 
+
 class Command(ProjectCommand):
     def add_arguments(self, parser):
         parser.add_argument(
@@ -47,4 +48,3 @@ class Command(ProjectCommand):
 
         spider_config = registry.get_spider(namespace.name)
         reactor = application(registry, spider_config)
-        # spider_config.run(**params)

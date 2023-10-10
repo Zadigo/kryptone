@@ -4,6 +4,7 @@ from kryptone.registry import registry
 import time
 from kryptone.checks.core import checks_registry
 
+
 class Command(ProjectCommand):
     def add_arguments(self, parser):
         parser.add_argument(
@@ -13,7 +14,7 @@ class Command(ProjectCommand):
         )
 
     def execute(self, namespace):
-        # This test runs the setup method in 
+        # This test runs the setup method in
         # and verifies that it completes
         # without raising any error
         start_time = time.time()
