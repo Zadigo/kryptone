@@ -1,11 +1,11 @@
 import asyncio
 import bisect
 import datetime
-from functools import cached_property
 import os
 import random
 import time
 from collections import defaultdict, namedtuple
+from functools import cached_property
 from urllib.parse import unquote, urlparse, urlunparse
 
 import pandas
@@ -28,12 +28,13 @@ from kryptone.db import backends
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import (read_csv_document, read_json_document,
+from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
+                                         read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
+from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLGenerator, pathlib, read_document
+from kryptone.utils.urls import URL, URLGenerator, pathlib
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -552,6 +553,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         self.statistics = {}
 
+    def __del__(self):
+        self.driver.quit()
+        logger.info('Project stopped')
+
     def resume(self, **kwargs):
         """From a previous list of urls to visit
         and visited urls, resume a previous
@@ -652,6 +657,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
+            if isinstance(start_urls, (LoadStartUrls)):
+                start_urls = list(start_urls)
             self.start_url = start_urls.pop()
 
         # If we have no urls to visit in
@@ -698,10 +705,14 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             self.driver.get(current_url)
             self.visited_pages_count = self.visited_pages_count + 1
 
-            # Always wait for the body section of
-            # the page to be located  or visible
-            wait = WebDriverWait(self.driver, 8)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            try:
+                # Always wait for the body section of
+                # the page to be located  or visible
+                wait = WebDriverWait(self.driver, 8)
+                wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            except:
+                logger.error('Body of page not detected')
+
             self.post_visit_actions(current_url=current_url)
 
             # Post navigation signal
@@ -772,10 +783,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             url_instance = URL(current_url)
             try:
                 self.run_actions(url_instance)
-            except TypeError:
+            except TypeError :
                 raise TypeError(
-                    "'self.run_actions' should be able to accept arguments")
+                    "'self.run_actions' should be able to accept arguments"
+                )
             except Exception as e:
+                logger.error(e)
                 raise ExceptionGroup(
                     "An exception occured while trygin "
                     "to execute 'self.run_actions'",

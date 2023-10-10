@@ -1,4 +1,5 @@
-from typing import List, Callable, Union
+from typing import Generator, List, Callable, Literal, Union
+from functools import cached_property
 
 
 def tokenize(func: Callable) -> Callable[[str, bool], List[str]]: ...
@@ -38,3 +39,13 @@ def write_text_document(
     data: str,
     encoding: str = ...
 ) -> None: ...
+
+
+class LoadStartUrls:
+    filename: str = Literal['start_urls.json']
+
+    def __init__(self, filename: str = None) -> None: ...
+    def __iter__(self) -> Generator[str]: ...
+
+    @cached_property
+    def content(self) -> set[str]: ...

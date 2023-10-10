@@ -1,9 +1,7 @@
-import itertools
 import csv
+import itertools
 import json
-from functools import cached_property, lru_cache, wraps
-from io import FileIO
-import pathlib
+from functools import cached_property, lru_cache
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -59,8 +57,13 @@ def write_json_document(filename, data):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
     with open(path, mode='w+', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False,
-                  cls=DefaultJsonEncoder)
+        json.dump(
+            data, 
+            f, 
+            indent=4, 
+            ensure_ascii=False,
+            cls=DefaultJsonEncoder
+        )
 
 
 def read_csv_document(filename, flatten=False):
@@ -130,3 +133,19 @@ class LoadJS:
                 return data
         logger.warning('No JS file named {self.filename} found in the project')
         return ''
+
+
+class LoadStartUrls:
+    """Loads the start urls from a JSON file"""
+    
+    def __init__(self, filename='start_urls'):
+        self.filename = f'{filename}.json'
+
+    def __iter__(self):
+        for url in self.content:
+            yield url
+
+    @cached_property
+    def content(self):
+        with open(self.filename, mode='r', encoding='utf-8') as f:
+            return set(json.load(f))
