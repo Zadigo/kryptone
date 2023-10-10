@@ -1,3 +1,5 @@
+from selenium.webdriver.common.by import By
+
 from kryptone import logger
 from kryptone.utils.iterators import JPEGImagesIterator
 
