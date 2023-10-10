@@ -2,7 +2,6 @@ import datetime
 import secrets
 from argparse import ArgumentParser
 from kryptone import logger
-from kryptone.core.server import run_server
 from kryptone.db.connections import redis_connection
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry

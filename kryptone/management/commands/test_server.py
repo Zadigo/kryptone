@@ -1,7 +1,6 @@
-import kryptone
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
-from kryptone.core.server import run_server
+from kryptone.core.server.app import application
 
 
 class Command(ProjectCommand):
@@ -9,4 +8,4 @@ class Command(ProjectCommand):
         pass
     
     def execute(self, namespace):
-        run_server()
+        reactor = application(registry)

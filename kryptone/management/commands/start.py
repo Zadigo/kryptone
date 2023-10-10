@@ -2,10 +2,11 @@ import multiprocessing
 
 import kryptone
 from kryptone.checks.core import checks_registry
-from kryptone.core.process import BaseProcess
+# from kryptone.core.process import BaseProcess
+from kryptone.core.server.app import application
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
-
+from kryptone.db.backends import Table
 
 class Command(ProjectCommand):
     def add_arguments(self, parser):
@@ -43,5 +44,7 @@ class Command(ProjectCommand):
             'start_urls': namespace.start_urls,
             'language': namespace.language
         }
+
         spider_config = registry.get_spider(namespace.name)
-        spider_config.run(**params)
+        reactor = application(registry, spider_config)
+        # spider_config.run(**params)
