@@ -1,11 +1,11 @@
 import asyncio
 import bisect
 import datetime
-from functools import cached_property
 import os
 import random
 import time
 from collections import defaultdict, namedtuple
+from functools import cached_property
 from urllib.parse import unquote, urlparse, urlunparse
 
 import pandas
@@ -34,7 +34,7 @@ from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLGenerator, pathlib, read_document
+from kryptone.utils.urls import URL, URLGenerator, pathlib
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -552,6 +552,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         )
 
         self.statistics = {}
+
+    def __del__(self):
+        self.driver.quit()
+        logger.info('Project stopped')
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit
