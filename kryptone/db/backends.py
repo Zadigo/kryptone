@@ -1,5 +1,6 @@
 
 import sqlite3
+from collections import OrderedDict, defaultdict
 from venv import logger
 
 import airtable
@@ -157,34 +158,74 @@ class GoogleSheets(BaseConnection):
             logger.error(e.args)
 
 
+class Field:
+    def __init__(self, name):
+        self.is_primary_key = False
+        self.name = name
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} "{self.name}">'
+
+    def sql(self):
+        return 'integer', 'primary key'
+
+
 class SQL:
-    SELECT = 'select {fields} from {table} where {params}'
+    SELECT = 'select {fields} from {table}'
     WHERE_CLAUSE = 'where {params}'
     CREATE_TABLE = 'create table if not exists {table} ({params})'
+    CREATE = ''
+    ORDER_BY = 'order by {field} {ordering}'
+    LIMIT = 'limit {value}'
+    INSERT = 'INSERT INTO {table} ({field}) VALUES({values})'
+    UPDATE = 'update {table} set {field}={new_value} where {field}={value}'
 
     def finalize_sql(self, sql):
         if sql.endswith(';'):
             return sql
         return f'{sql};'
+    
+    def quote(self, value):
+        if value.startswith("'"):
+            return value
+        return f"'{value}'"
+    
+    def join(self, values):
+        return ', '.join(values)
+    
+    def dict_to_sql(self, data):
+        fields = list(data.keys())
+        values = list(map(lambda x: self.quote(x), data.values()))
+        return fields, values
 
 
 class SQliteBackend(SQL):
     def __init__(self, database=None):
-        self.database = database or ':memory:'
+        self.database = f'{database}.sqlite' or ':memory:'
         self.connection = sqlite3.connect(self.database)
 
     def __getitem__(self, key):
         sql = self.finalize_sql(
             self.SELECT.format(fields=key, table=self.name, params='key=?')
         )
-        print(sql)
         result = self.connection.execute(sql)
         if not result:
             raise KeyError()
-        return result
+        return list(result)
 
-    def __setitem__(self, key):
-        pass
+    def __setitem__(self, key, value):
+        sql = self.finalize_sql(
+            self.INSERT.format(
+                table=self.name,
+                field=key,
+                columns=key, 
+                values=self.quote(value)
+            )
+        )
+        print(sql)
+        result = self.connection.execute(sql)
+        self.connection.commit()
+        print(result)
 
     def __delitem__(self, key):
         pass
@@ -213,32 +254,53 @@ class SQliteBackend(SQL):
     def items(self):
         pass
 
-    def update(self, column, value):
-        pass
-
-    def bulk_update(self, columns, values):
-        pass
-
-    def filter(self, *args, **kwargs):
-        pass
-
-    def create(self, **kwargs):
-        pass
-
 
 class Table(SQliteBackend):
+    fields = OrderedDict()
+
     def __init__(self, name, *, fields=[]):
-        super().__init__()
-        self.fields = fields
+        super().__init__(database='my_database')
+
+        for field in fields:
+            self.fields[field.name] = field
+
         self.name = name
         self.connection.execute(self.create_table_sql())
         self.connection.commit()
 
     def create_table_sql(self):
         sql = self.CREATE_TABLE.format(
-            table=self.name, params='key integer primary key, value blob')
+            table=self.name, 
+            # params='key integer primary key, url blob'
+            params='url blob'
+        )
         return self.finalize_sql(sql)
 
+    # def update(self, **kwargs):
+    #     pass
 
-# c = Table('seen_urls', fields=[('url', ('integer', 'primary key')), ])
-# print(c['url'])
+    def filter(self, **kwargs):
+        pass
+
+    def create(self, **kwargs):
+        fields, values = self.dict_to_sql(kwargs)
+        fields = self.join(fields)
+        values = self.join(values)
+        sql = self.CREATE_TABLE.format(table=self.name, params=values)
+        print(sql)
+        self.connection.execute(sql)
+        self.connection.commit()
+
+    def delete(self, **kwargs):
+        pass
+
+    def get(self, **kwargs):
+        pass
+
+
+# c = Table('seen_urls', fields=[Field('url')])
+# # c['url'] = 'http://example.com/1'
+# # print(c['url'])
+
+# # c.update(id=1, url='http://exampl.com/1')
+# print(c.create(url='http://google.com/kendall'))

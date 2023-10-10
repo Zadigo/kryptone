@@ -28,6 +28,7 @@ class Product(BaseModel):
     images: list = dataclasses.field(default_factory=list)
     composition: str = None
     color: str = None
+    date: str = None
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))

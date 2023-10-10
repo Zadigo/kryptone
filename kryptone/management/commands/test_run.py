@@ -3,7 +3,7 @@ import os
 import kryptone
 from kryptone.checks.core import checks_registry
 from kryptone.management.base import ProjectCommand
-from kryptone.registry import logger, registry
+from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
