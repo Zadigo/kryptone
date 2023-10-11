@@ -4,8 +4,8 @@ import pandas
 
 
 class Field:
-    def __init__(self, name, null=False):
-        self.is_primary_key = False
+    def __init__(self, name, *, null=False, primary_key=False):
+        self.is_primary_key = primary_key
         self.name = name
         self.null = null
 
@@ -23,7 +23,7 @@ class Field:
         else:
             field_parameters.pop(field_parameters.index('not null'))
             field_parameters.append('null')
-        return field_parameters
+        return ' '.join(field_parameters)
 
 
 class Index:
@@ -39,6 +39,7 @@ class Index:
 class SQL:
     """Base SQL statement builder"""
 
+    ALTER_TABLE = 'alter table {table} add column {field_name} {field_params}'
     CREATE_TABLE = 'create table if not exists {table} ({params})'
     CREATE_INDEX = 'create unique index {index_name} on {table} ({fields})'
     CREATE = 'insert into {table} ({fields}) values({values})'
@@ -62,11 +63,19 @@ class SQL:
     COUNT = 'count({field})'
 
     def finalize_sql(self, sql):
+        """Checks that the SQL to be 
+        used ends with a `;`"""
         if sql.endswith(';'):
             return sql
         return f'{sql};'
 
     def quote(self, value):
+        """Ensures that text values are
+        correctly quoted
+
+        >>> self.quote('Kendall')
+        ... "'Kendall'"
+        """
         if isinstance(value, int):
             return value
 
@@ -75,6 +84,8 @@ class SQL:
         return f"'{value}'"
 
     def join(self, values):
+        """Joins a set of values 
+        using a comma"""
         return ', '.join(values)
 
     def join_tokens(self, *sqls):
@@ -86,6 +97,8 @@ class SQL:
         return fields, values
 
     def complex_dict_to_sql(self, data):
+        """Converts operates as `age__gt=15` to
+        a python readable list `[['age', '>', 15]]`"""
         operators = {
             'gt': '>',
             'gte': '>=',
@@ -107,6 +120,16 @@ class SQL:
 
     def construct_sql_tokens(self, tokens):
         return self.finalize_sql(' '.join(tokens))
+
+    def data_to_dict(self, data):
+        pass
+
+    def data_to_dataframe(self, data):
+        return pandas.DataFrame(data=self.data_to_dict(data))
+
+    def build_script(self, *sqls):
+        script = '\n'.join(map(lambda x: self.finalize_sql(x), sqls))
+        return script
 
 
 class SQliteBackend(SQL):
@@ -202,6 +225,7 @@ class SQliteBackend(SQL):
         # print(sql)
         print(list(self.connection.execute(sql)))
 
+
 # class Query:
 #     def __init__(self, table, connection):
 #         self._table = table
@@ -230,10 +254,36 @@ class Table(SQliteBackend):
         super().__init__(database='my_database')
 
         for field in fields:
+            if not isinstance(field, Field):
+                raise ValueError()
             self.fields[field.name] = field
 
         self.name = name
         self.connection.execute(self.create_table_sql())
+        self.connection.commit()
+
+        new_fields = []
+        for field in fields:
+            truth_array = any(
+                map(lambda x: field.name in x, self.table_fields)
+            )
+            if truth_array:
+                continue
+            new_fields.append(field)
+
+        sqls = []
+        for field in new_fields:
+            sql = self.ALTER_TABLE.format(
+                table=self.name,
+                field_name=field.name,
+                field_params=field.prepare()
+            )
+            sqls.append(sql)
+
+        if sqls:
+            sql = self.build_script(*sqls)
+            self.connection.executescript(sql)
+            self.connection.commit()
 
         if indexes:
             indexes_sql = []
@@ -256,7 +306,11 @@ class Table(SQliteBackend):
 
     @property
     def table_fields(self):
-        return list(self.fields.keys())
+        """Returns the current fields present
+        in the database"""
+        # return list(self.fields.keys())
+        sql = f'pragma table_info({self.name})'
+        return list(self.connection.execute(self.finalize_sql(sql)))
 
     @property
     def table_indexes(self):
@@ -275,9 +329,29 @@ class Table(SQliteBackend):
         sql = self.CREATE_TABLE.format(
             table=self.name,
             # params='key integer primary key, url blob'
-            params='url blob'
+            params='id primary key, url blob'
         )
         return self.finalize_sql(sql)
+    
+    def drop_column_sql(self):
+        temporary_name = 'googke'
+        script = f"""
+        PRAGMA foreign_keys=off;
+        BEGIN TRANSACTION;
+
+        CREATE TABLE IF NOT EXISTS {temporary_name}(column_definition);
+
+        INSERT INTO {temporary_name}(column_list)
+        SELECT column_list
+        FROM table;
+
+        DROP TABLE {self.name};
+
+        ALTER TABLE {temporary_name} RENAME TO {self.name}; 
+
+        COMMIT;
+        PRAGMA foreign_keys=on;
+        """
 
     def create_index_sql(self):
         pass
@@ -345,7 +419,7 @@ class Table(SQliteBackend):
 # b = ' '.join(r)
 # print(b)
 
-c = Table('seen_urls', fields=[Field('url')],
+c = Table('seen_urls', fields=[Field('state'), Field('url')],
           indexes=[Index('seen_urls', 'url')])
 # c['url'] = 'http://example.com/1'
 # print(c['url'])
