@@ -96,6 +96,18 @@ class SpiderConfig:
         except Exception as e:
             spider_instance.create_dump()
             raise Exception(e)
+        
+    def resume(self, **kwargs):
+        spider_instance = self.get_spider_instance()
+
+        try:
+            spider_instance.resume(**kwargs)
+        except KeyboardInterrupt:
+            spider_instance.create_dump()
+            sys.exit(0)
+        except Exception as e:
+            spider_instance.create_dump()
+            raise Exception(e)
 
 
 class MasterRegistry:

@@ -45,4 +45,4 @@ class Command(ProjectCommand):
 
         params = {}
         spider_config = registry.get_spider(namespace.name)
-        spider_config.run(**params)
+        spider_config.resume(**params)
