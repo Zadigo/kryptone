@@ -1,208 +1,122 @@
-
 import sqlite3
 from collections import OrderedDict, defaultdict
-from venv import logger
-
-import airtable
-import gspread
-import requests
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
-from kryptone import logger
-from kryptone.conf import settings
-from kryptone.db import BaseConnection
-from kryptone.db.connections import redis_connection
-from kryptone.utils.file_readers import write_json_document
-
-AIRTABLE_ID_CACHE = set()
-
-
-def airtable_backend(sender, **kwargs):
-    """Use Airtable as a storage backend"""
-    if 'airtable' in settings.ACTIVE_STORAGE_BACKENDS:
-        config = settings.STORAGE_BACKENDS.get('airtable', None)
-        if config is None:
-            return False
-        table = airtable.Airtable(
-            config.get('base_id', None),
-            config.get('table_name', None),
-            config.get('api_key', None)
-        )
-        records = []
-        for item in sender.final_result:
-            record = {}
-            for key, value in item.items():
-                if key == 'id':
-                    AIRTABLE_ID_CACHE.add(value)
-
-                if key == 'id' and value in AIRTABLE_ID_CACHE:
-                    continue
-
-                record[key.title()] = value
-            records.append(record)
-        AIRTABLE_ID_CACHE.clear()
-        return table.batch_insert(records)
-
-
-def notion_backend(sender, **kwargs):
-    """Use Notion as a storage backend"""
-    if 'notion' in settings.ACTIVE_STORAGE_BACKENDS:
-        config = settings.STORAGE_BACKENDS.get('notion', None)
-        if config is None:
-            return False
-        headers = {
-            'Authorization': f'Bearer {config["token"]}',
-            'Content-Type': 'application/json',
-            'Notion-Version': '2022-02-22'
-        }
-        try:
-            url = f'https://api.notion.com/v1/databases/{config["database_id"]}'
-            response = requests.post(url, headers=headers)
-        except:
-            return False
-        else:
-            if response.ok:
-                return response.json()
-            return False
-
-
-def google_sheets_backend(sender, **kwargs):
-    """Use Google Sheets as a storage backend"""
-    # if 'google sheets' in settings.ACTIVE_STORAGE_BACKENDS:
-    google_sheet_settings = settings.STORAGE_BACKENDS['google_sheets']
-    project_path = settings.PROJECT_PATH
-
-    if project_path is None:
-        logger.critical("Cannot find 'creds.json' for Google sheet API")
-    else:
-        file_path = project_path / google_sheet_settings['credentials']
-        worksheet = gspread.service_account(filename=file_path)
-
-        # connect to your sheet (between "" = the name of your G Sheet, keep it short)
-        sheet = worksheet.open(google_sheet_settings['sheet_name']).sheet1
-
-        # get the values from cells a2 and b2
-        name = sheet.acell("a2").value
-        website = sheet.acell("b2").value
-        print(name, website)
-
-        # write values in cells a3 and b3
-        sheet.update('a3', 'Chat GPT')
-        sheet.update("b3", "openai.com")
-
-
-def redis_backend(sender, **kwargs):
-    """Use Redis as a storage backend"""
-    if 'redis' in settings.ACTIVE_STORAGE_BACKENDS:
-        instance = redis_connection()
-        if instance:
-            instance.hset('cache', None)
-
-
-class GoogleSheets(BaseConnection):
-    def __init__(self):
-        self.credentials = None
-        self.service = None
-
-        storage_backends = settings.STORAGE_BACKENDS
-        self.connection_settings = storage_backends.get(
-            'google_sheets', None
-        )
-
-        if self.connection_settings is None:
-            raise ValueError()
-
-        project_path = settings.PROJECT_PATH
-        if project_path is None:
-            logger.critical(
-                f"{self.__class__.__name__} connection "
-                "should be a ran in a project"
-            )
-        else:
-            try:
-                tokens_file_path = project_path / \
-                    self.connection_settings['credentials']
-            except KeyError:
-                raise
-            else:
-                if tokens_file_path.exists():
-                    self.credentials = Credentials.from_authorized_user_file(
-                        tokens_file_path,
-                        self.connection_settings['scopes']
-                    )
-
-                if not self.credentials is None or not self.credentials.valid:
-                    if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                        self.credentials.refresh(Request())
-                    else:
-                        flow = InstalledAppFlow.from_client_secrets_file(
-                            tokens_file_path,
-                            self.connection_settings['scopes']
-                        )
-                        self.credentials = flow.run_local_server(port=0)
-
-                    # Save the credentials for the next run
-                    write_json_document(
-                        self.connection_settings['credentials'],
-                        self.credentials.to_json()
-                    )
-
-    def connect(self):
-        try:
-            self.service = build('sheets', 'v4', credentials=self.credentials)
-        except HttpError as e:
-            logger.error(e.args)
+import pandas
 
 
 class Field:
-    def __init__(self, name):
+    def __init__(self, name, null=False):
         self.is_primary_key = False
         self.name = name
+        self.null = null
 
     def __repr__(self):
         return f'<{self.__class__.__name__} "{self.name}">'
 
-    def sql(self):
-        return 'integer', 'primary key'
+    def prepare(self):
+        field_parameters = ['text', 'not null']
+
+        if self.is_primary_key:
+            field_parameters.append('primary key')
+
+        if self.null:
+            field_parameters.append('null')
+        else:
+            field_parameters.pop(field_parameters.index('not null'))
+            field_parameters.append('null')
+        return field_parameters
+
+
+class Index:
+    def __init__(self, name, field):
+        self.name = f'idx_{name}'
+        self.field = field
+        self.table = None
+
+    def as_sql(self):
+        return [self.name, self.table, self.field]
 
 
 class SQL:
-    SELECT = 'select {fields} from {table}'
-    WHERE_CLAUSE = 'where {params}'
+    """Base SQL statement builder"""
+
     CREATE_TABLE = 'create table if not exists {table} ({params})'
-    CREATE = ''
-    ORDER_BY = 'order by {field} {ordering}'
-    LIMIT = 'limit {value}'
+    CREATE_INDEX = 'create unique index {index_name} on {table} ({fields})'
+    CREATE = 'insert into {table} ({fields}) values({values})'
+    DELETE = 'delete from {table}'
     INSERT = 'INSERT INTO {table} ({field}) VALUES({values})'
+    LIMIT = 'limit {value}'
+    ORDER_BY = 'order by {field} {ordering}'
+    SELECT = 'select {fields} from {table}'
     UPDATE = 'update {table} set {field}={new_value} where {field}={value}'
+    WHERE_CLAUSE = 'where {params}'
+
+    AND = 'and {rhv}'
+    OR = 'or {rhv}'
+
+    EQUALITY = '{field}={value}'
+    CONTAINS = '{field} in ({values})'
+    WILD_CARD = '{field} like {wildcard}'
+    BETWEEN = '{field} between {lhv} and {rhv}'
+    NOT_LIKE = '{field} not like {wildcard}'
+
+    COUNT = 'count({field})'
 
     def finalize_sql(self, sql):
         if sql.endswith(';'):
             return sql
         return f'{sql};'
-    
+
     def quote(self, value):
+        if isinstance(value, int):
+            return value
+
         if value.startswith("'"):
             return value
         return f"'{value}'"
-    
+
     def join(self, values):
         return ', '.join(values)
-    
+
+    def join_tokens(self, *sqls):
+        return ' '.join(sqls)
+
     def dict_to_sql(self, data):
         fields = list(data.keys())
         values = list(map(lambda x: self.quote(x), data.values()))
         return fields, values
 
+    def complex_dict_to_sql(self, data):
+        operators = {
+            'gt': '>',
+            'gte': '>=',
+            'lt': '<',
+            'lte': '<=',
+            'eq': '='
+        }
+        base_operators = list(operators.keys())
+        tokens = []
+        for key, value in data.items():
+            if '__' in key:
+                lhv, rhv = key.split('__')
+                if rhv not in base_operators:
+                    raise ValueError('Operator is not valid')
+                tokens.append([lhv, operators[rhv], self.quote(value)])
+            else:
+                tokens.append([key, operators['eq'], self.quote(value)])
+        return tokens
+
+    def construct_sql_tokens(self, tokens):
+        return self.finalize_sql(' '.join(tokens))
+
 
 class SQliteBackend(SQL):
+    """Base backend for the SQLite database"""
+
     def __init__(self, database=None):
         self.database = f'{database}.sqlite' or ':memory:'
-        self.connection = sqlite3.connect(self.database)
+        connection = sqlite3.connect(self.database)
+        self.connection = connection
+        # self.connection.row_factory = sqlite3.Row
 
     def __getitem__(self, key):
         sql = self.finalize_sql(
@@ -218,20 +132,23 @@ class SQliteBackend(SQL):
             self.INSERT.format(
                 table=self.name,
                 field=key,
-                columns=key, 
+                columns=key,
                 values=self.quote(value)
             )
         )
         print(sql)
         result = self.connection.execute(sql)
         self.connection.commit()
-        print(result)
 
     def __delitem__(self, key):
         pass
 
     def __len__(self):
-        pass
+        count_sql = self.COUNT.format(field='*')
+        sql = self.SELECT.format(fields=count_sql, table='seen_urls')
+        sql = self.finalize_sql(sql)
+        print(list(self.connection.execute(sql))[0][-1])
+        return list(self.connection.execute(sql))[0][-1]
 
     def __iter__(self):
         pass
@@ -254,11 +171,62 @@ class SQliteBackend(SQL):
     def items(self):
         pass
 
+    def order_by_sql(self, field, ordering):
+        ordering_types = ['ASC', 'DESC']
+        if ordering not in ordering_types:
+            raise ValueError('Ordering type if not correct')
+        return self.ORDER_BY.format(field=field, ordering=ordering)
+
+    def limit_sql(self, value):
+        if not isinstance(value, int):
+            raise ValueError('Limit should be an integer')
+        return [self.LIMIT.format(value=value)]
+
+    def list_tables(self):
+        sql = self.SELECT.format(fields='name', table='sqlite_schema')
+        # self.EQUALITY.format(field='type', value=self.quote('table'))
+
+        not_like_clause = self.NOT_LIKE.format(
+            field='name',
+            wildcard=self.quote('sqlite_%')
+        )
+
+        rhv = [
+            self.EQUALITY.format(field='type', value=self.quote('table')),
+            self.AND.format(rhv=not_like_clause)
+        ]
+        rhv = self.join_tokens(*rhv)
+        where_clause = self.WHERE_CLAUSE.format(params=rhv)
+        sql = self.join_tokens(sql, where_clause)
+        sql = self.finalize_sql(sql)
+        # print(sql)
+        print(list(self.connection.execute(sql)))
+
+# class Query:
+#     def __init__(self, table, connection):
+#         self._table = table
+#         self._connection = connection
+#         self._sql = None
+
+#     def run_query(self):
+#         if not isinstance(self._connection, sqlite3.Cursor):
+#             raise ValueError()
+#         self._connection.execute(self._sql)
+
+
+class QuerySet:
+    def __init__(self, table, query):
+        self.table = table
+        self.query = query
+
 
 class Table(SQliteBackend):
-    fields = OrderedDict()
+    """Base SQLite table"""
 
-    def __init__(self, name, *, fields=[]):
+    fields = OrderedDict()
+    index_map = OrderedDict()
+
+    def __init__(self, name, *, fields=[], indexes=[]):
         super().__init__(database='my_database')
 
         for field in fields:
@@ -266,28 +234,86 @@ class Table(SQliteBackend):
 
         self.name = name
         self.connection.execute(self.create_table_sql())
+
+        if indexes:
+            indexes_sql = []
+            # for index in indexes:
+            #     if not isinstance(index, Index):
+            #         raise ValueError()
+            #     index.table = self
+            #     self.index_map[index.name] = index
+            #     indexes_sql.append(self.CREATE_INDEX.format(
+            #         index_name=index.name,
+            #         table=self.name,
+            #         fields=index.field
+            #     ))
+            # sqls = list(map(lambda x: self.finalize_sql(x), indexes_sql))
+            # self.connection.execute(sqls[0])
+        else:
+            pass
+
         self.connection.commit()
+
+    @property
+    def table_fields(self):
+        return list(self.fields.keys())
+
+    @property
+    def table_indexes(self):
+        select_clause = self.SELECT.format(
+            fields=self.join(['name', 'tbl_name']),
+            table='sqlite_master'
+        )
+        where_clause = self.WHERE_CLAUSE.format(
+            params=self.EQUALITY.format(
+                field='type', value=self.quote('index'))
+        )
+        sql = self.join_tokens(select_clause, where_clause)
+        print(list(self.connection.execute(self.finalize_sql(sql))))
 
     def create_table_sql(self):
         sql = self.CREATE_TABLE.format(
-            table=self.name, 
+            table=self.name,
             # params='key integer primary key, url blob'
             params='url blob'
         )
         return self.finalize_sql(sql)
 
-    # def update(self, **kwargs):
-    #     pass
+    def create_index_sql(self):
+        pass
 
     def filter(self, **kwargs):
-        pass
+        tokens = self.complex_dict_to_sql(kwargs)
+        if len(tokens) > 1:
+            select_sql = self.SELECT.format(fields='*', table=self.name)
+            where_sql = self.WHERE_CLAUSE.format(params=rhv[0])
+
+            and_clauses = []
+            for i, token in enumerate(tokens):
+                if i == 0:
+                    continue
+                rhv = ''.join(token)
+                and_clauses.append(self.AND.format(rhv=rhv))
+
+            and_clauses = self.join(and_clauses)
+            sql = self.join_tokens(select_sql, where_sql, and_clauses)
+        else:
+            select_sql = self.SELECT.format(fields='*', table=self.name)
+            rhv = list(map(lambda x: ''.join(x), tokens))
+            where_sql = self.WHERE_CLAUSE.format(params=rhv[0])
+            sql = self.join_tokens(select_sql, where_sql)
+        result = self.connection.execute(self.finalize_sql(sql))
+        return list(result)
 
     def create(self, **kwargs):
         fields, values = self.dict_to_sql(kwargs)
         fields = self.join(fields)
         values = self.join(values)
-        sql = self.CREATE_TABLE.format(table=self.name, params=values)
-        print(sql)
+        sql = self.CREATE.format(
+            table=self.name,
+            fields=fields,
+            values=values
+        )
         self.connection.execute(sql)
         self.connection.commit()
 
@@ -297,10 +323,36 @@ class Table(SQliteBackend):
     def get(self, **kwargs):
         pass
 
+    def all(self):
+        sql = self.SELECT.format(table=self.name, fields='*')
+        sql = self.finalize_sql(sql)
+        data = self.connection.execute(sql)
 
-# c = Table('seen_urls', fields=[Field('url')])
-# # c['url'] = 'http://example.com/1'
-# # print(c['url'])
+        dict_data = []
+        for row in data:
+            element = {}
+            for i, item in enumerate(row):
+                element[self.table_fields[i]] = item
+            dict_data.append(element)
+        # print(dict_data)
+        df = pandas.DataFrame(data=dict_data)
+        print(df)
+        return list(data)
 
-# # c.update(id=1, url='http://exampl.com/1')
-# print(c.create(url='http://google.com/kendall'))
+
+# s = SQL()
+# r = s.complex_dict_to_sql({'url__gt': 'Kendall'})
+# b = ' '.join(r)
+# print(b)
+
+c = Table('seen_urls', fields=[Field('url')],
+          indexes=[Index('seen_urls', 'url')])
+# c['url'] = 'http://example.com/1'
+# print(c['url'])
+
+# c.update(id=1, url='http://exampl.com/1')
+# c.create(url='http://google.com/kendall')
+# print(c.filter(url='http://google.com/kendall/1'))
+# print(len(c))
+# c.all()
+c.table_indexes
