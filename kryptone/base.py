@@ -59,7 +59,7 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
     options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
     options = options_klass()
     options.add_argument('--remote-allow-origins=*')
-    options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+    options.add_argument(f'--user-agent={RANDOM_USER_AGENT()}')
 
     # Allow Selenium to be launched
     # in headless mode
@@ -77,6 +77,10 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
         }
     }
     options.add_experimental_option('prefs', preferences)
+
+    # Proxies
+    if settings.USE_PROXY_ADDRESS:
+        options.add_argument(f'--proxy-server={settings.PROXY_IP_ADDRESS}')
 
     service = Service(manager_instance().install())
     return browser(service=service, options=options)

@@ -114,3 +114,9 @@ LOAD_IMAGES = True
 
 # Load JS codes when launching the browser
 LOAD_JS = True
+
+
+# Use a proxy addresses
+USE_PROXY_ADDRESS = False
+
+PROXY_IP_ADDRESS = None
