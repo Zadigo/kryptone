@@ -566,16 +566,16 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             * Memcache is checked afterwards if no connection
             * Finally, the file cache is used as a final resort
         """
-        redis = backends.redis_connection()
-        if redis:
-            data = redis.get('cache')
-        else:
-            memcache = backends.memcache_connection()
-            if memcache:
-                data = memcache.get('cache', [])
-            else:
-                data = read_json_document('cache.json')
-
+        # redis = backends.redis_connection()
+        # if redis:
+        #     data = redis.get('cache')
+        # else:
+        #     memcache = backends.memcache_connection()
+        #     if memcache:
+        #         data = memcache.get('cache', [])
+        #     else:
+        #         data = read_json_document('cache.json')
+        data = read_json_document('cache.json')
         self.urls_to_visit = set(data['urls_to_visit'])
         self.visited_urls = set(data['visited_urls'])
 
@@ -678,7 +678,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         if start_urls:
             self.add_urls(*start_urls)
 
-        webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
+        # webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
