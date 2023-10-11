@@ -419,14 +419,14 @@ class Table(SQliteBackend):
 # b = ' '.join(r)
 # print(b)
 
-c = Table('seen_urls', fields=[Field('state'), Field('url')],
-          indexes=[Index('seen_urls', 'url')])
-# c['url'] = 'http://example.com/1'
-# print(c['url'])
+# c = Table('seen_urls', fields=[Field('state'), Field('url')],
+#           indexes=[Index('seen_urls', 'url')])
+# # c['url'] = 'http://example.com/1'
+# # print(c['url'])
 
-# c.update(id=1, url='http://exampl.com/1')
-# c.create(url='http://google.com/kendall')
-# print(c.filter(url='http://google.com/kendall/1'))
-# print(len(c))
-# c.all()
-c.table_indexes
+# # c.update(id=1, url='http://exampl.com/1')
+# # c.create(url='http://google.com/kendall')
+# # print(c.filter(url='http://google.com/kendall/1'))
+# # print(len(c))
+# # c.all()
+# c.table_indexes
