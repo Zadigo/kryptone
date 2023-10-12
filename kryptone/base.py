@@ -414,7 +414,7 @@ class BaseCrawler(metaclass=Crawler):
 
             if self._meta.ignore_images:
                 path = pathlib.Path(link)
-                if path != '':
+                if path.suffix != '':
                     if path in self.default_image_extensions:
                         continue
 
