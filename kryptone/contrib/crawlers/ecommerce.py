@@ -1,5 +1,6 @@
 import pandas
 import asyncio
+import pathlib
 import mimetypes
 from urllib.parse import urlparse
 
@@ -13,6 +14,9 @@ from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import clean_dictionnary
 
 
+TEMPORARY_PRODUCT_CACHE = set()
+
+
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
     to crawling ecommerce websites"""
@@ -22,6 +26,14 @@ class EcommerceCrawlerMixin:
     product_objects = []
     seen_products = []
     model = Product
+    found_products_counter = 0
+
+    def calculate_performance(self):
+        super().calculate_performance()
+        self.statistics.update({
+            'products_gathered': self.found_products_counter,
+            'products_urls': list(TEMPORARY_PRODUCT_CACHE)
+        })
 
     def seen_products(self, using='id_or_reference'):
         """Returns a list of all products that were seen"""
@@ -57,6 +69,9 @@ class EcommerceCrawlerMixin:
 
         self.product_objects.append(product)
         self.products.append(product.as_json())
+
+        self.found_products_counter = self.found_products_counter + 1
+        TEMPORARY_PRODUCT_CACHE.add(product.url)
         return True, product
 
     def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
@@ -83,7 +98,8 @@ class EcommerceCrawlerMixin:
             #     if isinstance(item, dict):
             #         self.product_objects.append(self.model(**item))
             self.product_objects = list(
-                map(lambda x: self.model(**x), previous_products_data))
+                map(lambda x: self.model(**x),
+                    previous_products_data))
             message = f"Loaded {len(self.products)} products from 'products.json'"
             logger.info(message)
 
@@ -113,9 +129,9 @@ class EcommerceCrawlerMixin:
         async def main():
             urls_to_use = product.images.copy()
 
-            if download_first :
+            if download_first:
                 urls_to_use = urls_to_use[:1]
-            
+
             queue = asyncio.Queue()
 
             async def request_image():

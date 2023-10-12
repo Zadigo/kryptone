@@ -35,7 +35,9 @@ from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
 from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, URLGenerator, pathlib
+from kryptone import constants
 from kryptone.webhooks import Webhooks
+from kryptone import exceptions
 
 DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
@@ -124,11 +126,8 @@ class CrawlerOptions:
         for name, value in options:
             if name not in DEFAULT_META_OPTIONS:
                 raise ValueError(
-                    "Meta for model '{name}' received "
-                    "an illegal option '{option}'".format(
-                        name=self.verbose_name,
-                        option=name
-                    )
+                    f"Meta for model '{self.verbose_name}' received "
+                    f"an illegal option '{name}'"
                 )
             setattr(self, name, value)
 
@@ -246,11 +245,12 @@ class BaseCrawler(metaclass=Crawler):
             None,
             None
         ))
-    
+
     def _backup_urls(self):
-        """Backs up the urls both in memory
-        cache and file cache"""
-        d = self.get_current_date()
+        """Backs up the urls both in memory 
+        and file cache which can then be resumed
+        on a next run"""
+        d = get_current_date(timezone=self.timezone)
 
         urls_data = {
             'spider': self.__class__.__name__,
@@ -258,7 +258,6 @@ class BaseCrawler(metaclass=Crawler):
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
-        # cache.set_value('urls_data', urls_data)
 
         write_json_document(
             f'{settings.CACHE_FILE_NAME}.json',
@@ -274,13 +273,6 @@ class BaseCrawler(metaclass=Crawler):
         #     data_type='urls',
         #     urls_data=urls_data
         # )
-
-    @cached_property
-    def default_image_extensions(self):
-        path = settings.GLOBAL_KRYPTONE_PATH / 'data/image_extensions.txt'
-        with open(path, mode='r', encoding='utf-8') as f:
-            text = f.read()
-            return text.split('\n')
 
     def urljoin(self, path):
         """Returns the domain of the current
@@ -332,6 +324,8 @@ class BaseCrawler(metaclass=Crawler):
         cannot actually be retrieved by the spider"""
         for item in urls_or_paths:
             new_url = str(item)
+            new_url_object = urlparse(new_url)
+
             if item.startswith('/'):
                 new_url = urlunparse((
                     self._start_url_object.scheme,
@@ -341,6 +335,12 @@ class BaseCrawler(metaclass=Crawler):
                     None,
                     None
                 ))
+
+            if new_url_object.netloc == '' and new_url_object.path == '':
+                continue
+
+            if new_url_object.netloc != self._start_url_object.netloc:
+                continue
 
             if new_url in self.visited_urls:
                 continue
@@ -354,11 +354,10 @@ class BaseCrawler(metaclass=Crawler):
     def get_page_urls(self):
         """Returns all the urls present on the
         actual given page"""
+        links = self.get_page_link_elements
         logger.info(f"Found {len(links)} url(s) on this page")
 
         for link in links:
-            # link = element.get_attribute('href')
-
             # Turn the url into a Python object
             # to make it more usable for us
             link_object = urlparse(link)
@@ -377,7 +376,9 @@ class BaseCrawler(metaclass=Crawler):
 
             # Links such as http://exampe.com/path#
             # are useless and can create
-            # useless repetition for us
+            # repetition. Additionally this is a
+            # guard against http://example.com# from
+            # urlparse which does not detect the #
             if link.endswith('#'):
                 continue
 
@@ -402,7 +403,6 @@ class BaseCrawler(metaclass=Crawler):
             # Reconstruct a partial url for example
             # /google becomes https://example.com/google
             if link_object.path != '/' and link.startswith('/'):
-                # link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
                 link = urlunparse((
                     self._start_url_object.scheme,
                     self._start_url_object.netloc,
@@ -445,6 +445,47 @@ class BaseCrawler(metaclass=Crawler):
                 "new overall url(s)"
             )
 
+    def refresh_page_urls(self):
+        """This function will only check if urls
+        were registered in the list of urls that
+        were already seen (regardless of the page).
+        This function should be used only to compare a
+        new incoming list of urls to seen ones
+
+        The filtering here is less more strict than `get_page_urls`
+        since we are interested in ALL urls that were *potentially*
+        seen to be visitable
+        """
+        newly_discovered_urls = []
+        for url in self.get_page_link_elements:
+            # url_object = urlparse(url)
+
+            # if new_url_object.netloc == '' and new_url_object.path == '':
+            #     continue
+
+            # if url_object.path != '/' and url.startswith('/'):
+            #     url = urlunparse((
+            #         self._start_url_object.scheme,
+            #         self._start_url_object.netloc,
+            #         url,
+            #         None,
+            #         None,
+            #         None
+            #     ))
+
+            # if url in self.list_of_seen_urls:
+            #     continue
+            
+            newly_discovered_urls.append(url)
+            self.list_of_seen_urls.add(url)
+        self.add_urls(*newly_discovered_urls)
+
+        if newly_discovered_urls:
+            logger.info(
+                f"Got {len(newly_discovered_urls)} new url(s) "
+                "after url discovery refresh"
+            )
+        self.add_urls(*newly_discovered_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
@@ -524,22 +565,21 @@ class BaseCrawler(metaclass=Crawler):
         return script
 
     def calculate_performance(self):
-        """Returns the amount of time for which the
-        spider has been running"""
-        self._end_date = self.get_current_date()
+        """Calculate the overall spider performance"""
+        # Calculate global performance
+        self._end_date = get_current_date(timezone=self.timezone)
         days = (self._start_date - self._end_date).days
         completed_time = round(time.time() - self._start_time, 1)
         days = 0 if days < 0 else days
-        return self.performance_audit(days, completed_time)
+        global_performance = self.performance_audit(days, completed_time)
 
-    def calculate_completion_percentage(self):
-        """Indicates the level of completion
-        for the current crawl session"""
+        # Calculate performance related to urls
         total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
         result = len(self.visited_urls) / total_urls
         percentage = round(result * 100, 3)
         logger.info(f'{percentage}% of total urls visited')
-        return self.urls_audit(
+
+        urls_performance = self.urls_audit(
             count_urls_to_visit=len(self.urls_to_visit),
             count_visited_urls=len(self.visited_urls),
             total_urls=total_urls,
@@ -547,9 +587,13 @@ class BaseCrawler(metaclass=Crawler):
             visited_pages_count=self.visited_pages_count
         )
 
-    def get_current_date(self):
-        timezone = pytz.timezone(self.timezone)
-        return datetime.datetime.now(tz=timezone)
+        self.statistics.update({
+            'days': global_performance.days,
+            'duration': global_performance.duration,
+            'count_urls_to_visit': urls_performance.count_urls_to_visit,
+            'count_visited_urls': urls_performance.count_visited_urls
+        })
+        return global_performance, urls_performance
 
     def post_visit_actions(self, **kwargs):
         """Actions to run on the page just after
@@ -574,8 +618,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
     def __init__(self, browser_name=None):
         super().__init__(browser_name=browser_name)
-        self._start_date = self.get_current_date()
 
+        self._start_date = get_current_date(timezone=self.timezone)
         self._start_time = time.time()
         self._end_time = None
 
@@ -589,7 +633,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
              'completion_percentage', 'total_urls',
              'visited_pages_count']
         )
-
         self.statistics = {}
 
     def __del__(self):
@@ -602,7 +645,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         crawling session.
 
             * Redis is checked as the primary database for a cache
-            * Memcache is checked afterwards if no connection
+            * Memcache is checked in second place
             * Finally, the file cache is used as a final resort
         """
         # redis = backends.redis_connection()
@@ -644,7 +687,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 continue
             start_urls.append(sub_children[0].text)
         return start_urls
-        # self.start(start_urls=start_urls, **kwargs)
 
     def start_from_html_sitemap(self, url, **kwargs):
         """Start crawling from the sitemap HTML page
@@ -686,9 +728,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
         start_urls = start_urls or self._meta.start_urls
 
-        # If we have absolutely no start url and at the
-        # same time we have no start urls to start from
-        # as a start url, raise an error
+        # If we have absolutely no start_url and at the
+        # same time we have no start_urls, raise an error
         if self.start_url is None and not start_urls:
             raise exceptions.BadImplementationError(
                 "No start url. Provide either a "
@@ -698,7 +739,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         if self.start_url is None and start_urls:
             if isinstance(start_urls, (LoadStartUrls)):
                 start_urls = list(start_urls)
+            self.list_of_seen_urls.update(*start_urls)
             self.start_url = start_urls.pop()
+            self._start_url_object = urlparse(self.start_url)
 
         # If we have no urls to visit in
         # the array, try to eventually
@@ -729,9 +772,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             # In the case where the user has provided a
             # set of urls directly in the function,
             # start_url would be None
-            if self.start_url is None:
-                self.start_url = current_url
-                self._start_url_object = urlparse(self.start_url)
+            # if self.start_url is None:
+            #     self.start_url = current_url
+            #     self._start_url_object = urlparse(self.start_url)
 
             current_url_object = urlparse(current_url)
             # If we are not on the same domain as the
@@ -747,10 +790,12 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             try:
                 # Always wait for the body section of
                 # the page to be located  or visible
-                wait = WebDriverWait(self.driver, 8)
-                wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+                wait = WebDriverWait(self.driver, 5)
+                wait.until(
+                    EC.presence_of_element_located((By.TAG_NAME, 'body'))
+                )
             except:
-                logger.error('Body of page not detected')
+                logger.error('Body element of page was not detected')
 
             self.post_visit_actions(current_url=current_url)
 
@@ -764,10 +809,9 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             self.visited_urls.add(current_url)
 
+            url_instance = URL(current_url)
+
             if self._meta.crawl:
-                # TODO: Check performance issues here
-                # where the url gathering and processing
-                # might be a little slow
                 # s = time.time()
                 self.get_page_urls()
                 # e = round(time.time() - s, 2)
@@ -817,25 +861,33 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 #     emails=self.emails_container
                 # )
 
-            # Run custom user actions once
-            # everything is completed
-            url_instance = URL(current_url)
             try:
+                # Run custom user actions once
+                # everything is completed
                 self.run_actions(url_instance)
-            except TypeError :
+            except TypeError:
                 raise TypeError(
                     "'self.run_actions' should be able to accept arguments"
                 )
             except Exception as e:
                 logger.error(e)
                 raise ExceptionGroup(
-                    "An exception occured while trygin "
+                    "An exception occured while trying "
                     "to execute 'self.run_actions'",
                     [
                         Exception(e),
                         exceptions.SpiderExecutionError()
                     ]
                 )
+            else:
+                # Refresh the urls once the
+                # user actions have been completed
+                # for example scrolling down a page
+                # that could generate new urls to
+                # disover or changing a filter
+                if self._meta.crawl:
+                    self.refresh_page_urls()
+                    self._backup_urls()
 
             # Run routing actions aka, base on given
             # url path, route to a function that
@@ -844,15 +896,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 self._meta.router.resolve(url_instance, self)
 
             if self._meta.crawl:
-                performance = self.calculate_performance()
-                urls_performance = self.calculate_completion_percentage()
-                performance_document = {
-                    'days': performance.days,
-                    'duration': performance.duration,
-                    'count_urls_to_visit': urls_performance.count_urls_to_visit,
-                    'count_visited_urls': urls_performance.count_visited_urls
-                }
-                write_json_document('performance.json', performance_document)
+                self.calculate_performance()
+                write_json_document('performance.json', self.statistics)
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
