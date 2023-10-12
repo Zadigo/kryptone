@@ -35,18 +35,7 @@ class EcommerceCrawlerMixin:
             'products_urls': list(TEMPORARY_PRODUCT_CACHE)
         })
 
-    def seen_products(self, using='id_or_reference'):
-        """Returns a list of all products that were seen"""
-        return set(map(lambda x: x[using], self.product_objects))
-
-    def product_exists(self, product, using='id_or_reference'):
-        """Checks if a product was already seen in the database"""
-        if not isinstance(product, (dict, self.model)):
-            raise ValueError(
-                f'Value should be an instance of dict or {self.model}')
-        return product[using] in self.seen_products(using=using)
-
-    def add_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
+    def add_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds a product to the internal product container
 
         >>> instance.add_product([{...}], track_id=False)
@@ -58,11 +47,8 @@ class EcommerceCrawlerMixin:
         if avoid_duplicates:
             # Creates the product but does not add it to the
             # general product list
-            if self.product_exists(data, using=duplicate_key):
+            if product[duplicate_key] in TEMPORARY_PRODUCT_CACHE:
                 return False, product
-
-        if track_id:
-            product.id = self.products.count() + 1
 
         if collection_id_regex is not None:
             product.set_collection_id(collection_id_regex)
@@ -71,7 +57,7 @@ class EcommerceCrawlerMixin:
         self.products.append(product.as_json())
 
         self.found_products_counter = self.found_products_counter + 1
-        TEMPORARY_PRODUCT_CACHE.add(product.url)
+        TEMPORARY_PRODUCT_CACHE.add(product[duplicate_key])
         return True, product
 
     def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
@@ -84,7 +70,6 @@ class EcommerceCrawlerMixin:
         # products from a previous scrap and if so, load the previous
         # products. This would prevent overwriting the previous file
         if not self.products:
-            # TODO: Create products.json if it does not already exist
             products_file = pathlib.Path(
                 settings.PROJECT_PATH / 'products.json'
             )
@@ -105,7 +90,6 @@ class EcommerceCrawlerMixin:
 
         new_product = self.add_product(
             data,
-            track_id=track_id,
             collection_id_regex=collection_id_regex,
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
