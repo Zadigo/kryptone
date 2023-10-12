@@ -748,7 +748,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 start_urls = list(start_urls)
             self.list_of_seen_urls.update(*start_urls)
             self.start_url = start_urls.pop()
-            self._start_url_object = urlparse(self.start_url)
+        self._start_url_object = urlparse(self.start_url)
 
         # If we have no urls to visit in
         # the array, try to eventually
