@@ -350,14 +350,7 @@ class BaseCrawler(metaclass=Crawler):
     def get_page_urls(self):
         """Returns all the urls present on the
         actual given page"""
-        links = self.driver.execute_script(
-        """
-        const urls = Array.from(document.querySelectorAll('a'))
-        return urls.map(x => x.href)
-        """
-        )
-        # elements = self.get_page_link_elements
-        logger.info(f"Found {len(links)} urls")
+        logger.info(f"Found {len(links)} url(s) on this page")
 
         for link in links:
             # link = element.get_attribute('href')
