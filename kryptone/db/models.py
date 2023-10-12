@@ -19,13 +19,9 @@ class BaseModel:
         return list(map(lambda x: x.name, fields))
 
     @cached_property
-    def url_object(self):
+    def get_url_object(self):
         result = unquote(getattr(self, 'url', ''))
         return urlparse(str(result))
-
-    @cached_property
-    def get_url_object(self):
-        return urlparse(str(self.url))
 
     @cached_property
     def url_stem(self):
