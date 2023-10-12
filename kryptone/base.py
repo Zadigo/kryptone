@@ -198,9 +198,35 @@ class BaseCrawler(metaclass=Crawler):
 
     @property
     def get_page_link_elements(self):
-        """Returns all the selenium `<a></a>` anchor tags
-        of the current page"""
-        return self.driver.find_elements(By.TAG_NAME, 'a')
+        """Returns all the links present on the
+        currently visited page"""
+        if self._meta.restrict_search_to:
+            found_urls = []
+            for selector in self._meta.restrict_search_to:
+                script = f"""
+                const urls = Array.from(document.querySelectorAll('{selector} a'))
+                return urls.map(x => x.href)
+                """
+                urls = self.driver.execute_script(script)
+
+                if urls:
+                    logger.info(
+                        f"Found {len(urls)} url(s) in '{selector}'")
+                found_urls.extend(urls)
+
+            # If no urls were found in the specific
+            # section of the page, we'll just return
+            # the whole page urls
+            if found_urls:
+                return found_urls
+
+        urls = self.driver.execute_script(
+            """
+        const urls = Array.from(document.querySelectorAll('a'))
+        return urls.map(x => x.href)
+        """
+        )
+        return urls
 
     @property
     def get_title_element(self):
