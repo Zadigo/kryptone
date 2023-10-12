@@ -7,7 +7,7 @@ import time
 from collections import defaultdict, namedtuple
 from functools import cached_property
 from urllib.parse import unquote, urlparse, urlunparse
-
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 import pandas
 import pytz
 import requests
@@ -80,7 +80,13 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
 
     # Proxies
     if settings.USE_PROXY_ADDRESS:
-        options.add_argument(f'--proxy-server={settings.PROXY_IP_ADDRESS}')
+        proxy = Proxy()
+        proxy.proxy_type = ProxyType.MANUAL
+        proxy.http_proxy = settings.PROXY_IP_ADDRESS
+        options.add_argument(
+            f'--proxy-server=http://{settings.PROXY_IP_ADDRESS}'
+        )
+        options.add_argument('--disable-gpu')
 
     service = Service(manager_instance().install())
     return browser(service=service, options=options)
