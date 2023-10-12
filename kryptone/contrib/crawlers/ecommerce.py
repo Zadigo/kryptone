@@ -70,8 +70,15 @@ class EcommerceCrawlerMixin:
         # products. This would prevent overwriting the previous file
         if not self.products:
             # TODO: Create products.json if it does not already exist
-            previous_products_data = read_json_document('products.json')
-            self.products = previous_products_data if previous_products_data else []
+            products_file = pathlib.Path(
+                settings.PROJECT_PATH / 'products.json'
+            )
+            
+            if not products_file.exists():
+                write_json_document('products.json', [])
+            else:
+                previous_products_data = read_json_document('products.json')
+                self.products = previous_products_data if previous_products_data else []
             # for item in previous_products_data:
             #     if isinstance(item, dict):
             #         self.product_objects.append(self.model(**item))
