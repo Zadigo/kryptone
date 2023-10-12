@@ -41,7 +41,7 @@ DEFAULT_META_OPTIONS = {
     'domains', 'audit_page', 'url_passes_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
     'gather_emails', 'router', 'crawl', 'start_urls',
-    'ignore_queries', 'ignore_images'
+    'ignore_queries', 'ignore_images', 'restrict_search_to'
 }
 
 
@@ -105,6 +105,10 @@ class CrawlerOptions:
         self.router = None
         self.crawl = True
         self.start_urls = []
+        # Restrict url retrieval only to
+        # to specific sections of the page
+        # e.g. body, div[class="example"]
+        self.restrict_search_to = []
         # Ignore urls with query strings
         self.ignore_queries = False
         self.ignore_images = False
