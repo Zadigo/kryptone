@@ -420,15 +420,27 @@ class BaseCrawler(metaclass=Crawler):
 
             self.urls_to_visit.add(link)
 
+        # Finally, run all the filters to exclude
+        # urls that the user does not want to visit
+        # NOTE: This re-initializes the list of
+        # urls to visit
+        self.urls_to_visit = set(self.run_filters())
+
+        newly_discovered_urls = []
+        for link in links:
+            if link not in self.list_of_seen_urls:
+                newly_discovered_urls.append(link)
+
             # For statistics, we'll keep track of all the
             # urls that we have gathered during crawl
             self.list_of_seen_urls.add(link)
 
-        # Finally, run all the filters to exclude
-        # urls that the user does not want to visit
-        # from the list of urls. NOTE: This re-initializes
-        # the list of urls to visit
-        self.urls_to_visit = set(self.run_filters())
+        if newly_discovered_urls:
+            logger.info(
+                f"Disovered {len(newly_discovered_urls)} "
+                "new overall url(s)"
+            )
+
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
