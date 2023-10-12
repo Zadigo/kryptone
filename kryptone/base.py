@@ -423,9 +423,10 @@ class BaseCrawler(metaclass=Crawler):
                     continue
 
             if self._meta.ignore_images:
-                path = pathlib.Path(link)
+                path = pathlib.Path(link_object.path)
                 if path.suffix != '':
-                    if path in constants.IMAGE_EXTENSIONS:
+                    suffix = path.suffix.removeprefix('.')
+                    if suffix in constants.IMAGE_EXTENSIONS:
                         continue
 
             self.urls_to_visit.add(link)
