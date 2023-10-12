@@ -29,6 +29,7 @@ class Product(BaseModel):
     composition: str = None
     color: str = None
     date: str = None
+    sizes: list = dataclasses.field(default_factory=list)
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))
