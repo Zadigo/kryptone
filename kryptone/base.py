@@ -686,8 +686,8 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         # same time we have no start urls to start from
         # as a start url, raise an error
         if self.start_url is None and not start_urls:
-            raise ValueError(
-                "No start url provided. Provide either a "
+            raise exceptions.BadImplementationError(
+                "No start url. Provide either a "
                 "start url or start urls in the Meta"
             )
 
