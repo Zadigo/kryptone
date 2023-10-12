@@ -230,7 +230,7 @@ class BaseCrawler(metaclass=Crawler):
                 return found_urls
 
         urls = self.driver.execute_script(
-            """
+        """
         const urls = Array.from(document.querySelectorAll('a'))
         return urls.map(x => x.href)
         """
@@ -480,11 +480,12 @@ class BaseCrawler(metaclass=Crawler):
             #         None
             #     ))
 
-            # if url in self.list_of_seen_urls:
-            #     continue
+            if url in self.list_of_seen_urls:
+                continue
             
             newly_discovered_urls.append(url)
             self.list_of_seen_urls.add(url)
+            
         self.add_urls(*newly_discovered_urls)
 
         if newly_discovered_urls:
@@ -762,7 +763,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 # Add the start_url to the list of
                 # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
-        self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.add_urls(*start_urls)
