@@ -41,6 +41,10 @@ class EcommerceCrawlerMixin:
         >>> instance.add_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if not data or data is None:
+            logger.warning(f'Product not added to product list with {data}')
+            return False
+        
         data = clean_dictionnary(data)
         product = self.model(**data)
 
