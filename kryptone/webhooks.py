@@ -5,7 +5,6 @@ from requests.auth import HTTPBasicAuth
 from requests.models import Request
 
 from kryptone import logger
-from kryptone.conf import settings
 
 
 class BaseWebhook:
@@ -17,7 +16,6 @@ class BaseWebhook:
     def __init__(self, *, url=None, auth_token_name='Bearer', auth_token=None):
         self.current_iteration = 0
         self.session = Session()
-        self.base_pagination = settings.WEBHOOK_PAGINATION
         self.current_slice = [0, self.base_pagination]
         self.response = None
         self.base_url = url
@@ -36,7 +34,7 @@ class BaseWebhook:
         request = Request(
             method='post',
             url=self.base_url,
-            data=data,
+            json=data,
             headers=headers,
             auth=None
         )
@@ -47,14 +45,6 @@ class BaseWebhook:
         except:
             logger.critical(f'Webhook failed for url: {self.base_url}')
         else:
-            if self.current_iteration > 0:
-                # Update the slice so that we can get the data from
-                # a given section to another one
-                self.current_slice[0] = self.current_slice[0] + \
-                    self.base_pagination
-                self.current_slice[1] = self.current_slice[1] + \
-                    self.base_pagination
-
             logger.info(f'Webhook completed for url: {self.base_url}')
             self.current_iteration = self.current_iteration + 1
 
@@ -88,8 +78,3 @@ class Webhooks:
             tasks.append(task)
 
         self.responses = await asyncio.gather(*tasks)
-
-
-# w = Webhooks(['http://example.com', 'http://example.com'])
-# asyncio.run(w.resolve([]))
-# print(w.webhooks)
