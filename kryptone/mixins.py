@@ -19,9 +19,6 @@ class TextMixin:
 
     page_documents = []
     fitted_page_documents = []
-    # TODO: load these modules inside of the class
-    # because they are extremely slow on start up
-    # tokenizer_class = NLTKWordTokenizer
 
     @cached_property
     def stop_words_english(self):
