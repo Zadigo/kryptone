@@ -4,12 +4,10 @@ import datetime
 import os
 import random
 import time
-from collections import defaultdict, namedtuple
-from functools import cached_property
+from collections import OrderedDict, defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 import pandas
-import pytz
 import requests
 from lxml import etree
 from requests import Session
@@ -24,9 +22,7 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import exceptions, logger
 from kryptone.conf import settings
-from kryptone.db import backends
-from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone.utils import file_readers
+from kryptone.utils import urls
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          read_json_document,
@@ -34,15 +30,17 @@ from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          write_json_document)
 from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLGenerator, pathlib
+from kryptone.utils.urls import URL, pathlib
+from kryptone.utils.iterators import URLGenerator
 from kryptone import constants
 from kryptone.webhooks import Webhooks
 from kryptone import exceptions
+from urllib.robotparser import RobotFileParser
 
 DEFAULT_META_OPTIONS = {
-    'domains', 'audit_page', 'url_passes_tests',
+    'domains', 'url_ignore_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router', 'crawl', 'start_urls',
+    'router', 'crawl', 'start_urls',
     'ignore_queries', 'ignore_images', 'restrict_search_to'
 }
 
@@ -104,12 +102,10 @@ class CrawlerOptions:
         self.initial_spider_meta = None
 
         self.domains = []
-        self.audit_page = False
-        self.url_passes_tests = None
+        self.url_ignore_tests = []
         self.debug_mode = False
         self.site_language = 'en'
         self.default_scroll_step = 80
-        self.gather_emails = False
         self.router = None
         self.crawl = True
         self.start_urls = []
@@ -189,12 +185,14 @@ class BaseCrawler(metaclass=Crawler):
 
     def __init__(self, browser_name=None):
         self._start_url_object = None
+
         self.driver = get_selenium_browser_instance(
             browser_name=browser_name or self.browser_name,
             headless=settings.HEADLESS,
             load_images=settings.LOAD_IMAGES,
             load_js=settings.LOAD_JS
         )
+        self.url_distribution = defaultdict(list)
 
         # navigation.connect(collect_images_receiver, sender=self)
 
@@ -220,7 +218,9 @@ class BaseCrawler(metaclass=Crawler):
 
                 if urls:
                     logger.info(
-                        f"Found {len(urls)} url(s) in '{selector}'")
+                        f"Found {len(urls)} url(s) "
+                        "in page section: '{selector}'"
+                    )
                 found_urls.extend(urls)
 
             # If no urls were found in the specific
@@ -280,6 +280,21 @@ class BaseCrawler(metaclass=Crawler):
         #     urls_data=urls_data
         # )
 
+    def _get_robot_txt_parser(self):
+        """Checks if an url can be crawled
+        using the Robots.txt file"""
+        instance = RobotFileParser()
+        robots_txt_url = urlunparse((
+            self._start_url_object.scheme,
+            self._start_url_object.netloc,
+            'robots.txt',
+            None,
+            None,
+            None
+        ))
+        instance.set_url(robots_txt_url)
+        return instance
+
     def urljoin(self, path):
         """Returns the domain of the current
         website"""
@@ -294,206 +309,149 @@ class BaseCrawler(metaclass=Crawler):
         ))
         return unquote(result)
 
-    def run_filters(self):
+    def url_structural_check(self, url):
+        """Checks the structure of an
+        incoming url"""
+        url = str(url)
+        if url.startswith('/'):
+            return self.urljoin(url)
+        clean_url = unquote(url)
+        return clean_url, urlparse(clean_url)
+
+    def url_filters(self, valid_urls):
         """Excludes urls in the list of urls to visit based
         on the return value of the function in `url_filters`.
         All conditions should be true for the url to be
         considered to be visited.
         """
-        if self._meta.url_passes_tests:
+        if self._meta.url_ignore_tests:
             results = defaultdict(list)
-            for url in self.urls_to_visit:
+            for url in valid_urls:
                 truth_array = results[url]
-                for instance in self._meta.url_passes_tests:
+                for instance in self._meta.url_ignore_tests:
                     truth_array.append(instance(url))
 
-            filtered_urls = []
+            urls_kept = set()
+            urls_removed = set()
+            final_urls_filtering_audit = OrderedDict()
+            
             for url, truth_array in results.items():
-                if not all(truth_array):
+                final_urls_filtering_audit[url] = any(truth_array)
+
+                # Expect all the test results to
+                # be true. Otherwise the url is invalid
+                if any(truth_array):
+                    urls_removed.add(url)
                     continue
-                filtered_urls.append(url)
-            message = (
-                f"Url filter completed. {len(filtered_urls)} "
-                "successfully passed the tests"
-            )
-            logger.info(message)
-            return filtered_urls
-        # Ensure that we return the original
-        # urls to visit if there are no filters
-        # or this might return nothing
-        return self.urls_to_visit
+                urls_kept.add(url)
+
+            logger.info(f"Filters completed. {len(urls_removed)} url(s) removed")
+            return urls_kept
+        return valid_urls
 
     def add_urls(self, *urls_or_paths):
         """Manually add urls to the current urls to
         visit. This is useful for cases where urls are
         nested in other elements than links and that
         cannot actually be retrieved by the spider"""
-        for item in urls_or_paths:
-            new_url = str(item)
-            new_url_object = urlparse(new_url)
+        counter = 0
+        valid_urls = set()
+        invalid_urls = set()
+        for url in urls_or_paths:
+            clean_url, url_object = self.url_structural_check(url)
+            self.list_of_seen_urls.add(clean_url)
 
-            if item.startswith('/'):
-                new_url = urlunparse((
-                    self._start_url_object.scheme,
-                    self._start_url_object.netloc,
-                    item,
-                    None,
-                    None,
-                    None
-                ))
-
-            if new_url_object.netloc == '' and new_url_object.path == '':
+            if url in self.visited_urls:
+                invalid_urls.add(url)
                 continue
 
-            if new_url_object.netloc != self._start_url_object.netloc:
+            if url in self.urls_to_visit:
+                invalid_urls.add(url)
                 continue
 
-            if new_url in self.visited_urls:
+            if url_object.netloc == '' and url_object.path == '':
+                invalid_urls.add(url)
                 continue
 
-            if new_url in self.urls_to_visit:
+            counter = counter + 1
+            valid_urls.add(url)
+        filtered_valid_urls = self.url_filters(valid_urls)
+        self.urls_to_visit.update(filtered_valid_urls)
+        logger.info(f'{counter} url(s) added')
+
+    def get_page_urls(self, current_url, refresh=False):
+        """Gets all the urls present on the
+        actual visited page"""
+        raw_urls = self.get_page_link_elements
+        logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
+
+        valid_urls = set()
+        invalid_urls = set()
+        for url in raw_urls:
+            if refresh:
+                if url in self.list_of_seen_urls:
+                    invalid_urls.add(clean_url)
+                    continue
+
+            clean_url, url_object = self.url_structural_check(url)
+
+            if url_object.netloc != self._start_url_object.netloc:
+                invalid_urls.add(clean_url)
                 continue
 
-            self.urls_to_visit.add(new_url)
-        logger.info(f'{len(urls_or_paths)} url(s) added')
-
-    def get_page_urls(self):
-        """Returns all the urls present on the
-        actual given page"""
-        links = self.get_page_link_elements
-        logger.info(f"Found {len(links)} url(s) on this page")
-
-        for link in links:
-            # Turn the url into a Python object
-            # to make it more usable for us
-            link_object = urlparse(link)
-
-            # We do not want to add an item
-            # to the list if it already exists,
-            # if it is invalid or None
-            if link in self.urls_to_visit:
+            if url is None or url == '':
+                invalid_urls.add(clean_url)
                 continue
 
-            if link in self.visited_urls:
+            if url_object.fragment:
+                invalid_urls.add(clean_url)
                 continue
 
-            if link is None or link == '':
+            if url.endswith('#'):
+                invalid_urls.add(clean_url)
                 continue
 
-            # Links such as http://exampe.com/path#
-            # are useless and can create
-            # repetition. Additionally this is a
-            # guard against http://example.com# from
-            # urlparse which does not detect the #
-            if link.endswith('#'):
+            if url_object.path == '/' and self._start_url_object.path == '/':
+                invalid_urls.add(clean_url)
                 continue
-
-            # If the link is similar to the initially
-            # visited url, skip it.
-            # NOTE: This is essentially a  security measure
-            if link_object.netloc != self._start_url_object.netloc:
-                continue
-
-            # If the url contains a fragment, it is the same
-            # as visiting the root page, for example:
-            # example.com/#google is the same as example.com/
-            if link_object.fragment:
-                continue
-
-            # If we have already visited the home page then
-            # skip all urls that include the '/' path.
-            # NOTE: This is another security measure
-            if link_object.path == '/' and self._start_url_object.path == '/':
-                continue
-
-            # Reconstruct a partial url for example
-            # /google becomes https://example.com/google
-            if link_object.path != '/' and link.startswith('/'):
-                link = urlunparse((
-                    self._start_url_object.scheme,
-                    self._start_url_object.netloc,
-                    link,
-                    None,
-                    None,
-                    None
-                ))
 
             if self._meta.ignore_queries:
-                if link_object.query != '':
+                if url_object.query:
+                    invalid_urls.add(clean_url)
                     continue
 
             if self._meta.ignore_images:
-                path = pathlib.Path(link_object.path)
-                if path.suffix != '':
-                    suffix = path.suffix.removeprefix('.')
+                url_as_path = pathlib.Path(clean_url)
+                if url_as_path.suffix != '':
+                    suffix = url_as_path.suffix.removeprefix('.')
                     if suffix in constants.IMAGE_EXTENSIONS:
+                        invalid_urls.add(clean_url)
                         continue
 
-            self.urls_to_visit.add(link)
-
-        # Finally, run all the filters to exclude
-        # urls that the user does not want to visit
-        # NOTE: This re-initializes the list of
-        # urls to visit
-        self.urls_to_visit = set(self.run_filters())
-
-        newly_discovered_urls = []
-        for link in links:
-            if link not in self.list_of_seen_urls:
-                newly_discovered_urls.append(link)
-
-            # For statistics, we'll keep track of all the
-            # urls that we have gathered during crawl
-            self.list_of_seen_urls.add(link)
-
-        if newly_discovered_urls:
-            logger.info(
-                f"Disovered {len(newly_discovered_urls)} "
-                "new overall url(s)"
-            )
-
-    def refresh_page_urls(self):
-        """This function will only check if urls
-        were registered in the list of urls that
-        were already seen (regardless of the page).
-        This function should be used only to compare a
-        new incoming list of urls to seen ones
-
-        The filtering here is less more strict than `get_page_urls`
-        since we are interested in ALL urls that were *potentially*
-        seen to be visitable
-        """
-        newly_discovered_urls = []
-        for url in self.get_page_link_elements:
-            # url_object = urlparse(url)
-
-            # if new_url_object.netloc == '' and new_url_object.path == '':
-            #     continue
-
-            # if url_object.path != '/' and url.startswith('/'):
-            #     url = urlunparse((
-            #         self._start_url_object.scheme,
-            #         self._start_url_object.netloc,
-            #         url,
-            #         None,
-            #         None,
-            #         None
-            #     ))
-
-            if url in self.list_of_seen_urls:
+            if clean_url in self.visited_urls:
+                invalid_urls.add(clean_url)
                 continue
-            
-            newly_discovered_urls.append(url)
-            self.list_of_seen_urls.add(url)
-            
-        self.add_urls(*newly_discovered_urls)
+
+            if clean_url in self.visited_urls:
+                invalid_urls.add(clean_url)
+                continue
+
+            valid_urls.add(clean_url)
+
+        if valid_urls:
+            logger.info(f'Kept {len(valid_urls)} valid url(s)')
+
+        newly_discovered_urls = []
+        for url in valid_urls:
+            if url not in self.list_of_seen_urls:
+                newly_discovered_urls.append(url)
 
         if newly_discovered_urls:
             logger.info(
-                f"Got {len(newly_discovered_urls)} new url(s) "
-                "after url discovery refresh"
-            )
-        self.add_urls(*newly_discovered_urls)
+                f'Discovered {len(newly_discovered_urls)} unseen url(s)')
+            
+        filtered_valid_urls = self.url_filters(valid_urls)
+        self.urls_to_visit.update(filtered_valid_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
@@ -621,7 +579,7 @@ class BaseCrawler(metaclass=Crawler):
         """
 
 
-class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
+class SiteCrawler(BaseCrawler):
     start_url = None
 
     def __init__(self, browser_name=None):
@@ -776,13 +734,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
             if current_url is None:
                 continue
 
-            # In the case where the user has provided a
-            # set of urls directly in the function,
-            # start_url would be None
-            # if self.start_url is None:
-            #     self.start_url = current_url
-            #     self._start_url_object = urlparse(self.start_url)
-
             current_url_object = urlparse(current_url)
             # If we are not on the same domain as the
             # starting url: *stop*. we are not interested
@@ -831,53 +782,10 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             if self._meta.crawl:
                 # s = time.time()
-                self.get_page_urls()
+                self.get_page_urls(current_url)
                 # e = round(time.time() - s, 2)
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
-
-            if self._meta.audit_page:
-                self.audit_page(current_url)
-                write_json_document('audit.json', self.page_audits)
-
-                # Write vocabulary as JSON
-                vocabulary = self.global_audit()
-                write_json_document('global_audit.json', vocabulary)
-
-                # Write vocabulary as CSV
-                rows = []
-                for key, value in vocabulary.items():
-                    rows.append([key, value])
-                write_csv_document('global_audit.csv', rows)
-
-                # Save the website's text
-                website_text = ' '.join(self.fitted_page_documents)
-                file_readers.write_text_document(
-                    'website_text.txt', website_text)
-
-                # cache.set_value('page_audit', self.page_audits)
-                # cache.set_value('global_audit', vocabulary)
-                # db_signal.send(
-                #     self,
-                #     page_audit=self.page_audits,
-                #     global_audit=vocabulary
-                # )
-
-                logger.info('Audit complete...')
-
-            if self._meta.gather_emails:
-                self.emails(
-                    self.get_transformed_raw_page_text,
-                    elements=self.get_page_link_elements
-                )
-                # Format each email as [[...], ...] in order to comply
-                # with the way that the csv writer outputs the rows
-                emails = list(map(lambda x: [x], self.emails_container))
-                write_csv_document('emails.csv', emails)
-                # db_signal.send(
-                #     self,
-                #     emails=self.emails_container
-                # )
 
             try:
                 # Run custom user actions once
@@ -904,7 +812,7 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.refresh_page_urls()
+                    self.get_page_urls(current_url, refresh=True)
                     self._backup_urls()
 
             # Run routing actions aka, base on given
