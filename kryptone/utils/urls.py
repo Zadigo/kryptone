@@ -89,6 +89,10 @@ class URL:
     def url_stem(self):
         return self.as_path.stem
 
+    @property
+    def is_secured(self):
+        return self.url_object.scheme == 'https'
+
     @classmethod
     def create(cls, url):
         return cls(url)
