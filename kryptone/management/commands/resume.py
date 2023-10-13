@@ -5,6 +5,8 @@ from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
         parser.add_argument(
             'name',
