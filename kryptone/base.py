@@ -313,9 +313,9 @@ class BaseCrawler(metaclass=Crawler):
         """Checks the structure of an
         incoming url"""
         url = str(url)
-        if url.startswith('/'):
-            return self.urljoin(url)
         clean_url = unquote(url)
+        if url.startswith('/'):
+            clean_url = self.urljoin(clean_url)
         return clean_url, urlparse(clean_url)
 
     def url_filters(self, valid_urls):
@@ -388,12 +388,12 @@ class BaseCrawler(metaclass=Crawler):
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
+            clean_url, url_object = self.url_structural_check(url)
+
             if refresh:
                 if url in self.list_of_seen_urls:
                     invalid_urls.add(clean_url)
                     continue
-
-            clean_url, url_object = self.url_structural_check(url)
 
             if url_object.netloc != self._start_url_object.netloc:
                 invalid_urls.add(clean_url)
@@ -437,6 +437,9 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             valid_urls.add(clean_url)
+
+        self.list_of_seen_urls.update(valid_urls)
+        self.list_of_seen_urls.update(invalid_urls)
 
         if valid_urls:
             logger.info(f'Kept {len(valid_urls)} valid url(s)')
@@ -624,7 +627,12 @@ class SiteCrawler(BaseCrawler):
         #     else:
         #         data = read_json_document('cache.json')
         data = read_json_document('cache.json')
-        self.urls_to_visit = set(data['urls_to_visit'])
+
+        # Before reloading the urls, run the filters
+        # in case previous urls to exclude were
+        # present
+        valid_urls = self.url_filters(data['urls_to_visit'])
+        self.urls_to_visit = set(valid_urls)
         self.visited_urls = set(data['visited_urls'])
 
         previous_seen_urls = read_csv_document('seen_urls.csv', flatten=True)
