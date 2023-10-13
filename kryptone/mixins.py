@@ -1,12 +1,13 @@
 import json
 import re
 import string
+import secrets
 from collections import Counter, defaultdict
 from functools import cached_property, lru_cache
 from urllib.parse import urlparse
 
+from kryptone.utils.date_functions import get_current_date
 from selenium.webdriver.common.by import By
-
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_null, drop_while, keep_while
@@ -61,6 +62,8 @@ class TextMixin:
     def get_text_length(text):
         """Get the length of the
         incoming text"""
+        if text is None:
+            return 0
         return len(text)
 
     @property
@@ -219,45 +222,38 @@ class SEOMixin(TextMixin):
 
     @property
     def get_page_title(self):
-        try:
-            script = "return document.querySelector('title').innerText"
-            text = self.driver.execute_script(script)
-        except:
-            return ''
-        else:
-            return self.fit(text)
+        text = self.driver.execute_script(
+            """
+            let title = document.querySelector('title')
+            return title && title.textContent
+            """
+        )
+        return self.fit(text)
 
     @property
     def get_page_description(self):
-        try:
-            script = """
-            return document.querySelector('meta[name="description"]').attributes.content.textContent
-            """
-            text = self.driver.execute_script(script)
-        except:
-            return ''
-        else:
-            return self.fit(text)
+        script = """
+        let element = document.querySelector('meta[name="description"]')
+        return element && element.attributes.content.textContent
+        """
+        text = self.driver.execute_script(script)
+        return self.fit(text)
 
     @property
     def get_page_keywords(self):
-        element = self.driver.find_element(
-            By.CSS_SELECTOR,
-            "meta[name='keywords']"
-        )
-        try:
-            return element.text
-        except:
-            return ''
+        script = """
+        let meta = document.querySelector('[name="keywords"]')
+        return meta && meta.content
+        """
+        text = self.driver.execute_script(script)
+        return self.fit(text)
 
     @property
     def has_head_title(self):
-        try:
-            element = self.driver.find_element(By.TAG_NAME, 'h1')
-        except:
-            return False
-        else:
-            return True if element else False
+        return all([
+            self.get_page_title is not None,
+            self.get_page_title != ''
+        ])
 
     @property
     def title_is_valid(self):
@@ -265,13 +261,13 @@ class SEOMixin(TextMixin):
 
     @property
     def description_is_valid(self):
-        return len(self.get_page_title) <= 150
+        return len(self.get_page_description) <= 150
 
     @property
     def get_page_text(self):
         """Returns a fitted and transformed
         version of the document's text"""
-        return self.driver.find_element(By.TAG_NAME, 'body').text
+        return self.driver.execute_script("""return document.body.textContent""")
 
     @staticmethod
     def normalize_integers(items):
@@ -303,12 +299,21 @@ class SEOMixin(TextMixin):
 
     def get_page_status_code(self):
         pass
+
+    def get_internal_urls(self, audit):
+        urls = self.driver.execute_script(
+            """
+            return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
+            """
+        )
+        filtered_urls = filter(lambda x: urlparse(x).netloc == self._start_url_object.netloc, urls)
+        audit['internal_urls'] = len(list(filtered_urls))
     
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
         image_alts = []
-        images = self.driver.find_elements(By.TAG_NAME, 'img')
+        images = self.driver.execute_script("""document.querySelectorAll('img')""")
         if images:
             for image in images:
                 image_alt = self.fit(image.get_attribute('alt'))
@@ -338,11 +343,8 @@ class SEOMixin(TextMixin):
         structured_data_type = None
         content = self.driver.execute_script(
             """
-            try {
-                return document.querySelector('script[type*="ld+json"]').innerText
-            } catch (e) {
-                return false
-            }
+            let el = document.querySelector('script[type*="ld+json"]')
+            return el && el.textContent
             """
         )
         if content:
@@ -380,31 +382,42 @@ class SEOMixin(TextMixin):
 
     def audit_page(self, current_url):
         """Audit the current page by analyzing different
-        key metrics from the title, the description etc."""
-        url_object = urlparse(current_url)
-        
+        key metrics from the title, the description etc."""        
         matrix, vectorizer = self.vectorize_page(self.get_page_text)
         vocabulary = self.normalize_integers(vectorizer.vocabulary_)
 
+        has_head_title = self.driver.execute_script(
+            """
+            let el = document.querySelector('h1')
+            return el && el !== null
+            """
+        )
+
+        if not has_head_title:
+            self.driver.save_screenshot(f'media/{secrets.token_hex(nbytes=5)}.png')
+
         audit = {
+            'date': get_current_date(),
             'title': self.get_page_title,
             'title_length': self.get_text_length(self.get_page_title),
             'title_is_valid': self.title_is_valid,
             'description': self.get_page_description,
             'description_length': self.get_text_length(self.get_page_description),
             'description_is_valid': self.description_is_valid,
-            'url': current_url,
+            'url': str(current_url),
             'page_content_length': len(self.get_page_text),
             'word_count_analysis': vocabulary,
             'status_code': None,
-            'is_https': url_object.scheme == 'https'
+            'is_https': current_url.is_secured,
+            'has_h1': has_head_title
         }
         
         self.audit_structured_data(audit)
         self.audit_images(audit)
         self.get_page_speed(audit)
+        self.get_internal_urls(audit)
 
-        self.page_audits[current_url] = audit
+        self.page_audits[str(current_url)] = audit
         return audit
 
 
