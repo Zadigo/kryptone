@@ -1,16 +1,12 @@
 import datetime
 import time
-from typing import (Coroutine, Iterator, List, Literal, NamedTuple, NoReturn,
-                    Tuple, Union)
-from urllib import parse
+from typing import (Coroutine, DefaultDict, Iterator, List, Literal, NamedTuple, Tuple, Union)
 from urllib.parse import ParseResult
 from urllib.robotparser import RobotFileParser
-from functools import cached_property
 import pandas
 from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.remote.webelement import WebElement
 
-from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.routing import Router
 from kryptone.utils.file_readers import LoadStartUrls
 from kryptone.utils.iterators import AsyncIterator
@@ -150,7 +146,8 @@ class SiteCrawler(BaseCrawler):
 class JSONCrawler:
     base_url: str = ...
     receveived_data: List[list, dict] = ...
-    iterator = AsyncIterator
+    date_sorted_data: DefaultDict[list] = ...
+    iterator: AsyncIterator = ...
     chunks: int = Literal[10]
     request_sent: int = Literal[0]
     max_pages: int = Literal[0]
@@ -162,11 +159,13 @@ class JSONCrawler:
     _url: URL = ...
 
     def __init__(self, chunks: int = ...): ...
+
     @property
     def data(self) -> List[Iterator[list, dict]]: ...
 
+    async def create_dump(self) -> Coroutine[None]: ...
     async def clean(
         self,
-        dataframe: pandas.DataFrame
+        data: Union[list, dict]
     ) -> Coroutine[pandas.DataFrame]: ...
-    async def start(self, interval: int = ...) -> Coroutine: ...
+    async def start(self, interval: int = ...) -> Coroutine[None]: ...
