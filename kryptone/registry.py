@@ -97,6 +97,18 @@ class SpiderConfig:
             spider_instance.create_dump()
             raise Exception(e)
         
+    async def arun(self, **kwargs):
+        spider_instance = self.get_spider_instance()
+
+        try:
+            await spider_instance.start(**kwargs)
+        except KeyboardInterrupt:
+            await spider_instance.create_dump()
+            sys.exit(0)
+        except Exception as e:
+            await spider_instance.create_dump()
+            raise Exception(e)
+        
     def resume(self, **kwargs):
         spider_instance = self.get_spider_instance()
 
@@ -180,7 +192,7 @@ class MasterRegistry:
                 f"related module: '{dotted_path}'"
             )
 
-        from kryptone.base import BaseCrawler
+        from kryptone.base import BaseCrawler, JSONCrawler
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -208,7 +220,7 @@ class MasterRegistry:
         )
 
         valid_spiders = filter(
-            lambda x: issubclass(x[1], BaseCrawler),
+            lambda x: issubclass(x[1], (BaseCrawler, JSONCrawler)),
             spiders
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
