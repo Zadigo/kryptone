@@ -394,7 +394,7 @@ class SEOMixin(TextMixin):
         )
 
         if not has_head_title:
-            self.driver.save_screenshot(f'media/{secrets.token_hex(nbytes=5)}.png')
+            self.driver.save_screenshot(f'media/no_h1_{secrets.token_hex(nbytes=5)}.png')
 
         audit = {
             'date': get_current_date(),

@@ -1,6 +1,7 @@
 import asyncio
 import bisect
 import datetime
+from json import JSONDecodeError
 import os
 import random
 import time
@@ -60,6 +61,7 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
     options = options_klass()
     options.add_argument('--remote-allow-origins=*')
     options.add_argument(f'--user-agent={RANDOM_USER_AGENT()}')
+    options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
     # Allow Selenium to be launched
     # in headless mode
@@ -850,7 +852,8 @@ class JSONCrawler:
     the data given an interval in minutes"""
 
     base_url = None
-    receveived_data = []
+    received_data = []
+    date_sorted_data = defaultdict(list)
     iterator = AsyncIterator
 
     def __init__(self, chunks=10):
@@ -863,6 +866,7 @@ class JSONCrawler:
         self.max_pages_key = None
         self.paginate_data = False
         self.pagination = 0
+        self.current_raw_data = {}
 
         if self.base_url is None:
             raise ValueError("'base_url' cannot be None")
@@ -871,15 +875,19 @@ class JSONCrawler:
 
     @property
     def data(self):
-        return self.iterator(self.receveived_data, by=self.chunks)
+        return self.iterator(self.received_data, by=self.chunks)
 
-    async def clean(self, dataframe):
+    async def create_dump(self):
+        pass
+
+    async def clean(self, data):
         """Use this function to run additional logic
         on the retrieved data"""
-        return dataframe.to_json()
+        return pandas.DataFrame(data)
 
     async def start(self, interval=15):
-        logger.info('Starting JSON crawler')
+        logger.info(f'Starting {self.__class__.__name__}')
+        logger.info(f'A request will be made every {interval} minutes')
 
         session = Session()
         request = Request(
@@ -900,8 +908,11 @@ class JSONCrawler:
             while True:
                 while not queue.empty():
                     data = await queue.get()
-                    # self.receveived_data.extend(data)
-                    # await webhooks.resolve(data)
+
+                    self.received_data.extend(data)
+                    self.date_sorted_data[str(get_current_date())] = data
+                    await webhooks.resolve(data)
+
                     await asyncio.sleep(5)
                 await asyncio.sleep(15)
 
@@ -937,23 +948,37 @@ class JSONCrawler:
                     except:
                         logger.error('Request failed')
                     else:
-                        df = pandas.DataFrame(data=response.json())
-                        data_or_dataframe = await self.clean(df)
-                        if isinstance(data_or_dataframe, pandas.DataFrame):
-                            data = data_or_dataframe.to_json(
-                                orient='records', force_ascii=False)
-                        else:
-                            data = data_or_dataframe
+                        if response.ok:
+                            logger.info('Request successfully completed')
+                            try:
+                                self.current_raw_data = response.json()
+                            except requests.exceptions.JSONDecodeError as e:
+                                logger.error(
+                                    f"Could not decode content as JSON "
+                                    "got: {response.content[:50]} - {e}"
+                                )
+                            else:
+                                data_or_dataframe = await self.clean(self.current_raw_data)
+                                if isinstance(data_or_dataframe, pandas.DataFrame):
+                                    data = data_or_dataframe.to_json(
+                                        orient='records', 
+                                        force_ascii=False
+                                    )
+                                else:
+                                    data = data_or_dataframe
 
-                        if self.paginate_data:
-                            self.max_pages = data[self.max_pages_key]
-                            self.current_page = data[self.current_page]
+                                logger.info(f'Received {len(self.current_raw_data)} elements')
 
-                        end_time = round(time.time() - start_time, 1)
-                        await queue.put(data)
+                                if self.paginate_data:
+                                    self.max_pages = data[self.max_pages_key]
+                                    self.current_page = data[self.current_page]
 
+                                await queue.put(data)
+
+                    end_time = round(time.time() - start_time, 1)
                     next_date = next_date + interval
                     self.request_sent = self.request_sent + 1
+                    self.current_raw_data = {}
 
                     logger.info(f'Request completed in {end_time}s')
 
