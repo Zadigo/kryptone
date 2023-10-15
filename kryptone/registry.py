@@ -44,8 +44,10 @@ class SpiderConfig:
         #     "trying to start spiders")
 
         if not paths:
-            raise ValueError("No spiders module within your project. "
-                             "Please create a 'spiders.py' module.")
+            raise ValueError(
+                "No spiders module within your project. "
+                "Please create a 'spiders.py' module."
+            )
 
         self.path = paths[0]
         self.is_ready = False
