@@ -137,10 +137,12 @@ class LoadJS:
 
 
 class LoadStartUrls:
-    """Loads the start urls from a JSON file"""
+    """Loads the start urls from a csv file.
+    The filename should be provided without
+    the file extension"""
     
     def __init__(self, filename='start_urls'):
-        self.filename = filename
+        self.filename = f'{filename}.csv'
 
     def __iter__(self):
         for url in self.content:
@@ -149,7 +151,7 @@ class LoadStartUrls:
     @cached_property
     def content(self):
         with open(self.filename, mode='r', encoding='utf-8') as f:
-            if self.filename.endswith('.json'):
-                return set(json.load(f))
-            elif self.filename.endswith('.csv'):
-                return list(itertools.chain(*csv.reader(f)))
+            # if self.filename.endswith('.json'):
+            #     return set(json.load(f))
+            # elif self.filename.endswith('.csv'):
+            return list(itertools.chain(*csv.reader(f)))
