@@ -1,4 +1,5 @@
 import csv
+from fileinput import filename
 import itertools
 import json
 from functools import cached_property, lru_cache
@@ -139,7 +140,7 @@ class LoadStartUrls:
     """Loads the start urls from a JSON file"""
     
     def __init__(self, filename='start_urls'):
-        self.filename = f'{filename}.json'
+        self.filename = filename
 
     def __iter__(self):
         for url in self.content:
@@ -148,4 +149,7 @@ class LoadStartUrls:
     @cached_property
     def content(self):
         with open(self.filename, mode='r', encoding='utf-8') as f:
-            return set(json.load(f))
+            if self.filename.endswith('.json'):
+                return set(json.load(f))
+            elif self.filename.endswith('.csv'):
+                return list(itertools.chain(*csv.reader(f)))
