@@ -221,7 +221,7 @@ class BaseCrawler(metaclass=Crawler):
                 if urls:
                     logger.info(
                         f"Found {len(urls)} url(s) "
-                        "in page section: '{selector}'"
+                        f"in page section: '{selector}'"
                     )
                 found_urls.extend(urls)
 
