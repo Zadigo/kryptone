@@ -1,5 +1,88 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+import datetime
+from functools import cached_property
+import json
 import sqlite3
+import secrets
+
+# {
+#     "id": "fe81zef5",
+#     "date": null,
+#     "number": 1,
+#     "tables": [
+#         {
+#             "name": "urls_seen",
+#             "fields": [
+#                 {
+#                     "name": "my_name",
+#                     "verbose_name": null,
+#                     "params": "text null"
+#                 }
+#             ],
+#             "indexes": [
+#                 "my_name"
+#             ]
+#         }
+#     ]
+# }
+
+class Migrations:
+    CACHE = {}
+
+    def __init__(self):
+        self.CACHE = self.read_content
+        try:
+            self.tables = self.CACHE['tables']
+        except KeyError:
+            raise KeyError('Migration file is not valid')
+        self.table_map = [table['name'] for table in self.tables]
+        self.fields_map = defaultdict(list)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} [something]>'
+        
+    @cached_property
+    def read_content(self):
+        with open('Z:/- RESPONSABLE DIGITAL/SCRIPTS/kryptone/kryptone/db/migrations.json', mode='r') as f:
+            return json.load(f)
+        
+    def _create_fields(self, table):
+        fields_map = []
+        for field in table.get_fields():
+            fields_map.append(field.deconstruct())
+        self.fields_map[table] = fields_map
+    
+    def _create_indexes(self, table):
+        return []
+        
+    def migrate(self, table):
+        with open('Z:/- RESPONSABLE DIGITAL/SCRIPTS/kryptone/kryptone/db/migrations.json', mode='r'):
+            self.CACHE['id'] = secrets.token_hex(5)
+            self.CACHE['date'] = datetime.datetime.now()
+            self.CACHE['number'] = self.CACHE['number'] + 1
+            self.CACHE['tables'].append({
+                'name': table.name,
+                'fields': self._create_fields(table),
+                'indexes': self._create_indexes(table)
+            })
+
+    def get_table_fields(self, name):
+        table_index = self.table_map.index(name)
+        return self.tables[table_index]['fields']
+    
+    def construct_fields(self, name):
+        fields = self.get_table_fields(name)
+
+        items = []
+        for field in fields:
+            params = []
+            for value in field.values():
+                params.append(value)
+            items.append(params)
+        return items
+
+# migrations = Migrations()
+# print(migrations.construct_fields('urls_seen'))
 
 
 class Field:
@@ -35,6 +118,10 @@ class Field:
         if not isinstance(table, Table):
             raise ValueError()
         self.table = table
+
+    def deconstruct(self):
+        field_parameters = ' '.join(self.field_parameters())
+        return (self.name, None, field_parameters)
 
 
 class TableRegistry:
@@ -282,8 +369,9 @@ class Table(AbstractTable):
         #     query = self.query_class(self, script_tokens)
         #     query.run(commit=True)
 
-table = Table('seen_urls', 'scraping', fields=[
-    Field('url')
-])
-table.create(url='http://example.com')
-table.create(url='http://example/1')
+
+# table = Table('seen_urls', 'scraping', fields=[
+#     Field('url')
+# ])
+# table.create(url='http://example.com')
+# table.create(url='http://example/1')
