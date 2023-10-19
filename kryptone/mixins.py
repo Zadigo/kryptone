@@ -274,12 +274,19 @@ class SEOMixin(TextMixin):
 
     @property
     def title_is_valid(self):
-        return len(self.get_page_title) <= 60
+        page_title = self.get_page_title
+        if page_title is None:
+            return False
+        return len(page_title) <= 60
 
     @property
     def description_is_valid(self):
-        return len(self.get_page_description) <= 150
+        page_description = self.get_page_description
+        if page_description is None:
+            return False
+        return len(page_description) <= 150
 
+    
     @property
     def get_page_text(self):
         """Returns a fitted and transformed
