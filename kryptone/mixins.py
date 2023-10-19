@@ -325,11 +325,10 @@ class SEOMixin(TextMixin):
         pass
 
     def get_internal_urls(self, audit):
-        urls = self.driver.execute_script(
-            """
-            return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
-            """
-        )
+        script = """
+        return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
+        """
+        urls = self.driver.execute_script(script)
         filtered_urls = filter(lambda x: urlparse(x).netloc == self._start_url_object.netloc, urls)
         audit['internal_urls'] = len(list(filtered_urls))
     
