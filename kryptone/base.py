@@ -1,7 +1,6 @@
 import asyncio
 import bisect
 import datetime
-from json import JSONDecodeError
 import os
 import random
 import time
@@ -23,7 +22,6 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import exceptions, logger
 from kryptone.conf import settings
-from kryptone.utils import urls
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          read_json_document,
@@ -42,7 +40,8 @@ DEFAULT_META_OPTIONS = {
     'domains', 'url_ignore_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
-    'ignore_queries', 'ignore_images', 'restrict_search_to'
+    'ignore_queries', 'ignore_images', 'restrict_search_to',
+    'url_gather_ignore_tests'
 }
 
 
@@ -118,6 +117,7 @@ class CrawlerOptions:
         # Ignore urls with query strings
         self.ignore_queries = False
         self.ignore_images = False
+        self.url_gather_ignore_tests = []
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -221,7 +221,7 @@ class BaseCrawler(metaclass=Crawler):
                 if urls:
                     logger.info(
                         f"Found {len(urls)} url(s) "
-                        "in page section: '{selector}'"
+                        f"in page section: '{selector}'"
                     )
                 found_urls.extend(urls)
 
@@ -360,6 +360,9 @@ class BaseCrawler(metaclass=Crawler):
         valid_urls = set()
         invalid_urls = set()
         for url in urls_or_paths:
+            if url is None:
+                continue
+
             clean_url, url_object = self.url_structural_check(url)
             self.list_of_seen_urls.add(clean_url)
 
@@ -376,7 +379,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             counter = counter + 1
-            valid_urls.add(url)
+            valid_urls.add(clean_url)
         filtered_valid_urls = self.url_filters(valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
         logger.info(f'{counter} url(s) added')
@@ -387,12 +390,34 @@ class BaseCrawler(metaclass=Crawler):
         raw_urls = self.get_page_link_elements
         logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
 
+        # Specifically indicate to the crawler to
+        # not try and get urls on pages that
+        # match the regex values
+        if self._meta.url_gather_ignore_tests:
+            matched_pattern = None
+            for regex in self._meta.url_gather_ignore_tests:
+                if current_url.test_url(regex):
+                    matched_pattern = regex
+                    break
+
+            if matched_pattern is not None:
+                self.list_of_seen_urls.update(raw_urls)
+                logger.warning(
+                    f"Url collection ignored on current url "
+                    f"by '{matched_pattern}'"
+                )
+                return
+
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
             clean_url, url_object = self.url_structural_check(url)
 
             if refresh:
+                # If we are for example paginating a page,
+                # then we only need to keep the new urls
+                # that have appeared and that we have
+                # not yet seen
                 if url in self.list_of_seen_urls:
                     invalid_urls.add(clean_url)
                     continue
@@ -792,7 +817,7 @@ class SiteCrawler(BaseCrawler):
 
             if self._meta.crawl:
                 # s = time.time()
-                self.get_page_urls(current_url)
+                self.get_page_urls(url_instance)
                 # e = round(time.time() - s, 2)
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
@@ -822,7 +847,7 @@ class SiteCrawler(BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.get_page_urls(current_url, refresh=True)
+                    self.get_page_urls(url_instance, refresh=True)
                     self._backup_urls()
 
             # Run routing actions aka, base on given

@@ -1,5 +1,108 @@
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+import datetime
+from functools import cached_property
+import json
+from kryptone.conf import settings
 import sqlite3
+import secrets
+
+
+class Migrations:
+    CACHE = {}
+
+    def __init__(self):
+        self.file = settings.PROJECT_PATH / 'migrations.json'
+        self.CACHE = self.read_content
+        self.file_id = self.CACHE['id']
+        try:
+            self.tables = self.CACHE['tables']
+        except KeyError:
+            raise KeyError('Migration file is not valid')
+        self.table_map = [table['name'] for table in self.tables]
+        self.fields_map = defaultdict(list)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} [{self.file_id}]>'
+        
+    @cached_property
+    def read_content(self):
+        with open(self.file, mode='r') as f:
+            return json.load(f)
+        
+    def _create_fields(self, table):
+        fields_map = []
+        for field in table.get_fields():
+            fields_map.append(field.deconstruct())
+        self.fields_map[table] = fields_map
+    
+    def _create_indexes(self, table):
+        return []
+    
+    def _get_template(self):
+        return {
+            'id': secrets.token_hex(5),
+            'date': datetime.datetime.now(),
+            'number': 1,
+            'tables': []
+        }
+    
+    def check(self, table):
+        """Checks the migration files in
+        relationship with the table"""
+        if table.name in self.table_map:
+            result = self.check_fields(table)
+            return True, result
+        return False, []
+
+    def check_fields(self, table):
+        """Checks the migration file for fields
+        in relationship with the table"""
+        dropped_fields = []
+        for field in table.fields:
+            if field.name not in self.fields_map:
+                dropped_fields.append(field)
+        return dropped_fields
+
+    def migrate(self, table):
+        with open(settings.PROJECT_PATH / 'migrations.json', mode='r'):
+            self.CACHE['id'] = secrets.token_hex(5)
+            self.CACHE['date'] = datetime.datetime.now()
+            self.CACHE['number'] = self.CACHE['number'] + 1
+            self.CACHE['tables'].append({
+                'name': table.name,
+                'fields': self._create_fields(table),
+                'indexes': self._create_indexes(table)
+            })
+
+    def get_table_fields(self, name):
+        table_index = self.table_map.index(name)
+        return self.tables[table_index]['fields']
+    
+    def construct_fields(self, name):
+        fields = self.get_table_fields(name)
+
+        items = []
+        for field in fields:
+            params = []
+            for value in field.values():
+                params.append(value)
+            items.append(params)
+        return items
+    
+    def reconstruct_table_fields(self, table_name=None):
+        reconstructed_fields = []
+        if table_name is not None:
+            fields = self.get_table_fields(table_name)
+            for field in fields:
+                instance = Field.create(
+                    field['name'], 
+                    field['params'], 
+                    verbose_name=field['verbose_name']
+                )
+                reconstructed_fields.append(instance)
+        else:
+            pass
+        return reconstructed_fields
 
 
 class Field:
@@ -9,15 +112,30 @@ class Field:
         self.primary_key = primary_key
         self.default = default
         self.table = None
+        self.base_field_parameters = ['text', 'not null']
 
     def __repr__(self):
         return f'<{self.__class__.__name__}[{self.name}]>'
 
     def __hash__(self):
         return hash((self.name))
+    
+    @classmethod
+    def create(cls, name, params, verbose_name=None):
+        instance = cls(name)
+        instance.base_field_parameters = params
+        instance.verbose_name = verbose_name
+        if 'null' in params:
+            instance.null = True
+        
+        if 'primary key' in params: 
+            instance.primary_key = True
+        instance.field_parameters()
+        print(params)
+        return instance
 
     def field_parameters(self):
-        base_parameters = ['text', 'not null']
+        base_parameters = self.base_field_parameters.copy()
         if self.null:
             base_parameters.pop(base_parameters.index('not null'))
             base_parameters.append('null')
@@ -29,12 +147,16 @@ class Field:
             value = self.table.quote_value(self.default)
             base_parameters.extend(['default', value])
         base_parameters.insert(0, self.name)
+        self.base_field_parameters = base_parameters
         return base_parameters
 
     def prepare(self, table):
         if not isinstance(table, Table):
             raise ValueError()
         self.table = table
+
+    def deconstruct(self):
+        return (self.name, None, self.field_parameters())
 
 
 class TableRegistry:
@@ -200,6 +322,7 @@ class AbstractTable(metaclass=BaseTable):
 
 class Table(AbstractTable):
     fields_map = OrderedDict()
+    migrations = Migrations()
 
     def __init__(self, name, database, *, fields=[]):
         self.name = name
@@ -219,6 +342,9 @@ class Table(AbstractTable):
 
     def __repr__(self):
         return f'<{self.__class__.__name__} [{self.name}]>'
+    
+    def has_field(self, name):
+        return name in self.fields_map
 
     def create_table_sql(self, fields):
         sql = self.backend.CREATE_TABLE.format(
@@ -282,8 +408,9 @@ class Table(AbstractTable):
         #     query = self.query_class(self, script_tokens)
         #     query.run(commit=True)
 
-table = Table('seen_urls', 'scraping', fields=[
-    Field('url')
-])
-table.create(url='http://example.com')
-table.create(url='http://example/1')
+
+# table = Table('seen_urls', 'scraping', fields=[
+#     Field('url')
+# ])
+# table.create(url='http://example.com')
+# table.create(url='http://example/1')

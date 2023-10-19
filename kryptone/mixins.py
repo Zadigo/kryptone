@@ -140,6 +140,11 @@ class TextMixin:
 
     def normalize_spaces(self, text):
         return ' '.join(self._tokenize(text))
+    
+    def validate_text(self, text):
+        if text is None:
+            return ''
+        return text
 
     def fit(self, text):
         """Normalize the document by removing newlines,
@@ -161,8 +166,8 @@ class TextMixin:
         """Fit a document and then transform it into
         a usable element for text analysis"""
         fitted_text = self.fit(text)
-        # if fitted_text is not None:
-        #     self.page_documents.append(fitted_text)
+        if fitted_text is not None:
+            self.page_documents.append(fitted_text)
 
         from nltk.stem import PorterStemmer
         from nltk.stem.snowball import SnowballStemmer
@@ -216,37 +221,47 @@ class TextMixin:
 class SEOMixin(TextMixin):
     """A mixin for auditing a web page"""
 
-    page_audits = defaultdict(dict)
     raw_texts = []
     error_pages = set()
+    text_by_page = defaultdict(str)
+    page_audits = defaultdict(dict)
 
     @property
     def get_page_title(self):
-        text = self.driver.execute_script(
-            """
-            let title = document.querySelector('title')
-            return title && title.textContent
-            """
-        )
+        script = """
+        let el = document.querySelector('title')
+        return el && el.textContent
+        """
+        text = self.driver.execute_script(script)
         return self.fit(text)
 
     @property
     def get_page_description(self):
         script = """
-        let element = document.querySelector('meta[name="description"]')
-        return element && element.attributes.content.textContent
+        let el = document.querySelector('meta[name="description"]')
+        return el && el.attributes.content.textContent
         """
         text = self.driver.execute_script(script)
-        return self.fit(text)
+        return self.fit(self.validate_text(text))
 
+    @property
+    def get_page_text(self):
+        """Returns a fitted and transformed
+        version of the document's text"""
+        script = """
+        return document.body.textContent
+        """
+        text = self.driver.execute_script(script)
+        return self.fit(self.validate_text(text))
+    
     @property
     def get_page_keywords(self):
         script = """
-        let meta = document.querySelector('[name="keywords"]')
-        return meta && meta.content
+        let el = document.querySelector('[name="keywords"]')
+        return el && el.content || ''
         """
         text = self.driver.execute_script(script)
-        return self.fit(text)
+        return self.fit(self.validate_text(text))
 
     @property
     def has_head_title(self):
@@ -257,17 +272,28 @@ class SEOMixin(TextMixin):
 
     @property
     def title_is_valid(self):
-        return len(self.get_page_title) <= 60
+        page_title = self.get_page_title
+        if page_title is None:
+            return False
+        return len(page_title) <= 60
 
     @property
     def description_is_valid(self):
-        return len(self.get_page_description) <= 150
+        page_description = self.get_page_description
+        if page_description is None:
+            return False
+        return len(page_description) <= 150
 
+    
     @property
-    def get_page_text(self):
-        """Returns a fitted and transformed
-        version of the document's text"""
-        return self.driver.execute_script("""return document.body.textContent""")
+    def get_grouped_text(self):
+        """Returns a fitted and transformed version
+        of the document's text including keywords
+        and description"""
+        body_text = self.get_page_text
+        description = self.get_page_description
+        keywords = self.get_page_keywords
+        return ' '.join([body_text, description, keywords])
 
     @staticmethod
     def normalize_integers(items):
@@ -278,12 +304,7 @@ class SEOMixin(TextMixin):
         for key, value in items.items():
             new_item[key] = int(value)
         return new_item
-    
-    @property
-    def get_transformed_raw_page_text(self):
-        text = self.driver.find_element(By.TAG_NAME, 'body').text
-        return self.fit(text)
-    
+        
     @cached_property
     def page_speed_script(self):
         path = settings.GLOBAL_KRYPTONE_PATH.joinpath(
@@ -301,11 +322,10 @@ class SEOMixin(TextMixin):
         pass
 
     def get_internal_urls(self, audit):
-        urls = self.driver.execute_script(
-            """
-            return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
-            """
-        )
+        script = """
+        return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
+        """
+        urls = self.driver.execute_script(script)
         filtered_urls = filter(lambda x: urlparse(x).netloc == self._start_url_object.netloc, urls)
         audit['internal_urls'] = len(list(filtered_urls))
     
@@ -313,11 +333,19 @@ class SEOMixin(TextMixin):
         """Checks that the images of the current
         page has ALT attributes to them"""
         image_alts = []
-        images = self.driver.execute_script("""document.querySelectorAll('img')""")
+        script = """
+        return document.querySelectorAll('img')
+        """
+        images = self.driver.execute_script(script)
         if images:
-            for image in images:
-                image_alt = self.fit(image.get_attribute('alt'))
-                image_alts.append(image_alt)
+            while images:
+                try:
+                    image = images.pop()
+                    image_alt = self.fit(image.get_attribute('alt'))
+                except:
+                    pass
+                else:
+                    image_alts.append(image_alt)
             empty_alts = list(keep_while(lambda x: x == '', image_alts))
 
             unique_image_alts = set(image_alts)
@@ -341,16 +369,16 @@ class SEOMixin(TextMixin):
         """
         has_structured_data = False
         structured_data_type = None
-        content = self.driver.execute_script(
-            """
-            let el = document.querySelector('script[type*="ld+json"]')
-            return el && el.textContent
-            """
-        )
+        script = """
+        let el = document.querySelector('script[type*="ld+json"]')
+        return el && el.textContent
+        """
+        content = self.driver.execute_script(script)
         if content:
             content = json.loads(content)
             has_structured_data = True
-            structured_data_type = content['@type']
+            # Try to get @type otherwise just return the content
+            structured_data_type = content.get('@type', None) or content
 
         audit['has_structured_data'] = has_structured_data
         audit['structured_data_type'] = structured_data_type
@@ -382,16 +410,18 @@ class SEOMixin(TextMixin):
 
     def audit_page(self, current_url):
         """Audit the current page by analyzing different
-        key metrics from the title, the description etc."""        
-        matrix, vectorizer = self.vectorize_page(self.get_page_text)
+        key metrics from the title, the description etc."""  
+        grouped_text = self.get_grouped_text
+        self.text_by_page[str(current_url)] = grouped_text
+
+        matrix, vectorizer = self.vectorize_page(grouped_text)
         vocabulary = self.normalize_integers(vectorizer.vocabulary_)
 
-        has_head_title = self.driver.execute_script(
-            """
-            let el = document.querySelector('h1')
-            return el && el !== null
-            """
-        )
+        script = """
+        let el = document.querySelector('h1')
+        return el && el !== null
+        """
+        has_head_title = self.driver.execute_script(script)
 
         if not has_head_title:
             self.driver.save_screenshot(f'media/no_h1_{secrets.token_hex(nbytes=5)}.png')
@@ -406,7 +436,7 @@ class SEOMixin(TextMixin):
             'description_is_valid': self.description_is_valid,
             'url': str(current_url),
             'page_content_length': len(self.get_page_text),
-            'word_count_analysis': vocabulary,
+            # 'word_count_analysis': vocabulary,
             'status_code': None,
             'is_https': current_url.is_secured,
             'has_h1': has_head_title

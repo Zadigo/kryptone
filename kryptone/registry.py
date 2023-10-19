@@ -6,7 +6,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-
+from kryptone import logger
 from kryptone.exceptions import SpiderExistsError
 
 
@@ -97,6 +97,7 @@ class SpiderConfig:
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
+            logger.error(e)
             raise Exception(e)
         
     async def arun(self, **kwargs):
@@ -121,6 +122,7 @@ class SpiderConfig:
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
+            logger.error(e)
             raise Exception(e)
 
 
