@@ -810,7 +810,7 @@ class SiteCrawler(BaseCrawler):
 
             if self._meta.crawl:
                 # s = time.time()
-                self.get_page_urls(current_url)
+                self.get_page_urls(url_instance)
                 # e = round(time.time() - s, 2)
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
@@ -840,7 +840,7 @@ class SiteCrawler(BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.get_page_urls(current_url, refresh=True)
+                    self.get_page_urls(url_instance, refresh=True)
                     self._backup_urls()
 
             # Run routing actions aka, base on given
