@@ -376,7 +376,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             counter = counter + 1
-            valid_urls.add(url)
+            valid_urls.add(clean_url)
         filtered_valid_urls = self.url_filters(valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
         logger.info(f'{counter} url(s) added')
