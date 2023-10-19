@@ -387,6 +387,24 @@ class BaseCrawler(metaclass=Crawler):
         raw_urls = self.get_page_link_elements
         logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
 
+        # Specifically indicate to the crawler to
+        # not try and get urls on pages that
+        # match the regex values
+        if self._meta.url_gather_ignore_tests:
+            matched_pattern = None
+            for regex in self._meta.url_gather_ignore_tests:
+                if current_url.test_url(regex):
+                    matched_pattern = regex
+                    break
+
+            if matched_pattern is not None:
+                self.list_of_seen_urls.update(raw_urls)
+                logger.warning(
+                    f"Url collection ignored on current url "
+                    f"by '{matched_pattern}'"
+                )
+                return
+
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
