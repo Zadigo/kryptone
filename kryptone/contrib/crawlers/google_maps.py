@@ -228,8 +228,11 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
                 rating = business.find_element(
-                    By.CSS_SELECTOR, 'span[role="img"]').get_attribute('aria-label')
+                    By.CSS_SELECTOR, 
+                    'span[role="img"]'
+                ).get_attribute('aria-label')
             except:
+                logger.error(f'No business information found')
                 continue
             else:
                 rating, number_of_reviews = rating.split(' ')
