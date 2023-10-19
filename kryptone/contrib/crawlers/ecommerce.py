@@ -70,6 +70,8 @@ class EcommerceCrawlerMixin:
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if 'date' not in data:
+            data['date'] = datetime.datetime.now(tz=pytz.UTC)
         # Before writing new products, ensure that we have previous
         # products from a previous scrap and if so, load the previous
         # products. This would prevent overwriting the previous file
