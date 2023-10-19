@@ -1,7 +1,6 @@
 import asyncio
 import bisect
 import datetime
-from json import JSONDecodeError
 import os
 import random
 import time
@@ -23,7 +22,6 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import exceptions, logger
 from kryptone.conf import settings
-from kryptone.utils import urls
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          read_json_document,
@@ -416,6 +414,10 @@ class BaseCrawler(metaclass=Crawler):
             clean_url, url_object = self.url_structural_check(url)
 
             if refresh:
+                # If we are for example paginating a page,
+                # then we only need to keep the new urls
+                # that have appeared and that we have
+                # not yet seen
                 if url in self.list_of_seen_urls:
                     invalid_urls.add(clean_url)
                     continue
