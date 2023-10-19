@@ -119,6 +119,7 @@ class CrawlerOptions:
         # Ignore urls with query strings
         self.ignore_queries = False
         self.ignore_images = False
+        self.url_gather_ignore_tests = []
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
