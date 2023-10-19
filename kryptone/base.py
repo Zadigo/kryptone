@@ -42,7 +42,8 @@ DEFAULT_META_OPTIONS = {
     'domains', 'url_ignore_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
-    'ignore_queries', 'ignore_images', 'restrict_search_to'
+    'ignore_queries', 'ignore_images', 'restrict_search_to',
+    'url_gather_ignore_tests'
 }
 
 
