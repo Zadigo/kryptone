@@ -2,35 +2,18 @@ from collections import OrderedDict, defaultdict
 import datetime
 from functools import cached_property
 import json
+from kryptone.conf import settings
 import sqlite3
 import secrets
 
-# {
-#     "id": "fe81zef5",
-#     "date": null,
-#     "number": 1,
-#     "tables": [
-#         {
-#             "name": "urls_seen",
-#             "fields": [
-#                 {
-#                     "name": "my_name",
-#                     "verbose_name": null,
-#                     "params": "text null"
-#                 }
-#             ],
-#             "indexes": [
-#                 "my_name"
-#             ]
-#         }
-#     ]
-# }
 
 class Migrations:
     CACHE = {}
 
     def __init__(self):
+        self.file = settings.PROJECT_PATH / 'migrations.json'
         self.CACHE = self.read_content
+        self.file_id = self.CACHE['id']
         try:
             self.tables = self.CACHE['tables']
         except KeyError:
@@ -39,11 +22,11 @@ class Migrations:
         self.fields_map = defaultdict(list)
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} [something]>'
+        return f'<{self.__class__.__name__} [{self.file_id}]>'
         
     @cached_property
     def read_content(self):
-        with open('Z:/- RESPONSABLE DIGITAL/SCRIPTS/kryptone/kryptone/db/migrations.json', mode='r') as f:
+        with open(self.file, mode='r') as f:
             return json.load(f)
         
     def _create_fields(self, table):
@@ -54,9 +37,34 @@ class Migrations:
     
     def _create_indexes(self, table):
         return []
-        
+    
+    def _get_template(self):
+        return {
+            'id': secrets.token_hex(5),
+            'date': datetime.datetime.now(),
+            'number': 1,
+            'tables': []
+        }
+    
+    def check(self, table):
+        """Checks the migration files in
+        relationship with the table"""
+        if table.name in self.table_map:
+            result = self.check_fields(table)
+            return True, result
+        return False, []
+
+    def check_fields(self, table):
+        """Checks the migration file for fields
+        in relationship with the table"""
+        dropped_fields = []
+        for field in table.fields:
+            if field.name not in self.fields_map:
+                dropped_fields.append(field)
+        return dropped_fields
+
     def migrate(self, table):
-        with open('Z:/- RESPONSABLE DIGITAL/SCRIPTS/kryptone/kryptone/db/migrations.json', mode='r'):
+        with open(settings.PROJECT_PATH / 'migrations.json', mode='r'):
             self.CACHE['id'] = secrets.token_hex(5)
             self.CACHE['date'] = datetime.datetime.now()
             self.CACHE['number'] = self.CACHE['number'] + 1
@@ -80,9 +88,21 @@ class Migrations:
                 params.append(value)
             items.append(params)
         return items
-
-# migrations = Migrations()
-# print(migrations.construct_fields('urls_seen'))
+    
+    def reconstruct_table_fields(self, table_name=None):
+        reconstructed_fields = []
+        if table_name is not None:
+            fields = self.get_table_fields(table_name)
+            for field in fields:
+                instance = Field.create(
+                    field['name'], 
+                    field['params'], 
+                    verbose_name=field['verbose_name']
+                )
+                reconstructed_fields.append(instance)
+        else:
+            pass
+        return reconstructed_fields
 
 
 class Field:
@@ -92,15 +112,30 @@ class Field:
         self.primary_key = primary_key
         self.default = default
         self.table = None
+        self.base_field_parameters = ['text', 'not null']
 
     def __repr__(self):
         return f'<{self.__class__.__name__}[{self.name}]>'
 
     def __hash__(self):
         return hash((self.name))
+    
+    @classmethod
+    def create(cls, name, params, verbose_name=None):
+        instance = cls(name)
+        instance.base_field_parameters = params
+        instance.verbose_name = verbose_name
+        if 'null' in params:
+            instance.null = True
+        
+        if 'primary key' in params: 
+            instance.primary_key = True
+        instance.field_parameters()
+        print(params)
+        return instance
 
     def field_parameters(self):
-        base_parameters = ['text', 'not null']
+        base_parameters = self.base_field_parameters.copy()
         if self.null:
             base_parameters.pop(base_parameters.index('not null'))
             base_parameters.append('null')
@@ -112,6 +147,7 @@ class Field:
             value = self.table.quote_value(self.default)
             base_parameters.extend(['default', value])
         base_parameters.insert(0, self.name)
+        self.base_field_parameters = base_parameters
         return base_parameters
 
     def prepare(self, table):
@@ -120,8 +156,7 @@ class Field:
         self.table = table
 
     def deconstruct(self):
-        field_parameters = ' '.join(self.field_parameters())
-        return (self.name, None, field_parameters)
+        return (self.name, None, self.field_parameters())
 
 
 class TableRegistry:
@@ -287,6 +322,7 @@ class AbstractTable(metaclass=BaseTable):
 
 class Table(AbstractTable):
     fields_map = OrderedDict()
+    migrations = Migrations()
 
     def __init__(self, name, database, *, fields=[]):
         self.name = name
@@ -306,6 +342,9 @@ class Table(AbstractTable):
 
     def __repr__(self):
         return f'<{self.__class__.__name__} [{self.name}]>'
+    
+    def has_field(self, name):
+        return name in self.fields_map
 
     def create_table_sql(self, fields):
         sql = self.backend.CREATE_TABLE.format(
