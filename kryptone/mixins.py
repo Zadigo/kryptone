@@ -224,6 +224,8 @@ class SEOMixin(TextMixin):
     page_audits = defaultdict(dict)
     raw_texts = []
     error_pages = set()
+    text_by_page = defaultdict(str)
+    page_audits = defaultdict(dict)
 
     @property
     def get_page_title(self):
