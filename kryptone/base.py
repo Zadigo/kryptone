@@ -360,6 +360,9 @@ class BaseCrawler(metaclass=Crawler):
         valid_urls = set()
         invalid_urls = set()
         for url in urls_or_paths:
+            if url is None:
+                continue
+
             clean_url, url_object = self.url_structural_check(url)
             self.list_of_seen_urls.add(clean_url)
 
