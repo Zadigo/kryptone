@@ -140,6 +140,11 @@ class TextMixin:
 
     def normalize_spaces(self, text):
         return ' '.join(self._tokenize(text))
+    
+    def validate_text(self, text):
+        if text is None:
+            return ''
+        return text
 
     def fit(self, text):
         """Normalize the document by removing newlines,
