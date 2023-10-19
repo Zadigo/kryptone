@@ -240,20 +240,30 @@ class SEOMixin(TextMixin):
     @property
     def get_page_description(self):
         script = """
-        let element = document.querySelector('meta[name="description"]')
-        return element && element.attributes.content.textContent
+        let el = document.querySelector('meta[name="description"]')
+        return el && el.attributes.content.textContent
         """
         text = self.driver.execute_script(script)
-        return self.fit(text)
+        return self.fit(self.validate_text(text))
 
+    @property
+    def get_page_text(self):
+        """Returns a fitted and transformed
+        version of the document's text"""
+        script = """
+        return document.body.textContent
+        """
+        text = self.driver.execute_script(script)
+        return self.fit(self.validate_text(text))
+    
     @property
     def get_page_keywords(self):
         script = """
-        let meta = document.querySelector('[name="keywords"]')
-        return meta && meta.content
+        let el = document.querySelector('[name="keywords"]')
+        return el && el.content || ''
         """
         text = self.driver.execute_script(script)
-        return self.fit(text)
+        return self.fit(self.validate_text(text))
 
     @property
     def has_head_title(self):
