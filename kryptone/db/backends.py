@@ -8,7 +8,9 @@ from hashlib import md5
 from sqlite3 import Row
 
 import pytz
-from google_comments import PROJECT_PATH
+
+from kryptone.conf import settings
+
 
 DATABASE = 'scraping'
 
@@ -29,16 +31,24 @@ class Functions:
 
 
 class Lower(Functions):
-    def __init__(self, field):
-        self.field = field
+    def __init__(self, field_name):
+        self.field_name = field_name
         super().__init__()
 
     def __str__(self):
-        return f'<{self.__class__.__name__}({self.value})>'
+        return f'<{self.__class__.__name__}({self.field_name})>'
 
     def function_sql(self):
         sql = self.backend.LOWER.format_map({
-            'field': self.field
+            'field': self.field_name
+        })
+        return sql
+
+
+class Upper(Lower):
+    def function_sql(self):
+        sql = self.backend.UPPER.format_map({
+            'field': self.field_name
         })
         return sql
 
@@ -73,6 +83,7 @@ class SQL:
     # UNIQUE_INDEX = 'create unique index {name} ON {table}({fields})'
 
     LOWER = 'lower({field})'
+    UPPER = 'upper({field})'
 
     @staticmethod
     def quote_value(value):
@@ -227,6 +238,7 @@ class SQL:
 
                 quoted_list_values = (self.quote_value(item) for item in value)
                 operator_and_value = self.IN.format_map({
+                    'field': field,
                     'values': self.comma_join(quoted_list_values)
                 })
                 built_filters.append(operator_and_value)
@@ -256,7 +268,7 @@ class SQL:
                 built_filters.append(operator_and_value)
                 continue
 
-            if operator == 'range':
+            if operator == 'between':
                 lhv, rhv = value
                 operator_and_value = self.BETWEEN.format_map({
                     'lhv': lhv,
@@ -423,7 +435,7 @@ class Migrations:
     backend_class = SQLiteBackend
 
     def __init__(self):
-        self.file = PROJECT_PATH / 'migrations.json'
+        self.file = settings.PROJECT_PATH / 'migrations.json'
         self.CACHE = self.read_content
         self.file_id = self.CACHE['id']
 
@@ -561,7 +573,7 @@ class Migrations:
         # necessary e.g. dropped tables, changed fields
         if self.has_migrations:
             cache_copy = self.CACHE.copy()
-            with open(PROJECT_PATH / 'migrations.json', mode='w+') as f:
+            with open(settings.PROJECT_PATH / 'migrations.json', mode='w+') as f:
                 cache_copy['id'] = secrets.token_hex(5)
                 cache_copy['date'] = str(datetime.datetime.now())
                 cache_copy['number'] = self.CACHE['number'] + 1
@@ -1108,9 +1120,11 @@ class Database:
     Connections to the database are opened at the table level
     """
 
-    migrations = Migrations()
+    migrations = None
+    migrations_class = Migrations
 
     def __init__(self, name, *tables):
+        self.migrations = self.migrations_class()
         self.table_map = {}
         for table in tables:
             if not isinstance(table, Table):
@@ -1182,5 +1196,8 @@ table.prepare()
 # r = table.get(rowid=1)
 # print(r)
 # table.create(url='http://example.com')
+
 # r = table.annotate(lowered_url=Lower('url'))
-# print(r)
+r = table.annotate(uppered_url=Upper('url'))
+
+print(r)
