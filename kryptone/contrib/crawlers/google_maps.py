@@ -130,7 +130,8 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             logger.info('No consent screen')
 
     def run_actions(self, current_url, **kwargs):
-        results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
+        # results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
+        results_xpath = "//div[@role='feed']"
         results_is_scrollable = True
 
         scroll_script = """
@@ -202,7 +203,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
                 name = link.get_attribute('aria-label')
                 url = link.get_attribute('href')
             except:
-                logger.info('Business information not found or not existant')
+                logger.info(f'Business information not found or not existant. Got: {item}')
             else:
                 rows.append([name, url])
         

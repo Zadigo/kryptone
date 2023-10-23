@@ -8,7 +8,6 @@ from hashlib import md5
 from sqlite3 import Row
 
 import pytz
-
 from google_comments import PROJECT_PATH
 
 DATABASE = 'scraping'
