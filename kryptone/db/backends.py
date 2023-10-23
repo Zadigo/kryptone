@@ -91,12 +91,34 @@ class ExtractYear(Functions):
         return sql
 
 
+class Index:
+    prefix = 'idx'
+
+    def __init__(self, name, *fields):
+        self.index_name = f'{self.prefix}_{name}'
+        self._fields = list(fields)
+        self._backend = None
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}: {self.index_name}>'
+
+    def function_sql(self):
+        sql = self._backend.CREATE_INDEX.format_map({
+            'name': self.index_name,
+            'table': 'seen_urls',
+            'fields': self._backend.comma_join(self._fields)
+        })
+        return sql
+
+
 class SQL:
     """Base sql compiler"""
 
     ALTER_TABLE = 'alter table {table} add column {params}'
     CREATE_TABLE = 'create table if not exists {table} ({fields})'
+    CREATE_INDEX = 'create index {name} on {table} ({fields})'
     DROP_TABLE = 'drop table if exists {table}'
+    DROP_INDEX = 'drop index if exists {value}'
     DELETE = 'delete from {table}'
     INSERT = 'insert into {table} ({fields}) values({values})'
     SELECT = 'select {fields} from {table}'
@@ -438,25 +460,32 @@ class SQLiteBackend(SQL):
         query.run()
         return query.result_cache
 
+    def drop_indexes_sql(self, row):
+        sql = self.DROP_INDEX.format_map({
+            'value': row['name']
+        })
+        return sql
+
     def create_table_fields(self, table, columns_to_create):
         field_params = []
-        while columns_to_create:
-            column_to_create = columns_to_create.pop()
-            field = table.fields_map[column_to_create]
-            field_params.append(field.field_parameters())
+        if columns_to_create:
+            while columns_to_create:
+                column_to_create = columns_to_create.pop()
+                field = table.fields_map[column_to_create]
+                field_params.append(field.field_parameters())
 
-        statements = [self.simple_join(param) for param in field_params]
-        for i, statement in enumerate(statements):
-            if i > 1:
-                statement = f'add table {statement}'
-            statements[i] = statement
+            statements = [self.simple_join(param) for param in field_params]
+            for i, statement in enumerate(statements):
+                if i > 1:
+                    statement = f'add table {statement}'
+                statements[i] = statement
 
-        alter_sql = self.ALTER_TABLE.format_map({
-            'table': table.name,
-            'params': self.simple_join(statements)
-        })
-        query = Query(self, [alter_sql], table=table)
-        query.run(commit=True)
+            alter_sql = self.ALTER_TABLE.format_map({
+                'table': table.name,
+                'params': self.simple_join(statements)
+            })
+            query = Query(self, [alter_sql], table=table)
+            query.run(commit=True)
 
     def list_tables_sql(self):
         sql = self.SELECT.format(
@@ -477,6 +506,29 @@ class SQLiteBackend(SQL):
             ])
         )
         query = Query(self, [sql, where_clause])
+        query.run()
+        return query.result_cache
+
+    def list_database_indexes(self):
+        base_fields = ['type', 'name', 'tbl_name', 'sql']
+        select_sql = self.SELECT.format_map({
+            'fields': self.comma_join(base_fields),
+            'table': 'sqlite_master'
+        })
+        where_clause = self.WHERE_CLAUSE.format_map({
+            'params': self.EQUALITY.format_map({
+                'field': 'type',
+                'value': self.quote_value('index')
+            })
+        })
+        sql = [select_sql, where_clause]
+        query = Query(self, sql)
+        query.run()
+        return query.result_cache
+
+    def list_table_indexes(self, table):
+        sql = f'PRAGMA index_list({self.quote_value(table.name)})'
+        query = Query(self, sql, table=table)
         query.run()
         return query.result_cache
     
@@ -609,7 +661,10 @@ class Migrations:
         self.fields_map[table.name] = fields_map
 
     def _write_indexes(self, table):
-        return []
+        indexes = {}
+        for index in table.indexes:
+            indexes[index.index_name] = index._fields
+        return indexes
 
     def create_migration_table(self):
         table_fields = [
@@ -687,6 +742,24 @@ class Migrations:
 
         cached_results = list(Query.run_multiple(backend, sqls_to_run))
         # self.migrate(table_instances)
+
+        # Create indexes for each table
+        database_indexes = backend.list_database_indexes()
+        index_sqls = []
+        for name, table in table_instances.items():
+            # if name in database_indexes:
+            #     raise ValueError('Index already exists on databas')
+
+            for index in table.indexes:
+                index._backend = backend
+                index_sqls.append(index.function_sql())
+
+        # Remove obsolete indexes
+        for database_index in database_indexes:
+            if database_index not in table.indexes:
+                index_sqls.append(backend.drop_indexes_sql(database_index))
+
+        # Query.run_multiple(backend, index_sqls)
 
         self.tables_for_creation.clear()
         self.tables_for_deletion.clear()
@@ -1250,9 +1323,9 @@ class Table(AbstractTable):
     """
     fields_map = OrderedDict()
 
-    def __init__(self, name, database, *, fields=[]):
+    def __init__(self, name, database, *, fields=[], index=[]):
         self.name = name
-        self.query = None
+        self.indexes = index
         super().__init__(database=database)
 
         for field in fields:
@@ -1288,7 +1361,7 @@ class Table(AbstractTable):
         ]
 
     def prepare(self):
-        """Prepares a table for creation in 
+        """Prepares and creates a table for
         the database"""
         field_params = self.build_field_parameters()
         field_params = [
@@ -1297,7 +1370,6 @@ class Table(AbstractTable):
         ]
         sql = self.create_table_sql(self.backend.comma_join(field_params))
         query = self.query_class(self.backend, sql, table=self)
-        self.query = query
         query.run(commit=True)
 
 
@@ -1314,7 +1386,13 @@ class Database:
     ... database.migrate()
     ... table.create(url='http://example.com')
 
-    Connections to the database are opened at the table level
+    Connections to the database are opened at the table level.
+
+    `make_migrations` writes the physical changes to the
+    local tables into the `migrations.json` file
+
+    `migrate` implements the changes to the migration
+    file into the SQLite database
     """
 
     migrations = None
@@ -1359,13 +1437,16 @@ table = Table('seen_urls', 'scraping', fields=[
     Field('url'),
     BooleanField('visited', default=False),
     Field('created_on')
-])
+],
+# index=[
+#     Index('for_urls', 'url')
+)
 # table.prepare()
 
 
 def make_migrations(*tables):
     """Writes the physical changes to the
-    tables to the `migrations.json` file"""
+    local tables into the `migrations.json` file"""
     from kryptone.conf import settings
     import pathlib
     settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
@@ -1376,7 +1457,7 @@ def make_migrations(*tables):
 
 
 def migrate(*tables):
-    """Applies the migrations in the
+    """Applies the migrations from the local
     `migrations.json` file to the database"""
     from kryptone.conf import settings
     import pathlib
@@ -1388,7 +1469,7 @@ def migrate(*tables):
 
 # make_migrations()
 
-# migrate()
+migrate()
 
 
 
@@ -1440,7 +1521,7 @@ def migrate(*tables):
 
 # r = table.order_by('rowid')
 
-print(r)
+# print(r)
 
 # import time
 
