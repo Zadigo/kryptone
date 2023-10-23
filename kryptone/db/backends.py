@@ -9,16 +9,39 @@ from sqlite3 import Row
 
 import pytz
 
-from kryptone.conf import settings
+from google_comments import PROJECT_PATH
 
 DATABASE = 'scraping'
 
 
-class Hash:
-    HASH = 'hash({value})'
+# class Hash:
+#     HASH = 'hash({value})'
 
-    def __call__(self, text):
-        return md5(text).hexdigest()
+#     def __call__(self, text):
+#         return md5(text).hexdigest()
+
+
+class Functions:
+    def __init__(self):
+        self.backend = None
+
+    def function_sql(self):
+        pass
+
+
+class Lower(Functions):
+    def __init__(self, field):
+        self.field = field
+        super().__init__()
+
+    def __str__(self):
+        return f'<{self.__class__.__name__}({self.value})>'
+
+    def function_sql(self):
+        sql = self.backend.LOWER.format_map({
+            'field': self.field
+        })
+        return sql
 
 
 class SQL:
@@ -35,8 +58,6 @@ class SQL:
 
     EQUALITY = '{field}={value}'
     LIKE = '{field} like {conditions}'
-    # STARTS_WITH = '{field} like {value}%'
-    # ENDS_WITH = '{field} like %{value}'
     BETWEEN = 'between {lhv} and {rhv}'
     IN = '{field} in ({values})'
     NOT_LIKE = '{field} not like {wildcard}'
@@ -50,6 +71,9 @@ class SQL:
     DESCENDNIG = '{field} desc'
 
     ORDER_BY = 'order by {conditions}'
+    # UNIQUE_INDEX = 'create unique index {name} ON {table}({fields})'
+
+    LOWER = 'lower({field})'
 
     @staticmethod
     def quote_value(value):
@@ -188,6 +212,10 @@ class SQL:
 
         >>> self.build_filters([('rowid', 'startswith', '1')])
         ... ["rowid like '1%'"]
+
+
+        >>> self.build_filters([('url', '=', Lower('url')])
+        ... ["lower(url)"]
         """
         built_filters = []
         for item in items:
@@ -244,6 +272,20 @@ class SQL:
             )
         return built_filters
 
+    def build_annotation(self, **conditions):
+        function_filters = {}
+        for key, function in conditions.items():
+            if isinstance(function, Functions):
+                function.backend = self
+                # Use key as alias instead of column named
+                # "lower(value)" in the returned results
+                function_filters[key] = self.simple_join(
+                    [function.function_sql(), f'as {key}']
+                )
+
+        joined_fields = self.comma_join(function_filters.values())
+        return [joined_fields]
+
 
 class SQLiteBackend(SQL):
     """Class that initiates and encapsulates a
@@ -253,11 +295,11 @@ class SQLiteBackend(SQL):
         if database is None:
             database = ':memory:'
         else:
-            database = f'{database}.sqlite'   
+            database = f'{database}.sqlite'
         self.database = database
 
         connection = sqlite3.connect(database)
-        connection.create_function('hash', 1, Hash())
+        # connection.create_function('hash', 1, Hash())
         connection.row_factory = BaseRow
         self.connection = connection
 
@@ -351,6 +393,7 @@ class BaseRow(Row):
     #     })
     #     sql = [update_sql, where_clause]
     #     setattr(self, key, value)
+
     #     query = Query(backend, sql, table=None)
     #     query.run()
     #     return self
@@ -381,9 +424,10 @@ class Migrations:
     backend_class = SQLiteBackend
 
     def __init__(self):
-        self.file = settings.PROJECT_PATH / 'migrations.json'
+        self.file = PROJECT_PATH / 'migrations.json'
         self.CACHE = self.read_content
         self.file_id = self.CACHE['id']
+
         try:
             self.tables = self.CACHE['tables']
         except KeyError:
@@ -418,13 +462,13 @@ class Migrations:
     def _write_indexes(self, table):
         return []
 
-    def _get_template(self):
-        return {
-            'id': secrets.token_hex(5),
-            'date': str(datetime.datetime.now(tz=pytz.UTC)),
-            'number': 1,
-            'tables': []
-        }
+    def create_migration_table(self):
+        table_fields = [
+            Field('name'),
+            Field('applied')
+        ]
+        table = Table('migrations', '', fields=table_fields)
+        table.prepare()
 
     def check(self, table_instances={}):
         errors = []
@@ -518,7 +562,7 @@ class Migrations:
         # necessary e.g. dropped tables, changed fields
         if self.has_migrations:
             cache_copy = self.CACHE.copy()
-            with open(settings.PROJECT_PATH / 'migrations.json', mode='w+') as f:
+            with open(PROJECT_PATH / 'migrations.json', mode='w+') as f:
                 cache_copy['id'] = secrets.token_hex(5)
                 cache_copy['date'] = str(datetime.datetime.now())
                 cache_copy['number'] = self.CACHE['number'] + 1
@@ -537,37 +581,24 @@ class Migrations:
         table_index = self.table_map.index(name)
         return self.tables[table_index]['fields']
 
-    def construct_fields(self, name):
-        fields = self.get_table_fields(name)
-
-        items = []
-        for field in fields:
-            params = []
-            for value in field.values():
-                params.append(value)
-            items.append(params)
-        return items
-
-    def reconstruct_table_fields(self, table_name=None):
+    def reconstruct_table_fields(self, table):
         reconstructed_fields = []
-        if table_name is not None:
-            fields = self.get_table_fields(table_name)
-            for field in fields:
-                instance = Field.create(
-                    field['name'],
-                    field['params'],
-                    verbose_name=field['verbose_name']
-                )
-                reconstructed_fields.append(instance)
-        else:
-            pass
+        fields = self.get_table_fields(table)
+        for field in fields:
+            instance = Field.create(
+                field['name'],
+                field['params'],
+                verbose_name=field['verbose_name']
+            )
+            reconstructed_fields.append(instance)
         return reconstructed_fields
 
 
 class Field:
     python_type = str
+    base_validators = []
 
-    def __init__(self, name, *, null=False, primary_key=False, default=None, unique=False):
+    def __init__(self, name, *, null=False, primary_key=False, default=None, unique=False, validators=[]):
         self.name = name
         self.null = null
         self.primary_key = primary_key
@@ -730,10 +761,17 @@ class BooleanField(Field):
 
 
 class Query:
+    """This class represents an sql statement query
+    and is responsible for executing the query on the
+    database. The return data is stored on
+    the `result_cache`
+    """
+
     def __init__(self, backend, sql_tokens, table=None):
         self._table = table
         if not isinstance(backend, SQLiteBackend):
             raise ValueError('Connection should be an instance SQLiteBackend')
+
         self._backend = backend
         self._sql = None
         self._sql_tokens = sql_tokens
@@ -742,8 +780,12 @@ class Query:
     def __repr__(self):
         return f'<{self.__class__.__name__} [{self._sql}]>'
 
+    def __del__(self):
+        self._backend.connection.close()
+
     @classmethod
     def run_multiple(cls, backend, *sqls, **kwargs):
+        """Runs multiple queries against the database"""
         for sql in sqls:
             instance = cls(backend, sql, **kwargs)
             instance.run(commit=True)
@@ -751,14 +793,23 @@ class Query:
 
     @classmethod
     def create(cls, backend, sql_tokens, table=None):
-        """Creates a new `Query` to run """
+        """Creates a new `Query` class to be executed"""
         return cls(backend, sql_tokens, table=table)
 
     def prepare_sql(self):
+        """Prepares a statement before it is sent
+        to the database by joining the sql statements
+        and implement a `;` to the end
+
+        >>> ["select url from seen_urls", "where url='http://'"]
+        ... "select url from seen_urls where url='http://';"
+        """
         sql = self._backend.simple_join(self._sql_tokens)
         self._sql = self._backend.finalize_sql(sql)
 
     def run(self, commit=False):
+        """Runs an sql statement and stores the
+        return data on the `result_cache`"""
         self.prepare_sql()
         result = self._backend.connection.execute(self._sql)
         if commit:
@@ -883,7 +934,7 @@ class AbstractTable(metaclass=BaseTable):
 
     def filter(self, **kwargs):
         tokens = self.backend.decompose_filters(**kwargs)
-        filters = self.backend.build_filters(tokens)
+        return_type, filters = self.backend.build_filters(tokens)
 
         if len(filters) > 1:
             filters = [' and '.join(filters)]
@@ -924,19 +975,25 @@ class AbstractTable(metaclass=BaseTable):
         return self.last()
 
     def get(self, **kwargs):
+        base_return_fields = ['rowid', '*']
         filters = self.backend.build_filters(
             self.backend.decompose_filters(**kwargs)
         )
+
+        # Functions SQL: select rowid, *, lower(url) from table
         select_sql = self.backend.SELECT.format_map({
-            'fields': self.backend.comma_join(['rowid', '*']),
+            'fields': self.backend.comma_join(base_return_fields),
             'table': self.name
         })
+        sql = [select_sql]
 
+        # Filters SQL: select rowid, * from table where url='http://'
         joined_statements = ' and '.join(filters)
         where_clause = self.backend.WHERE_CLAUSE.format_map({
             'params': joined_statements
         })
-        sql = [select_sql, where_clause]
+        sql.extend([where_clause])
+
         query = self.query_class(self.backend, sql, table=self)
         query.run()
 
@@ -947,6 +1004,20 @@ class AbstractTable(metaclass=BaseTable):
             raise ValueError('Returned more than 1 value')
 
         return query.result_cache[0]
+
+    def annotate(self, **kwargs):
+        base_return_fields = ['rowid', '*']
+        fields = self.backend.build_annotation(**kwargs)
+        base_return_fields.extend(fields)
+
+        sql = self.backend.SELECT.format_map({
+            'fields': self.backend.comma_join(base_return_fields),
+            'table': self.name
+        })
+
+        query = Query(self.backend, [sql], table=self)
+        query.run()
+        return query.result_cache
 
 
 class Table(AbstractTable):
@@ -1026,7 +1097,7 @@ class Database:
     """This class links and unifies independent
     tables together and allows the management of
     a migration file
-    
+
     Creating a new database can be done by doing the following steps:
 
     >>> table = Table('my_table', 'my_database', fields=[Field('url')])
@@ -1110,4 +1181,7 @@ table.prepare()
 # r = table.filter(url__startswith='http')
 # r = table.filter(url__contains='google')
 # r = table.get(rowid=1)
+# print(r)
+# table.create(url='http://example.com')
+# r = table.annotate(lowered_url=Lower('url'))
 # print(r)
