@@ -3,6 +3,7 @@ import unittest
 
 from kryptone.conf import settings
 from kryptone.db.backends import SQL
+from kryptone.db.backends import Lower
 
 settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.absolute().joinpath('testproject')
 
@@ -86,6 +87,16 @@ class TestSQL(unittest.TestCase):
         for argument in arguments:
             with self.subTest(argument=argument):
                 result = self.instance.build_filters(argument[0])
+                self.assertListEqual(result, argument[1])
+
+
+    def test_build_annotations(self):
+        arguments = [
+            [{'name': Lower('name')}, ['lower(name) as name']]
+        ]
+        for argument in arguments:
+            with self.subTest(argument=argument):
+                result = self.instance.build_annotation(**argument[0])
                 self.assertListEqual(result, argument[1])
 
     def test_dict_to_sql(self):
