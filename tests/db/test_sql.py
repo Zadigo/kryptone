@@ -111,18 +111,6 @@ class TestSQL(unittest.TestCase):
                 self.assertListEqual(result[0], ['name__eq'])
                 self.assertTrue(result[1][0].startswith("'"))
 
-    # def test_complex_dict_to_sql(self):
-    #     test_value = {'url__gt': 'Kendall'}
-    #     result = self.instance.complex_dict_to_sql(test_value)
-    #     self.assertListEqual(result, [['url', '>', "'Kendall'"]])
-
-    #     test_value = {'url__gt': 'Kendall', 'age': 25}
-    #     result = self.instance.complex_dict_to_sql(test_value)
-    #     self.assertListEqual(
-    #         result,
-    #         [['url', '>', "'Kendall'"], ['url', '=', 25]]
-    #     )
-
 
 if __name__ == '__main__':
     unittest.main()
