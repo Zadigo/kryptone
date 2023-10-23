@@ -5,12 +5,11 @@ import sqlite3
 from collections import OrderedDict, defaultdict
 from functools import cached_property
 from hashlib import md5
-from sqlite3 import Row
+from sqlite3 import Cursor, Row
 
 import pytz
 
 from kryptone.conf import settings
-
 
 DATABASE = 'scraping'
 
@@ -361,6 +360,33 @@ class SQLiteBackend(SQL):
         query = Query(self, [sql, where_clause])
         query.run()
         return query.result_cache
+    
+    def save_row(self, row, updated_values):
+        if not isinstance(row, BaseRow):
+            raise ValueError()
+        
+        if row.marked_for_update:
+            # TODO: Pass the current table somewhere
+            # either in the row or [...]
+            update_sql = self.UPDATE.format_map({
+                'table': 'seen_urls',
+                'params': self.EQUALITY.format_map({
+                    'field': updated_values[0],
+                    'value': self.quote_value(updated_values[1])
+                })
+            })
+            where_clause = self.WHERE_CLAUSE.format_map({
+                'params': self.EQUALITY.format_map({
+                    'field': 'rowid',
+                    'value': row['rowid']
+                })
+            })
+            sql = [update_sql, where_clause]
+
+            query = Query(self, [sql], table=None)
+            query.run()
+            row.marked_for_update = False
+        return row
 
 
 class BaseRow(Row):
@@ -376,6 +402,11 @@ class BaseRow(Row):
     """
 
     backend_class = SQLiteBackend
+    marked_for_update = False
+
+    # def __init__(self, cursor, data):
+    #     super().__init__(cursor, data)
+    #     self.marked_for_update = False
 
     def __repr__(self):
         values = {}
@@ -390,29 +421,15 @@ class BaseRow(Row):
         return any((self[key] == value for key in self.keys()))
 
     # def __setitem__(self, key, value):
+    #     self.marked_for_update = True
     #     backend = self.initialize_backend
-    #     update_sql = backend.UPDATE.format_map({
-    #         'table': '',
-    #         'params': backend.EQUALITY.format_map({
-    #             'lhv': key,
-    #             'rhv': backend.quote_value(value)
-    #         })
-    #     })
-    #     where_clause = backend.WHERE_CLAUSE.format_map({
-    #         'lhv': 'rowid',
-    #         'rhv': self['id']
-    #     })
-    #     sql = [update_sql, where_clause]
     #     setattr(self, key, value)
-
-    #     query = Query(backend, sql, table=None)
-    #     query.run()
-    #     return self
+    #     return backend.save_row(self, [key, value])
 
     @property
     def initialize_backend(self):
         return self.backend_class(database=DATABASE)
-
+    
     # def delete(self):
     #     backend = self.initialize_backend
     #     delete_sql = backend.DELETE.format(table='')
@@ -791,8 +808,8 @@ class Query:
     def __repr__(self):
         return f'<{self.__class__.__name__} [{self._sql}]>'
 
-    def __del__(self):
-        self._backend.connection.close()
+    # def __del__(self):
+    #     self._backend.connection.close()
 
     @classmethod
     def run_multiple(cls, backend, *sqls, **kwargs):
@@ -1193,11 +1210,22 @@ table.prepare()
 # table.create(url='http://google.com', visited=True)
 # r = table.filter(url__startswith='http')
 # r = table.filter(url__contains='google')
-# r = table.get(rowid=1)
+r = table.get(rowid=1)
+# r['url'] = 'http://google.com/3'
 # print(r)
 # table.create(url='http://example.com')
 
 # r = table.annotate(lowered_url=Lower('url'))
-r = table.annotate(uppered_url=Upper('url'))
+# r = table.annotate(uppered_url=Upper('url'))
 
 print(r)
+
+# import time
+
+# count = 1
+
+# while True:
+#     table.create(url=f'http://example.com/{count}')
+#     count = count + 1
+#     time.sleep(5)
+#     print(table.all())
