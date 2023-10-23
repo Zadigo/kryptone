@@ -52,6 +52,35 @@ class Upper(Lower):
         return sql
 
 
+class Length(Functions):
+    """Returns length of each iterated values
+    from the database
+    
+    >>> table.annotate(url_length=Length('url'))
+    """
+
+    def function_sql(self):
+        sql = self.backend.LENGTH.format_map({
+            'field': self.field_name
+        })
+        return sql
+    
+
+class ExtractYear(Functions):
+    """Extracts the year section of each
+    iterated value
+    
+    >>> table.annotate(year=ExtractYear('created_on'))
+    >>> table.filter(year__gte=ExtractYear('created_on'))
+    """
+    def function_sql(self):
+        sql = self.backend.STRFTIME.format_map({
+            'format': self.backend.quote_value('%Y'),
+            'value': self.field_name
+        })
+        return sql
+
+
 class SQL:
     ALTER_TABLE = 'alter table {table} add column {params}'
     CREATE_TABLE = 'create table if not exists {table} ({fields})'
