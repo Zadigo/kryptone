@@ -6,7 +6,7 @@ from selenium.webdriver.common.by import By
 from kryptone.base import SiteCrawler
 from kryptone.contrib.crawlers.ecommerce import EcommerceCrawlerMixin
 from kryptone.routing import Router, route
-from kryptone.utils.urls import URLPassesTest
+from kryptone.utils.urls import URLIgnoreTest
 
 IGNORE_URLS = [
     'faq-faq',
@@ -48,7 +48,7 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
         #     )
         # ])
         url_passes_tests = [
-            URLPassesTest(
+            URLIgnoreTest(
                 'base_pages',
                 paths=IGNORE_URLS
             )
