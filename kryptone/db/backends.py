@@ -1127,6 +1127,40 @@ class AbstractTable(metaclass=BaseTable):
         query._table = self
         query.run()
         return query.result_cache
+    
+    def order_by(self, *fields):
+        base_return_fields = ['rowid', '*']
+        ascending_fields = set()
+        descending_fields = set()
+
+        for field in fields:
+            if field.startswith('-'):
+                descending_fields.add(field.removeprefix('-'))
+                continue
+            ascending_fields.add(field)
+
+        sql = self.backend.SELECT.format_map({
+            'fields': self.backend.comma_join(base_return_fields),
+            'table': self.name
+        })
+
+        ascending_fields = [
+            self.backend.ASCENDING.format(field=field)
+            for field in ascending_fields
+        ]
+        descending_fields = [
+            self.backend.DESCENDNIG.format(field=field)
+            for field in descending_fields
+        ]
+        conditions = ascending_fields + descending_fields
+
+        order_by_clause = self.backend.ORDER_BY.format_map({
+            'conditions': self.backend.comma_join(conditions)
+        })
+        sql = [sql, order_by_clause]
+        query = Query(self.backend, sql, table=self)
+        query.run()
+        return query.result_cache
 
 
 class Table(AbstractTable):
