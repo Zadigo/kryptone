@@ -5,7 +5,7 @@ import sqlite3
 from collections import OrderedDict, defaultdict
 from functools import cached_property
 from hashlib import md5
-from sqlite3 import Cursor, Row
+from sqlite3 import Row
 
 import pytz
 
@@ -66,7 +66,7 @@ class SQL:
 
     EQUALITY = '{field}={value}'
     LIKE = '{field} like {conditions}'
-    BETWEEN = 'between {lhv} and {rhv}'
+    BETWEEN = '{field} between {lhv} and {rhv}'
     IN = '{field} in ({values})'
     NOT_LIKE = '{field} not like {wildcard}'
     WHERE_CLAUSE = 'where {params}'
@@ -193,7 +193,6 @@ class SQL:
             'in': 'in',
             'isnull': 'isnull'
         }
-        errors = []
         filters_map = []
         for key, value in kwargs.items():
             if '__' not in key:
@@ -270,9 +269,18 @@ class SQL:
             if operator == 'between':
                 lhv, rhv = value
                 operator_and_value = self.BETWEEN.format_map({
+                    'field': field,
                     'lhv': lhv,
                     'rhv': rhv
                 })
+                built_filters.append(operator_and_value)
+                continue
+
+            if operator == 'isnull':
+                if value:
+                    operator_and_value = f'{field} is null'
+                else:
+                    operator_and_value = f'{field} is not null'
                 built_filters.append(operator_and_value)
                 continue
 
@@ -297,6 +305,72 @@ class SQL:
         return [joined_fields]
 
 
+class BaseRow:
+    """Adds additional functionalities to
+    the default SQLite `Row` class. Rows
+    allows the data that comes from the database
+    to be interfaced
+
+    >>> row = table.get(name='Kendall')
+    ... <BaseRow [{'rowid': 1}]>
+    ... row['rowid']
+    ... 1
+    """
+
+    _marked_for_update = False
+
+    def __init__(self, cursor, fields, data):
+        self._cursor = cursor
+        self._fields = fields
+        self._cached_data = data
+        self._backend = None
+        self._table = None
+
+        for key, value in self._cached_data.items():
+            setattr(self, key, value)
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__} {self._cached_data}>'
+
+    def __setitem__(self, key, value):
+        self._marked_for_update = True
+        setattr(self, key, value)
+        result = self._backend.save_row(self, [key, value])
+        self._marked_for_update = False
+        return result
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __contains__(self, value):
+        truth_array = []
+        for item in self._cached_data.values():
+            if isinstance(item, int):
+                item = str(item)
+            truth_array.append(value in item)
+        return any(truth_array)
+        # return any((value in self[key] for key in self._fields))
+
+    def __eq__(self, value):
+        return any((self[key] == value for key in self._fields))
+
+    def delete(self):
+        pass
+
+
+def row_factory(backend):
+    """Base function to generate row that implement
+    additional functionnalities on the results
+    of the database"""
+    def inner_factory(cursor, row):
+        fields = [column[0] for column in cursor.description]
+        data = {key: value for key, value in zip(fields, row)}
+        instance = BaseRow(cursor, fields, data)
+        instance._backend = backend
+        return instance
+    return inner_factory
+
+
 class SQLiteBackend(SQL):
     """Class that initiates and encapsulates a
     new connection to the database"""
@@ -310,7 +384,8 @@ class SQLiteBackend(SQL):
 
         connection = sqlite3.connect(database)
         # connection.create_function('hash', 1, Hash())
-        connection.row_factory = BaseRow
+        # connection.row_factory = BaseRow
+        connection.row_factory = row_factory(self)
         self.connection = connection
 
     def list_table_columns_sql(self, table):
@@ -365,7 +440,7 @@ class SQLiteBackend(SQL):
         if not isinstance(row, BaseRow):
             raise ValueError()
         
-        if row.marked_for_update:
+        if row._marked_for_update:
             # TODO: Pass the current table somewhere
             # either in the row or [...]
             update_sql = self.UPDATE.format_map({
@@ -383,48 +458,46 @@ class SQLiteBackend(SQL):
             })
             sql = [update_sql, where_clause]
 
-            query = Query(self, [sql], table=None)
-            query.run()
-            row.marked_for_update = False
+            query = Query(self, sql, table=None)
+            query.run(commit=True)
         return row
 
 
-class BaseRow(Row):
-    """Adds additional functionalities to
-    the default SQLite `Row` class. Rows
-    allows the data that comes from the database
-    to be interfaced
+# class BaseRow(Row):
+#     """Adds additional functionalities to
+#     the default SQLite `Row` class. Rows
+#     allows the data that comes from the database
+#     to be interfaced
 
-    >>> row = table.get(name='Kendall')
-    ... <BaseRow [{'rowid': 1}]>
-    ... row['rowid']
-    ... 1
-    """
+#     >>> row = table.get(name='Kendall')
+#     ... <BaseRow [{'rowid': 1}]>
+#     ... row['rowid']
+#     ... 1
+#     """
 
-    backend_class = SQLiteBackend
-    marked_for_update = False
+#     backend_class = SQLiteBackend
+#     marked_for_update = False
 
-    # def __init__(self, cursor, data):
-    #     super().__init__(cursor, data)
-    #     self.marked_for_update = False
+#     # def __init__(self, cursor, data):
+#     #     super().__init__(cursor, data)
+#     #     self.marked_for_update = False
 
-    def __repr__(self):
-        values = {}
-        for key in self.keys():
-            values[key] = self[key]
-        return f'<{self.__class__.__name__} [{values}]>'
+#     def __repr__(self):
+#         values = {}
+#         for key in self.keys():
+#             values[key] = self[key]
+#         return f'<{self.__class__.__name__} [{values}]>'
 
-    def __contains__(self, value):
-        return any((value in self[key] for key in self.keys))
+#     def __contains__(self, value):
+#         return any((value in self[key] for key in self.keys))
 
-    def __eq__(self, value):
-        return any((self[key] == value for key in self.keys()))
+#     def __eq__(self, value):
+#         return any((self[key] == value for key in self.keys()))
 
-    # def __setitem__(self, key, value):
-    #     self.marked_for_update = True
-    #     backend = self.initialize_backend
-    #     setattr(self, key, value)
-    #     return backend.save_row(self, [key, value])
+#     # def __setitem__(self, key, value):
+#     #     self.marked_for_update = True
+#     #     backend = self.initialize_backend
+#     #     return backend.save_row(self, [key, value])
 
     @property
     def initialize_backend(self):
@@ -904,7 +977,10 @@ class QuerySet:
         })
         sql = [previous_sql, order_by_clause]
         new_query = self.query.create(
-            self.query._backend, sql, table=self.query._table)
+            self.query._backend, 
+            sql, 
+            table=self.query._table
+        )
         new_query.run()
         # return QuerySet(new_query)
         return new_query.result_cache
@@ -956,13 +1032,14 @@ class AbstractTable(metaclass=BaseTable):
         })
         sql = [all_sql]
         query = self.query_class(self.backend, sql, table=self)
+        query._table = self
         query.run()
         return query.result_cache
         # return QuerySet(query)
 
     def filter(self, **kwargs):
         tokens = self.backend.decompose_filters(**kwargs)
-        return_type, filters = self.backend.build_filters(tokens)
+        filters = self.backend.build_filters(tokens)
 
         if len(filters) > 1:
             filters = [' and '.join(filters)]
@@ -976,6 +1053,7 @@ class AbstractTable(metaclass=BaseTable):
         })
         sql = [select_sql, where_clause]
         query = self.query_class(self.backend, sql, table=self)
+        query._table = self
         query.run()
         return query.result_cache
 
@@ -999,6 +1077,7 @@ class AbstractTable(metaclass=BaseTable):
             values=joined_values
         )
         query = self.query_class(self.backend, [sql])
+        query._table = self
         query.run(commit=True)
         return self.last()
 
@@ -1023,6 +1102,7 @@ class AbstractTable(metaclass=BaseTable):
         sql.extend([where_clause])
 
         query = self.query_class(self.backend, sql, table=self)
+        query._table = self
         query.run()
 
         if not query.result_cache:
@@ -1044,6 +1124,7 @@ class AbstractTable(metaclass=BaseTable):
         })
 
         query = Query(self.backend, [sql], table=self)
+        query._table = self
         query.run()
         return query.result_cache
 
@@ -1208,11 +1289,26 @@ table.prepare()
 # migrate()
 
 # table.create(url='http://google.com', visited=True)
+
+# r = table.get(rowid=4)
+
 # r = table.filter(url__startswith='http')
 # r = table.filter(url__contains='google')
-r = table.get(rowid=1)
+# r = table.filter(rowid__in=[1, 4, 6])
+# TODO: Use Field.to_database before evaluating the
+# value to the dabase
+# r = table.filter(rowid__in=[1, 4, 6], visited=False)
+# r = table.filter(rowid__gte=3)
+# r = table.filter(rowid__lte=3)
+# r = table.filter(url__contains='/3')
+# r = table.filter(url__startswith='http://')
+# r = table.filter(url__endswith='/3')
+# r = table.filter(rowid__range=[1, 3])
+# r = table.filter(rowid__ne=1)
+# r = table.filter(url__isnull=True)
+
 # r['url'] = 'http://google.com/3'
-# print(r)
+
 # table.create(url='http://example.com')
 
 # r = table.annotate(lowered_url=Lower('url'))
