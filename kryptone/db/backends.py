@@ -1469,7 +1469,7 @@ def migrate(*tables):
 
 # make_migrations()
 
-migrate()
+# migrate()
 
 
 
