@@ -1,5 +1,6 @@
 import datetime
 import json
+import pathlib
 import secrets
 import sqlite3
 from collections import OrderedDict, defaultdict
@@ -22,7 +23,8 @@ DATABASE = 'scraping'
 
 
 class Functions:
-    def __init__(self):
+    def __init__(self, field):
+        self.field_name = field
         self.backend = None
 
     def function_sql(self):
@@ -30,9 +32,11 @@ class Functions:
 
 
 class Lower(Functions):
-    def __init__(self, field_name):
-        self.field_name = field_name
-        super().__init__()
+    """Returns each values of the given
+    column in lowercase
+    
+    >>> table.annotate(url_lower=Lower('url'))
+    """
 
     def __str__(self):
         return f'<{self.__class__.__name__}({self.field_name})>'
@@ -45,6 +49,12 @@ class Lower(Functions):
 
 
 class Upper(Lower):
+    """Returns each values of the given
+    column in uppercase
+    
+    >>> table.annotate(url_upper=Upper('url'))
+    """
+
     def function_sql(self):
         sql = self.backend.UPPER.format_map({
             'field': self.field_name
@@ -82,6 +92,8 @@ class ExtractYear(Functions):
 
 
 class SQL:
+    """Base sql compiler"""
+
     ALTER_TABLE = 'alter table {table} add column {params}'
     CREATE_TABLE = 'create table if not exists {table} ({fields})'
     DROP_TABLE = 'drop table if exists {table}'
@@ -112,6 +124,9 @@ class SQL:
 
     LOWER = 'lower({field})'
     UPPER = 'upper({field})'
+    LENGTH = 'length({field})'
+
+    STRFTIME = 'strftime({format}, {value})'
 
     @staticmethod
     def quote_value(value):
@@ -359,7 +374,7 @@ class BaseRow:
             setattr(self, key, value)
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} {self._cached_data}>'
+        return f'<id: {self.rowid}>'
 
     def __setitem__(self, key, value):
         self._marked_for_update = True
@@ -575,8 +590,12 @@ class Migrations:
 
     @cached_property
     def read_content(self):
-        with open(self.file, mode='r') as f:
-            return json.load(f)
+        try:
+            with open(self.file, mode='r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            # Create a blank migration file
+            return self.blank_migration()
 
     def _write_fields(self, table):
         fields_map = []
@@ -686,6 +705,23 @@ class Migrations:
         # TODO: Drop columns that were dropped in the database
 
         backend.create_table_fields(table, columns_to_create)
+
+    def blank_migration(self):
+        """Creates a blank initial migration file"""
+        migration_content = {}
+
+        file_path = settings.PROJECT_PATH / 'migrations.json'
+        if not file_path.exists():
+            file_path.touch()
+        
+        with open(file_path, mode='w') as f:
+            migration_content['id'] = secrets.token_hex(5)
+            migration_content['date'] = str(datetime.datetime.now())
+            migration_content['number'] = 1
+
+            migration_content['tables'] = []
+            json.dump(migration_content, f, indent=4, ensure_ascii=False)
+            return migration_content
 
     def migrate(self, tables):
         # Write to the migrations.json file only if
@@ -1321,37 +1357,60 @@ class Database:
 
 table = Table('seen_urls', 'scraping', fields=[
     Field('url'),
-    BooleanField('visited', default=False)
+    BooleanField('visited', default=False),
+    Field('created_on')
 ])
-table.prepare()
+# table.prepare()
 
 
-# database = Database('seen_urls', table)
-# database.make_migrations()
-# database.migrate()
+def make_migrations(*tables):
+    """Writes the physical changes to the
+    tables to the `migrations.json` file"""
+    from kryptone.conf import settings
+    import pathlib
+    settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
+    migrations = Migrations()
+    migrations.has_migrations = True
+    instances = {table.name: table}
+    migrations.migrate(instances)
 
-# def make_migrations(*tables):
-#     """Writes the physical changes to the
-#     tables to the `migrations.json` file"""
-#     migrations = Migrations()
-#     migrations.has_migrations = True
-#     instances = {table.name: table}
-#     migrations.migrate(instances)
 
-
-# def migrate(*tables):
-#     """Applies the migrations in the
-#     `migrations.json` file to the database"""
-#     migrations = Migrations()
-#     instances = {table.name: table}
-#     migrations.check(table_instances=instances)
+def migrate(*tables):
+    """Applies the migrations in the
+    `migrations.json` file to the database"""
+    from kryptone.conf import settings
+    import pathlib
+    settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
+    migrations = Migrations()
+    instances = {table.name: table}
+    migrations.check(table_instances=instances)
 
 
 # make_migrations()
 
 # migrate()
 
+
+
+# TODO: Implement cases
+# 1. case when '1' then '2' else '3' end
+# 2 case when '1' then '3' when '2' then '4'  else '5' end
+# case {condition} end
+# when {condition} then {then_value} else {else_value}
+
+# TODO: Implement group by
+# select rowid, *, count(rowid) from groupby rowid
+# select rowid, *, count(rowid) from groupby rowid order by count(rowid) desc
+# select rowid, *, count(rowid) from groupby rowid having count(rowid) > 1
+
+
+# database = Database('seen_urls', table)
+# database.make_migrations()
+# database.migrate()
+
 # table.create(url='http://google.com', visited=True)
+# import datetime
+# table.create(url='http://example.com/1', visited=False, created_on=str(datetime.datetime.now()))
 
 # r = table.get(rowid=4)
 
@@ -1376,6 +1435,10 @@ table.prepare()
 
 # r = table.annotate(lowered_url=Lower('url'))
 # r = table.annotate(uppered_url=Upper('url'))
+# r = table.annotate(url_length=Length('url'))
+# r = table.annotate(year=ExtractYear('created_on'))
+
+# r = table.order_by('rowid')
 
 print(r)
 
