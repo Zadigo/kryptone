@@ -20,3 +20,7 @@ class Lower(Functions):
 
 class Upper(Lower):
     ...
+
+
+class ExtractYear(Functions):
+    ...
