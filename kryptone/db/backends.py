@@ -5,6 +5,72 @@ from kryptone.db.functions import Functions
 from kryptone.db.queries import Query
 
 
+class BaseRow:
+    """Adds additional functionalities to
+    the default SQLite `Row` class. Rows
+    allows the data that comes from the database
+    to be interfaced
+
+    >>> row = table.get(name='Kendall')
+    ... <BaseRow [{'rowid': 1}]>
+    ... row['rowid']
+    ... 1
+    """
+
+    _marked_for_update = False
+
+    def __init__(self, cursor, fields, data):
+        self._cursor = cursor
+        self._fields = fields
+        self._cached_data = data
+        self._backend = None
+        self._table = None
+
+        for key, value in self._cached_data.items():
+            setattr(self, key, value)
+
+    def __repr__(self):
+        return f'<id: {self.rowid}>'
+
+    def __setitem__(self, key, value):
+        self._marked_for_update = True
+        setattr(self, key, value)
+        result = self._backend.save_row(self, [key, value])
+        self._marked_for_update = False
+        return result
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __contains__(self, value):
+        truth_array = []
+        for item in self._cached_data.values():
+            if isinstance(item, int):
+                item = str(item)
+            truth_array.append(value in item)
+        return any(truth_array)
+        # return any((value in self[key] for key in self._fields))
+
+    def __eq__(self, value):
+        return any((self[key] == value for key in self._fields))
+
+    def delete(self):
+        pass
+
+
+def row_factory(backend):
+    """Base function to generate row that implement
+    additional functionnalities on the results
+    of the database"""
+    def inner_factory(cursor, row):
+        fields = [column[0] for column in cursor.description]
+        data = {key: value for key, value in zip(fields, row)}
+        instance = BaseRow(cursor, fields, data)
+        instance._backend = backend
+        return instance
+    return inner_factory
+
+
 class SQL:
     """Base sql compiler"""
 
@@ -42,6 +108,8 @@ class SQL:
     LOWER = 'lower({field})'
     UPPER = 'upper({field})'
     LENGTH = 'length({field})'
+    MAX = 'max({field})'
+    MIN = 'min({field})'
 
     STRFTIME = 'strftime({format}, {value})'
 
@@ -98,6 +166,10 @@ class SQL:
         if sql.endswith(';'):
             return sql.removesuffix(';')
         return sql
+
+    @staticmethod
+    def wrap_parenthentis(value):
+        return f"({value})"
 
     def quote_startswith(self, value):
         """Adds a wildcard to quoted value
@@ -276,79 +348,13 @@ class SQL:
 
         joined_fields = self.comma_join(function_filters.values())
         return [joined_fields]
-
-
-class BaseRow:
-    """Adds additional functionalities to
-    the default SQLite `Row` class. Rows
-    allows the data that comes from the database
-    to be interfaced
-
-    >>> row = table.get(name='Kendall')
-    ... <BaseRow [{'rowid': 1}]>
-    ... row['rowid']
-    ... 1
-    """
-
-    _marked_for_update = False
-
-    def __init__(self, cursor, fields, data):
-        self._cursor = cursor
-        self._fields = fields
-        self._cached_data = data
-        self._backend = None
-        self._table = None
-
-        for key, value in self._cached_data.items():
-            setattr(self, key, value)
-
-    def __repr__(self):
-        return f'<id: {self.rowid}>'
-
-    def __setitem__(self, key, value):
-        self._marked_for_update = True
-        setattr(self, key, value)
-        result = self._backend.save_row(self, [key, value])
-        self._marked_for_update = False
-        return result
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __contains__(self, value):
-        truth_array = []
-        for item in self._cached_data.values():
-            if isinstance(item, int):
-                item = str(item)
-            truth_array.append(value in item)
-        return any(truth_array)
-        # return any((value in self[key] for key in self._fields))
-
-    def __eq__(self, value):
-        return any((self[key] == value for key in self._fields))
-
-    def delete(self):
-        pass
-
-
-def row_factory(backend):
-    """Base function to generate row that implement
-    additional functionnalities on the results
-    of the database"""
-    def inner_factory(cursor, row):
-        fields = [column[0] for column in cursor.description]
-        data = {key: value for key, value in zip(fields, row)}
-        instance = BaseRow(cursor, fields, data)
-        instance._backend = backend
-        return instance
-    return inner_factory
-
+    
 
 class SQLiteBackend(SQL):
     """Class that initiates and encapsulates a
     new connection to the database"""
 
-    def __init__(self, database_name=None):
+    def __init__(self, database_name=None, table=None):
         if database_name is None:
             database_name = ':memory:'
         else:
@@ -360,6 +366,7 @@ class SQLiteBackend(SQL):
         # connection.row_factory = BaseRow
         connection.row_factory = row_factory(self)
         self.connection = connection
+        self.table = table
 
     def list_table_columns_sql(self, table):
         sql = f'pragma table_info({table.name})'
@@ -464,48 +471,7 @@ class SQLiteBackend(SQL):
             query = Query(self, sql, table=None)
             query.run(commit=True)
         return row
-
-
-# class BaseRow(Row):
-#     """Adds additional functionalities to
-#     the default SQLite `Row` class. Rows
-#     allows the data that comes from the database
-#     to be interfaced
-
-#     >>> row = table.get(name='Kendall')
-#     ... <BaseRow [{'rowid': 1}]>
-#     ... row['rowid']
-#     ... 1
-#     """
-
-#     backend_class = SQLiteBackend
-#     marked_for_update = False
-
-#     # def __init__(self, cursor, data):
-#     #     super().__init__(cursor, data)
-#     #     self.marked_for_update = False
-
-#     def __repr__(self):
-#         values = {}
-#         for key in self.keys():
-#             values[key] = self[key]
-#         return f'<{self.__class__.__name__} [{values}]>'
-
-#     def __contains__(self, value):
-#         return any((value in self[key] for key in self.keys))
-
-#     def __eq__(self, value):
-#         return any((self[key] == value for key in self.keys()))
-
-#     # def __setitem__(self, key, value):
-#     #     self.marked_for_update = True
-#     #     backend = self.initialize_backend
-#     #     return backend.save_row(self, [key, value])
-
-    @property
-    def initialize_backend(self):
-        return self.backend_class(database=DATABASE)
-    
+        
     # def delete(self):
     #     backend = self.initialize_backend
     #     delete_sql = backend.DELETE.format(table='')

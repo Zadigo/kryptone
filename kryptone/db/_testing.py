@@ -3,20 +3,15 @@ import datetime
 from kryptone.db import tables
 from kryptone.db.fields import BooleanField, Field
 from kryptone.db.migrations import Migrations
-from kryptone.db.functions import Lower, ExtractYear
+from kryptone.db.functions import Lower, ExtractYear, Max
 from kryptone.db.tables import Table
 
-table = Table('seen_urls', 'scraping', fields=[
-        Field('url'),
-        BooleanField('visited', default=False),
-        Field('created_on')
-    ],
-    constraints=[
-        
-    ]
-    # index=[
-    #     Index('for_urls', 'url')
-)
+fields = [
+    Field('url'),
+    BooleanField('visited', default=False),
+    Field('created_on')
+]
+table = Table('seen_urls', database_name='scraping', fields=fields)
 table.prepare()
 
 
@@ -98,7 +93,8 @@ def migrate(*tables):
 # r = table.annotate(lowered_url=Lower('url'))
 # r = table.annotate(uppered_url=Upper('url'))
 # r = table.annotate(url_length=Length('url'))
-r = table.annotate(year=ExtractYear('created_on'))
+# r = table.annotate(year=ExtractYear('created_on'))
+# r = table.annotate(year=Max('rowid'))
 # r = r.values()
 
 # r = table.order_by('rowid')

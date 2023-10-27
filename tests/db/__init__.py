@@ -4,11 +4,11 @@ from kryptone.db.tables import Table
 
 
 def create_table(create=False):
-    table = Table('celebrities', 'test_database', fields=[
+    table = Table('celebrities', fields=[
         Field('name')
     ])
     table.prepare()
     if create:
         table.create(name='Kendall Jenner')
-    return table.backend
+    return table
     

@@ -26,8 +26,10 @@ class AbstractTable(metaclass=BaseTable):
     backend_class = SQLiteBackend
 
     def __init__(self, database_name=None):
-        self.backend = self.backend_class(database_name=database_name or DATABASE)
-        # registry.add_table(self.name, self)
+        self.backend = self.backend_class(
+            database_name=database_name or DATABASE,
+            table=self
+        )
 
     def __hash__(self):
         return hash((self.name))
@@ -244,7 +246,7 @@ class Table(AbstractTable):
     """
     fields_map = OrderedDict()
 
-    def __init__(self, name, database_name, *, fields=[], index=[], constraints=[]):
+    def __init__(self, name, *, database_name=None, fields=[], index=[], constraints=[]):
         self.name = name
         self.indexes = index
         self.constraints = constraints
