@@ -38,8 +38,8 @@ class Table(AbstractTable):
     def __init__(
         self,
         name: str,
-        database_name: str,
         *,
+        database_name: str = ...,
         fields: list[Field] = ...,
         index: list[Index],
         constraints: list[CheckConstraint]
