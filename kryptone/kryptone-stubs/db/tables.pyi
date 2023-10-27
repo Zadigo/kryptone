@@ -1,8 +1,11 @@
 from typing import Any, OrderedDict, Type, Union
 
 from kryptone.db.backends import BaseRow, SQLiteBackend
+from kryptone.db.fields import Field
 from kryptone.db.migrations import Migrations
 from kryptone.db.queries import Query
+from kryptone.db.indexes import Index
+from kryptone.db.constraints import CheckConstraint
 
 class BaseTable(type):
     def __new__(cls, name: str, bases: tuple, attrs: dict) -> type: ...
@@ -35,9 +38,11 @@ class Table(AbstractTable):
     def __init__(
         self,
         name: str,
-        database: str,
+        database_name: str,
         *,
-        fields: list[str] = ...
+        fields: list[Field] = ...,
+        index: list[Index],
+        constraints: list[CheckConstraint]
     ) -> None: ...
 
     def __repr__(self) -> str: ...
