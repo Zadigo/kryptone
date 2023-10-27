@@ -2,15 +2,16 @@ import pathlib
 import unittest
 
 from kryptone.conf import settings
-from kryptone.db.backends import Field, Table
+from kryptone.db.fields import Field
+from kryptone.db.tables import Table
 
-settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.absolute().joinpath('testproject')
+# settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.absolute().joinpath('testproject')
 
 
 class TestField(unittest.TestCase):
     def test_field_params(self):
         field = Field('name')
-        Table('celebrities', 'hollywood', fields=[field])
+        Table('celebrities', fields=[field])
 
         result = field.field_parameters()
         self.assertListEqual(result, ['name', 'text', 'not null'])
