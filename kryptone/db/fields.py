@@ -17,7 +17,13 @@ class Field:
         self.table = None
         self.max_length = max_length
         self.base_validators = self.base_validators + validators
-        self.base_field_parameters = [self.field_type, 'not null']
+        self.base_field_parameters = {
+            'primary key': False,
+            'null': False,
+            'not null': True,
+            'unique': False
+        }
+        # self.base_field_parameters = [self.field_type, 'not null']
 
         if max_length is not None:
             instance = MaxLengthConstraint(fields=[name])
@@ -69,28 +75,54 @@ class Field:
         >>> Field('visited', default=False)
         ... ['visited', 'text', 'not null', 'default', 0]
         """
-        base_parameters = self.base_field_parameters.copy()
-        if self.null:
-            base_parameters.pop(base_parameters.index('not null'))
-            base_parameters.append('null')
+        field_type = None
+        if self.max_length is not None:
+            field_type = f'varchar({self.max_length})'
+            
+        initial_parameters = [self.name, field_type or self.field_type]
 
-        if self.primary_key:
-            base_parameters.append('primary key')
+        if self.null:
+            self.base_field_parameters['null'] = True
+            self.base_field_parameters['not null'] = False
+        else:
+            self.base_field_parameters['null'] = False
+            self.base_field_parameters['not null'] = True
+
+        self.base_field_parameters['primary key'] = self.primary_key
+        self.base_field_parameters['unique'] = self.unique
 
         if self.default is not None:
             database_value = self.to_database(self.default)
             value = self.table.backend.quote_value(database_value)
-            base_parameters.extend(['default', value])
+            initial_parameters.extend(['default', value])
 
-        if self.unique:
-            base_parameters.append('unique')
-            if 'not null' not in base_parameters and 'null' in base_parameters:
-                base_parameters.index(
-                    'not null', base_parameters.index('null'))
+        true_parameters = list(filter(lambda x: x[1] is True, self.base_field_parameters.items()))
+        additional_parameters = list(map(lambda x: x[0], true_parameters))
+        base_field_parameters = initial_parameters + additional_parameters
+        return base_field_parameters
 
-        base_parameters.insert(0, self.name)
-        self.base_field_parameters = base_parameters
-        return base_parameters
+        # base_parameters = self.base_field_parameters.copy()
+        # if self.null:
+        #     base_parameters.pop(base_parameters.index('not null'))
+        #     base_parameters.append('null')
+
+        # if self.primary_key:
+        #     base_parameters.append('primary key')
+
+        # if self.default is not None:
+        #     database_value = self.to_database(self.default)
+        #     value = self.table.backend.quote_value(database_value)
+        #     base_parameters.extend(['default', value])
+
+        # if self.unique:
+        #     base_parameters.append('unique')
+        #     if 'not null' not in base_parameters and 'null' in base_parameters:
+        #         base_parameters.index(
+        #             'not null', base_parameters.index('null'))
+
+        # base_parameters.insert(0, self.name)
+        # self.base_field_parameters = base_parameters
+        # return base_parameters
 
     def prepare(self, table):
         from kryptone.db.tables import Table
