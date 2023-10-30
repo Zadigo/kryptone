@@ -28,10 +28,15 @@ EXECUTION_TABLE = Table('execution_table', fields=[
 ])
 
 
-database = Database(
-    'kryptone',
-    SEEN_URLS_TABLE,
-    URLS_TO_VISIT_TABLE,
-    VISITED_URLS_TABLE,
-    EXECUTION_TABLE
-)
+def get_database():
+    """A wraper that returns the database instance
+    because the __init__ of Database calls Migrations
+    which calls settings.PROJECT_PATH which is None
+    and raises an error when using Database in module"""
+    return Database(
+        'kryptone',
+        SEEN_URLS_TABLE,
+        URLS_TO_VISIT_TABLE,
+        VISITED_URLS_TABLE,
+        EXECUTION_TABLE
+    )
