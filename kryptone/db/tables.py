@@ -353,7 +353,7 @@ class Database:
         should generally be called before running `migrate`
         """
         self.migrations.has_migrations = True
-        self.migrations.migrate(self.table_instances)
+        self.migrations.make_migrations(self.table_instances)
 
     def migrate(self):
         """Implements the changes to the migration
