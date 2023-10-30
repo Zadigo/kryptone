@@ -1,4 +1,8 @@
-from collections import OrderedDict
+import dataclasses
+from collections import OrderedDict, namedtuple
+from dataclasses import is_dataclass
+
+from matplotlib.pyplot import isinteractive
 
 from kryptone.db import DATABASE
 from kryptone.db.backends import SQLiteBackend
@@ -44,6 +48,9 @@ class AbstractTable(metaclass=BaseTable):
         are quoted by default"""
         validates_values = []
         for i, field in enumerate(fields):
+            if field == 'rowid' or field == 'id':
+                continue
+
             field = self.fields_map[field]
             validated_value = self.backend.quote_value(
                 field.to_database(list(values)[i])
@@ -122,6 +129,31 @@ class AbstractTable(metaclass=BaseTable):
         query._table = self
         query.run(commit=True)
         return self.last()
+    
+    def bulk_create(self, objs):
+        new_objects = []
+
+        # Use a namedtuple to ensure that the values
+        # that are entered match the fields on the
+        # database. In other words, the data entered
+        # always matches the fields of the database
+        true_field_names = list(filter(lambda x: x != 'rowid', self.field_names))
+        defaults = [None] * len(true_field_names)
+        item = namedtuple(self.name, true_field_names, defaults=defaults)
+        
+        for obj in objs:
+            if isinstance(obj, dict):
+                new_objects.append(item(**obj))
+
+            # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
+            if hasattr(obj, '_fields'):
+                new_objects.append(obj)
+        
+        new_item = {}
+        for obj in new_objects:
+            for field in obj._fields:
+                new_item[field] = getattr(obj, field)
+            self.create(**new_item)
 
     def get(self, **kwargs):
         """Returns a specific row from the database

@@ -1,6 +1,7 @@
 import datetime
 
 from kryptone.db import tables
+from collections import namedtuple
 from kryptone.db.fields import BooleanField, Field
 from kryptone.db.migrations import Migrations
 from kryptone.db.functions import Lower, ExtractYear, Max
@@ -66,6 +67,9 @@ def migrate(*tables):
 # database.migrate()
 
 # table.create(url='http://google.com', visited=True)
+
+obj = namedtuple('Object', ['url'])
+table.bulk_create([obj('http://example.com')])
 # import datetime
 # table.create(url='http://example.com/1', visited=False, created_on=str(datetime.datetime.now()))
 
