@@ -1,7 +1,8 @@
 import kryptone
-from kryptone.management.base import ProjectCommand
 from kryptone.checks.core import checks_registry
-from kryptone.contrib.database import database
+from kryptone.conf import settings
+from kryptone.contrib.database import get_database
+from kryptone.management.base import ProjectCommand
 
 
 class Command(ProjectCommand):
@@ -10,4 +11,5 @@ class Command(ProjectCommand):
     def execute(self, namespace):
         kryptone.setup()
         checks_registry.run()
+        database = get_database()
         database.make_migrations()
