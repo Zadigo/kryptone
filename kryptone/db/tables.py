@@ -358,4 +358,4 @@ class Database:
     def migrate(self):
         """Implements the changes to the migration
         file into the SQLite database"""
-        self.migrations.check(self.table_instances)
+        self.migrations.check(self.table_map)
