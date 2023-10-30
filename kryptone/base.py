@@ -6,7 +6,8 @@ import random
 import time
 from collections import OrderedDict, defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
-from selenium.webdriver.common.proxy import Proxy, ProxyType
+from urllib.robotparser import RobotFileParser
+
 import pandas
 import requests
 from lxml import etree
@@ -15,33 +16,31 @@ from requests.models import Request
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import exceptions, logger
+from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
+from kryptone.db.tables import Database
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import AsyncIterator
+from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
-from kryptone.utils.iterators import URLGenerator
-from kryptone import constants
 from kryptone.webhooks import Webhooks
-from kryptone import exceptions
-from urllib.robotparser import RobotFileParser
 
 DEFAULT_META_OPTIONS = {
     'domains', 'url_ignore_tests',
     'debug_mode', 'site_language', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
     'ignore_queries', 'ignore_images', 'restrict_search_to',
-    'url_gather_ignore_tests'
+    'url_gather_ignore_tests', 'database'
 }
 
 
@@ -118,6 +117,7 @@ class CrawlerOptions:
         self.ignore_queries = False
         self.ignore_images = False
         self.url_gather_ignore_tests = []
+        self.database = None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -138,6 +138,13 @@ class CrawlerOptions:
     def prepare(self):
         if isinstance(self.start_urls, URLGenerator):
             self.start_urls = list(self.start_urls)
+
+        if self.database is not None:
+            if not isinstance(self.database, Database):
+                raise ValueError(
+                    f"{type(self.database)} should be "
+                    "an instance of Database"
+                )
 
 
 class Crawler(type):
