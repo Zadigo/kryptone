@@ -86,6 +86,10 @@ class Migrations:
 
         if errors:
             raise ValueError(*errors)
+        
+        if not table_instances:
+            return
+
         backend = self.backend_class(database_name=DATABASE)
         database_tables = backend.list_tables_sql()
         # When the table is in the migration file
@@ -206,7 +210,7 @@ class Migrations:
             json.dump(migration_content, f, indent=4, ensure_ascii=False)
             return migration_content
 
-    def migrate(self, tables):
+    def make_migrations(self, tables):
         # Write to the migrations.json file only if
         # necessary e.g. dropped tables, changed fields
         if self.has_migrations:
@@ -217,7 +221,7 @@ class Migrations:
                 cache_copy['number'] = self.CACHE['number'] + 1
 
                 cache_copy['tables'] = []
-                for key, table in tables.items():
+                for table in tables:
                     self._write_fields(table)
                     cache_copy['tables'].append({
                         'name': table.name,
