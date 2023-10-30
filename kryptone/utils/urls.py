@@ -254,7 +254,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
     ignored with `\/\d+`
     """
 
-    def __init__(self, name, *, regex):
+    def __init__(self, name, regex):
         self.name = name
         self.regex = re.compile(regex)
 
