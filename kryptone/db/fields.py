@@ -55,6 +55,9 @@ class Field:
         return self.python_type(data)
 
     def to_database(self, data):
+        if callable(data):
+            return self.python_type(str(data()))
+        
         if not isinstance(data, self.python_type):
             raise ValueError(
                 f"{type(data)} should be an instance "
