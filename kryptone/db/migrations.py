@@ -86,8 +86,7 @@ class Migrations:
 
         if errors:
             raise ValueError(*errors)
-
-        backend = self.backend_class(database=DATABASE)
+        backend = self.backend_class(database_name=DATABASE)
         database_tables = backend.list_tables_sql()
         # When the table is in the migration file
         # and not in the database, it needs to be
