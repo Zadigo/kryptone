@@ -33,6 +33,9 @@ class AbstractTable(metaclass=BaseTable):
 
     def __hash__(self):
         return hash((self.name))
+    
+    def __eq__(self, value):
+        return self.name ==  value
 
     def validate_values(self, fields, values):
         """Validate an incoming value in regards
