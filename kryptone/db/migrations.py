@@ -50,10 +50,9 @@ class Migrations:
     def _write_fields(self, table):
         fields_map = []
         for name, field in table.fields_map.items():
-            field_name, verbose_name, params = list(field.deconstruct())
+            field_name, params = list(field.deconstruct())
             fields_map.append({
                 'name': field_name,
-                'verbose_name': verbose_name,
                 'params': params
             })
         self.fields_map[table.name] = fields_map
