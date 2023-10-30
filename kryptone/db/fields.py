@@ -63,6 +63,9 @@ class Field:
         if callable(data):
             return self.python_type(str(data()))
         
+        if data is None:
+            return ''
+        
         if not isinstance(data, self.python_type):
             raise ValueError(
                 f"{type(data)} should be an instance "
