@@ -1,8 +1,4 @@
-import dataclasses
 from collections import OrderedDict, namedtuple
-from dataclasses import is_dataclass
-
-from matplotlib.pyplot import isinteractive
 
 from kryptone.db import DATABASE
 from kryptone.db.backends import SQLiteBackend
