@@ -1,8 +1,10 @@
+import datetime
 import pandas
 import asyncio
 import pathlib
 import mimetypes
 from urllib.parse import urlparse
+import pytz
 
 import requests
 
@@ -41,6 +43,10 @@ class EcommerceCrawlerMixin:
         >>> instance.add_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if not data or data is None:
+            logger.warning(f'Product not added to product list with {data}')
+            return False
+        
         data = clean_dictionnary(data)
         product = self.model(**data)
 
@@ -66,6 +72,8 @@ class EcommerceCrawlerMixin:
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if 'date' not in data:
+            data['date'] = datetime.datetime.now(tz=pytz.UTC)
         # Before writing new products, ensure that we have previous
         # products from a previous scrap and if so, load the previous
         # products. This would prevent overwriting the previous file

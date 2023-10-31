@@ -1,6 +1,7 @@
 import unittest
 
-from kryptone.utils.urls import URL, URLIterator
+from kryptone.utils.iterators import URLIterator
+from kryptone.utils.urls import URL
 
 START_URLS = [
     'http://example.com',

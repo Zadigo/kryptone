@@ -6,7 +6,7 @@ from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-
+from kryptone import logger
 from kryptone.exceptions import SpiderExistsError
 
 
@@ -44,8 +44,10 @@ class SpiderConfig:
         #     "trying to start spiders")
 
         if not paths:
-            raise ValueError("No spiders module within your project. "
-                             "Please create a 'spiders.py' module.")
+            raise ValueError(
+                "No spiders module within your project. "
+                "Please create a 'spiders.py' module."
+            )
 
         self.path = paths[0]
         self.is_ready = False
@@ -95,6 +97,19 @@ class SpiderConfig:
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
+            logger.error(e)
+            raise Exception(e)
+        
+    async def arun(self, **kwargs):
+        spider_instance = self.get_spider_instance()
+
+        try:
+            await spider_instance.start(**kwargs)
+        except KeyboardInterrupt:
+            await spider_instance.create_dump()
+            sys.exit(0)
+        except Exception as e:
+            await spider_instance.create_dump()
             raise Exception(e)
         
     def resume(self, **kwargs):
@@ -107,6 +122,7 @@ class SpiderConfig:
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
+            logger.error(e)
             raise Exception(e)
 
 
@@ -180,7 +196,7 @@ class MasterRegistry:
                 f"related module: '{dotted_path}'"
             )
 
-        from kryptone.base import BaseCrawler
+        from kryptone.base import BaseCrawler, JSONCrawler
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -208,7 +224,7 @@ class MasterRegistry:
         )
 
         valid_spiders = filter(
-            lambda x: issubclass(x[1], BaseCrawler),
+            lambda x: issubclass(x[1], (BaseCrawler, JSONCrawler)),
             spiders
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
