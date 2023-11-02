@@ -639,7 +639,10 @@ class SiteCrawler(BaseCrawler):
         self.statistics = {}
 
     def __del__(self):
-        self.driver.quit()
+        try:
+            self.driver.quit()
+        except:
+            pass
         logger.info('Project stopped')
 
     def resume(self, **kwargs):
@@ -1016,4 +1019,4 @@ class JSONCrawler:
 
                 await asyncio.sleep(60)
 
-        await asyncio.gather(sender(), receiver())
+        await asyncio.gather(sende
