@@ -1019,4 +1019,4 @@ class JSONCrawler:
 
                 await asyncio.sleep(60)
 
-        await asyncio.gather(sende
+        await asyncio.gather(sender(), receiver())
