@@ -1,6 +1,5 @@
 import sqlite3
 
-from kryptone.db import DATABASE
 from kryptone.db.functions import Functions
 from kryptone.db.queries import Query
 
