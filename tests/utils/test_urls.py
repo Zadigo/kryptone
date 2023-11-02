@@ -109,7 +109,7 @@ class TestUrlIgnoreURL(unittest.TestCase):
             URLIgnoreTest('other_pages', paths=['baby'])
         ]
 
-        # Logic used in 
+        # Logic used in
         def url_filters():
             results = defaultdict(list)
             for url in URLS:
@@ -120,11 +120,17 @@ class TestUrlIgnoreURL(unittest.TestCase):
         results = url_filters()
 
         self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
-        self.assertListEqual(results['https://www.defacto.com/fr-ma/woman'], [False, False])
-        
+        self.assertListEqual(
+            results['https://www.defacto.com/fr-ma/woman'], 
+            [False, False]
+        )
+
         self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
-        self.assertListEqual(results['https://www.defacto.com/fr-ma/baby'], [True, True])
-    
+        self.assertListEqual(
+            results['https://www.defacto.com/fr-ma/baby'], 
+            [True, True]
+        )
+
     def test_regex_result(self):
         instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
         self.assertTrue(instance(URLS[0]))
@@ -145,18 +151,13 @@ class TestUrlIgnoreURL(unittest.TestCase):
             return results
         results = url_filters()
 
-        self.assertFalse(all(results['https://www.defacto.com/fr-ma/statik/new-member']))
-        self.assertTrue(results['https://www.defacto.com/fr-ma/baby'], [True, False])
-
-
-class TestUrlGenerator(unittest.TestCase):
-    def test_generation(self):
-        instance = URLGenerator(
-            'https://www.defacto.com/fr-ma/ma-all-products?page=$page',
-            params={'page': 1},
-            k=169
+        self.assertFalse(
+            all(results['https://www.defacto.com/fr-ma/statik/new-member'])
         )
-        print(list(instance))
+        self.assertTrue(
+            results['https://www.defacto.com/fr-ma/baby'], 
+            [True, False]
+        )
 
 
 if __name__ == '__main__':

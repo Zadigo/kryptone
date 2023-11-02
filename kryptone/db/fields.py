@@ -106,29 +106,6 @@ class Field:
         base_field_parameters = initial_parameters + additional_parameters
         return base_field_parameters
 
-        # base_parameters = self.base_field_parameters.copy()
-        # if self.null:
-        #     base_parameters.pop(base_parameters.index('not null'))
-        #     base_parameters.append('null')
-
-        # if self.primary_key:
-        #     base_parameters.append('primary key')
-
-        # if self.default is not None:
-        #     database_value = self.to_database(self.default)
-        #     value = self.table.backend.quote_value(database_value)
-        #     base_parameters.extend(['default', value])
-
-        # if self.unique:
-        #     base_parameters.append('unique')
-        #     if 'not null' not in base_parameters and 'null' in base_parameters:
-        #         base_parameters.index(
-        #             'not null', base_parameters.index('null'))
-
-        # base_parameters.insert(0, self.name)
-        # self.base_field_parameters = base_parameters
-        # return base_parameters
-
     def prepare(self, table):
         from kryptone.db.tables import Table
         if not isinstance(table, Table):

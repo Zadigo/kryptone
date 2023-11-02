@@ -1,11 +1,7 @@
-import pathlib
 import unittest
 
-from kryptone.conf import settings
-from kryptone.db.fields import Field
+from kryptone.db.fields import BooleanField, Field, IntegerField
 from kryptone.db.tables import Table
-
-# settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.absolute().joinpath('testproject')
 
 
 class TestField(unittest.TestCase):
@@ -37,6 +33,29 @@ class TestField(unittest.TestCase):
         field = Field('name')
         result = field.to_database('Kendall')
         self.assertEqual(result, 'Kendall')
+
+
+class TestIntegerField(unittest.TestCase):
+    def test_result(self):
+        field = IntegerField('age')
+        result = field.to_database(1)
+        self.assertIsInstance(result, int)
+        self.assertEqual(result, 1)
+
+
+class TestBooleanField(unittest.TestCase):
+    def test_result(self):
+        field = BooleanField('completed')
+
+        result = field.to_database(0)
+        self.assertEqual(result, 0)
+
+        result = field.to_database(True)
+        self.assertEqual(result, 1)
+
+        result = field.to_database('true')
+        self.assertEqual(result, 1)
+
 
 if __name__ == '__main__':
     unittest.main()
