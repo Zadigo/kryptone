@@ -1,19 +1,21 @@
 import unittest
 
-from kryptone.utils.urls import (URL, CompareUrls, URLIgnoreRegexTest,
-                                 URLIgnoreTest, URLPassesRegexTest, URLGenerator, Some)
+from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest
+from collections import defaultdict
 
-
-IGNORE_URLS = [
+IGNORE_PATHS = [
     '/Customer/Wishlist',
     '/fr-ma/corporate/contact-us',
-    'new-member'
+    'new-member',
+    '/baby'
 ]
 
 
 URLS = [
     'https://www.defacto.com/fr-ma/statik/new-member',
-    'https://www.defacto.com/fr-ma/Customer/Wishlist'
+    'https://www.defacto.com/fr-ma/Customer/Wishlist',
+    'https://www.defacto.com/fr-ma/baby',
+    'https://www.defacto.com/fr-ma/woman'
 ]
 
 
@@ -93,53 +95,58 @@ class TestUrl(unittest.TestCase):
         url = 'http://example/[1]'
 
 
-class TestUrlIgnoreTest(unittest.TestCase):
+class TestUrlIgnoreURL(unittest.TestCase):
     def test_result(self):
-        instance = URLIgnoreTest('base_pages', paths=IGNORE_URLS)
+        instance = URLIgnoreTest('base_pages', paths=IGNORE_PATHS)
 
         for url in URLS:
             with self.subTest(url=url):
-                self.assertFalse(instance(url))
+                self.assertTrue(instance(url))
 
+    def test_multiple_ignores(self):
+        ignore_instances = [
+            URLIgnoreTest('base_pages', paths=IGNORE_PATHS),
+            URLIgnoreTest('other_pages', paths=['baby'])
+        ]
+
+        # Logic used in 
+        def url_filters():
+            results = defaultdict(list)
+            for url in URLS:
+                truth_array = results[url]
+                for instance in ignore_instances:
+                    truth_array.append(instance(url))
+            return results
+        results = url_filters()
+
+        self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
+        self.assertListEqual(results['https://www.defacto.com/fr-ma/woman'], [False, False])
+        
+        self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
+        self.assertListEqual(results['https://www.defacto.com/fr-ma/baby'], [True, True])
+    
     def test_regex_result(self):
         instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
-        self.assertFalse(instance(URLS[0]))
-
-    def test_multiple_results(self):
-        instances = [
-            URLIgnoreTest('base_pages', paths=IGNORE_URLS),
-            URLIgnoreRegexTest('other_pages', regex=r'\/static\/')
-        ]
-        for url in URLS:
-            with self.subTest(url=url):
-                pass
-
-
-class TestUrlPassesTest(unittest.TestCase):
-    def test_result(self):
-        instance = URLPassesRegexTest('statik_page', regex=r'\/statik')
-
         self.assertTrue(instance(URLS[0]))
-        self.assertFalse(instance(URLS[1]))
+        self.assertFalse(instance(URLS[-1]))
 
-
-class TestSome(unittest.TestCase):
-    def test_result(self):
-        instance = Some(
-            URLIgnoreTest('pages1', paths=['statik'])
-        )
-
-    def test_combination(self):
-        instances = [
-            Some(
-                URLIgnoreTest('pages1', paths=['statik']),
-                URLPassesRegexTest('pages2', regex='\/Customer')
-            )
+    def test_different_ignores(self):
+        ignore_instances = [
+            URLIgnoreTest('base_pages', paths=['/baby']),
+            URLIgnoreRegexTest('other_pages', regex=r'\/woman')
         ]
-        results = [
-            instance('https://www.defacto.com/fr-ma/statik/new-member') 
-            for instance in instances
-        ]
+
+        def url_filters():
+            results = defaultdict(list)
+            for url in URLS:
+                truth_array = results[url]
+                for instance in ignore_instances:
+                    truth_array.append(instance(url))
+            return results
+        results = url_filters()
+
+        self.assertFalse(all(results['https://www.defacto.com/fr-ma/statik/new-member']))
+        self.assertTrue(results['https://www.defacto.com/fr-ma/baby'], [True, False])
 
 
 class TestUrlGenerator(unittest.TestCase):
@@ -150,12 +157,6 @@ class TestUrlGenerator(unittest.TestCase):
             k=169
         )
         print(list(instance))
-
-
-class TestCompareUrls(unittest.TestCase):
-    def test_result(self):
-        instance = CompareUrls('http://example.com/1', 'http://example.com/2')
-        self.assertFalse(instance)
 
 
 if __name__ == '__main__':
