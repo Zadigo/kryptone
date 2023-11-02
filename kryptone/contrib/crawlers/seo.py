@@ -1,7 +1,7 @@
-from kryptone.base import SiteCrawler
-from kryptone.utils import file_readers
 from kryptone import logger
+from kryptone.base import SiteCrawler
 from kryptone.mixins import SEOMixin
+from kryptone.utils import file_readers
 
 
 class SEOCrawler(SiteCrawler, SEOMixin):
@@ -48,9 +48,7 @@ class SEOCrawler(SiteCrawler, SEOMixin):
             'text_by_pages.json',
             self.text_by_page
         )
-
-
-
+        
         # db_signal.send(
         #     self,
         #     page_audit=self.page_audits,

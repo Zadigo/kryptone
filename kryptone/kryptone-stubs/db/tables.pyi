@@ -1,11 +1,12 @@
-from typing import Any, OrderedDict, Type, Union
+from ast import List
+from typing import Any, OrderedDict, Type, Union, NamedTuple
 
 from kryptone.db.backends import BaseRow, SQLiteBackend
+from kryptone.db.constraints import CheckConstraint
 from kryptone.db.fields import Field
+from kryptone.db.indexes import Index
 from kryptone.db.migrations import Migrations
 from kryptone.db.queries import Query
-from kryptone.db.indexes import Index
-from kryptone.db.constraints import CheckConstraint
 
 class BaseTable(type):
     def __new__(cls, name: str, bases: tuple, attrs: dict) -> type: ...
@@ -26,6 +27,10 @@ class AbstractTable(metaclass=BaseTable):
     def filter(self, **kwargs) -> list[BaseRow]: ...
     def first(self) -> BaseRow: ...
     def last(self) -> BaseRow: ...
+    def bulk_create(
+        self, 
+        objs: List[Union[dict, NamedTuple]]
+    ) -> List[BaseRow]: ...
     def create(self, **kwargs) -> BaseRow: ...
     def get(self, **kwargs) -> Union[BaseRow, None]: ...
 

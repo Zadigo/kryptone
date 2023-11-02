@@ -41,6 +41,9 @@ class BaseRow:
 
     def __getitem__(self, key):
         return getattr(self, key)
+    
+    def __hash__(self):
+        return hash((self.rowid))
 
     def __contains__(self, value):
         truth_array = []

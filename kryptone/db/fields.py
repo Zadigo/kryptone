@@ -45,10 +45,9 @@ class Field:
         return 'text'
 
     @classmethod
-    def create(cls, name, params, verbose_name=None):
+    def create(cls, name, params):
         instance = cls(name)
         instance.base_field_parameters = params
-        instance.verbose_name = verbose_name
         if 'null' in params:
             instance.null = True
 
@@ -61,6 +60,12 @@ class Field:
         return self.python_type(data)
 
     def to_database(self, data):
+        if callable(data):
+            return self.python_type(str(data()))
+        
+        if data is None:
+            return ''
+        
         if not isinstance(data, self.python_type):
             raise ValueError(
                 f"{type(data)} should be an instance "
@@ -131,7 +136,7 @@ class Field:
         self.table = table
 
     def deconstruct(self):
-        return (self.name, None, self.field_parameters())
+        return (self.name, self.field_parameters())
 
 
 class CharField(Field):
