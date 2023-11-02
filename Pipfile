@@ -20,6 +20,7 @@ google-auth-httplib2 = "*"
 google-auth-oauthlib = "*"
 pymemcache = "*"
 twisted = "*"
+lxml = "*"
 
 [dev-packages]
 
