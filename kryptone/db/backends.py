@@ -29,7 +29,8 @@ class BaseRow:
             setattr(self, key, value)
 
     def __repr__(self):
-        return f'<id: {self.rowid}>'
+        id_or_rowid = getattr(self, 'rowid', getattr(self, 'id', None))
+        return f'<id: {id_or_rowid}>'
 
     def __setitem__(self, key, value):
         self._marked_for_update = True
@@ -40,7 +41,7 @@ class BaseRow:
 
     def __getitem__(self, key):
         return getattr(self, key)
-    
+
     def __hash__(self):
         return hash((self.rowid))
 
@@ -134,12 +135,12 @@ class SQL:
             return value
         values = map(check_integers, values)
         return ', '.join(values)
-    
+
     @staticmethod
     def operator_join(values, operator='and'):
         """Joins a set of values using a valid
         operator
-        
+
         >>> self.condition_join(["name='Kendall'", "surname='Jenner'"])
         ... "name='Kendall' and surname='Jenner'"
         """
@@ -350,7 +351,7 @@ class SQL:
 
         joined_fields = self.comma_join(function_filters.values())
         return [joined_fields]
-    
+
 
 class SQLiteBackend(SQL):
     """Class that initiates and encapsulates a
@@ -447,11 +448,11 @@ class SQLiteBackend(SQL):
         query = Query(self, sql, table=table)
         query.run()
         return query.result_cache
-    
+
     def save_row(self, row, updated_values):
         if not isinstance(row, BaseRow):
             raise ValueError()
-        
+
         if row._marked_for_update:
             # TODO: Pass the current table somewhere
             # either in the row or [...]
@@ -473,7 +474,7 @@ class SQLiteBackend(SQL):
             query = Query(self, sql, table=None)
             query.run(commit=True)
         return row
-        
+
     # def delete(self):
     #     backend = self.initialize_backend
     #     delete_sql = backend.DELETE.format(table='')

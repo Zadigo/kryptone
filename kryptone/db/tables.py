@@ -25,7 +25,7 @@ class AbstractTable(metaclass=BaseTable):
     query_class = Query
     backend_class = SQLiteBackend
 
-    def __init__(self, database_name=None):
+    def __init__(self, database_name=None, inline_build=False):
         self.backend = self.backend_class(
             database_name=database_name or DATABASE,
             table=self
@@ -33,9 +33,9 @@ class AbstractTable(metaclass=BaseTable):
 
     def __hash__(self):
         return hash((self.name))
-    
+
     def __eq__(self, value):
-        return self.name ==  value
+        return self.name == value
 
     def validate_values(self, fields, values):
         """Validate an incoming value in regards
@@ -69,7 +69,7 @@ class AbstractTable(metaclass=BaseTable):
     def filter(self, **kwargs):
         """Filter the data in the database based on
         a set of criteria
-        
+
         >>> self.filter(name='Kendall')
         ... self.filter(name__eq='Kendall')
         ... self.filter(age__gt=15)
@@ -108,7 +108,7 @@ class AbstractTable(metaclass=BaseTable):
 
     def create(self, **kwargs):
         """Creates a new row in the database table
-        
+
         >>> self.create(name='Kendall')
         """
         fields, values = self.backend.dict_to_sql(kwargs, quote_values=False)
@@ -125,7 +125,7 @@ class AbstractTable(metaclass=BaseTable):
         query._table = self
         query.run(commit=True)
         return self.last()
-    
+
     def bulk_create(self, objs):
         new_objects = []
 
@@ -133,10 +133,11 @@ class AbstractTable(metaclass=BaseTable):
         # that are entered match the fields on the
         # database. In other words, the data entered
         # always matches the fields of the database
-        true_field_names = list(filter(lambda x: x != 'rowid', self.field_names))
+        true_field_names = list(
+            filter(lambda x: x != 'rowid', self.field_names))
         defaults = [None] * len(true_field_names)
         item = namedtuple(self.name, true_field_names, defaults=defaults)
-        
+
         for obj in objs:
             if isinstance(obj, dict):
                 new_objects.append(item(**obj))
@@ -144,7 +145,7 @@ class AbstractTable(metaclass=BaseTable):
             # https://stackoverflow.com/questions/2166818/how-to-check-if-an-object-is-an-instance-of-a-namedtuple
             if hasattr(obj, '_fields'):
                 new_objects.append(obj)
-        
+
         new_item = {}
         for obj in new_objects:
             for field in obj._fields:
@@ -154,7 +155,7 @@ class AbstractTable(metaclass=BaseTable):
     def get(self, **kwargs):
         """Returns a specific row from the database
         based on a set of criteria
-        
+
         >>> self.get(id__eq=1)
         ... self.get(id=1)
         """
@@ -192,7 +193,7 @@ class AbstractTable(metaclass=BaseTable):
     def annotate(self, **kwargs):
         """Annotations implements the usage of
         functions in the query
-        
+
         For example, if we want the iteration of each
         value in the database to be returned in lowercase
         or in uppercase
@@ -201,7 +202,7 @@ class AbstractTable(metaclass=BaseTable):
         ... self.annotate(uppered_name=Upper('name'))
 
         If we want to return only the year section of a date
-        
+
         >>> self.annotate(year=ExtractYear('created_on'))
         """
         base_return_fields = ['rowid', '*']
@@ -219,7 +220,7 @@ class AbstractTable(metaclass=BaseTable):
         query.run()
         # return query.result_cache
         return QuerySet(query)
-    
+
     def order_by(self, *fields):
         base_return_fields = ['rowid', '*']
         ascending_fields = set()
@@ -277,11 +278,14 @@ class Table(AbstractTable):
     """
     fields_map = OrderedDict()
 
-    def __init__(self, name, *, database_name=None, fields=[], index=[], constraints=[]):
+    def __init__(self, name, *, database_name=None, inline_build=False, fields=[], index=[], constraints=[]):
         self.name = name
         self.indexes = index
         self.constraints = constraints
-        super().__init__(database_name=database_name)
+        super().__init__(
+            database_name=database_name,
+            inline_build=inline_build
+        )
 
         for field in fields:
             if not isinstance(field, Field):
@@ -289,10 +293,10 @@ class Table(AbstractTable):
 
             field.prepare(self)
             self.fields_map[field.name] = field
-        
+
         # Automatically create an ID field
         self.fields_map['id'] = AutoField()
-        
+
         field_names = list(self.fields_map.keys())
         field_names.append('rowid')
         self.field_names = field_names
