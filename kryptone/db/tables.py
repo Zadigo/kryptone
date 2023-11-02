@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from kryptone.db import DATABASE
 from kryptone.db.backends import SQLiteBackend
-from kryptone.db.fields import Field
+from kryptone.db.fields import AutoField, Field
 from kryptone.db.migrations import Migrations
 from kryptone.db.queries import Query, QuerySet
 
@@ -258,6 +258,9 @@ class Table(AbstractTable):
 
             field.prepare(self)
             self.fields_map[field.name] = field
+        
+        # Automatically create an ID field
+        self.fields_map['id'] = AutoField()
         
         field_names = list(self.fields_map.keys())
         field_names.append('rowid')
