@@ -1,47 +1,47 @@
 import datetime
+from collections import namedtuple
 
 from kryptone.db import tables
-from collections import namedtuple
-from kryptone.db.fields import BooleanField, Field
+from kryptone.db.fields import BooleanField, CharField, Field, JSONField
+from kryptone.db.functions import ExtractYear, Lower, Max
 from kryptone.db.migrations import Migrations
-from kryptone.db.functions import Lower, ExtractYear, Max
 from kryptone.db.tables import Table
 
 fields = [
-    Field('url'),
+    CharField('url', max_length=500, unique=True),
     BooleanField('visited', default=False),
     Field('created_on')
 ]
-table = Table('seen_urls', database_name='scraping', fields=fields)
+table = Table('something_urls', database_name='scraping', fields=fields)
 table.prepare()
 
 
 
 
 
-def make_migrations(*tables):
-    """Writes the physical changes to the
-    local tables into the `migrations.json` file"""
-    import pathlib
+# def make_migrations(*tables):
+#     """Writes the physical changes to the
+#     local tables into the `migrations.json` file"""
+#     import pathlib
 
-    from kryptone.conf import settings
-    settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
-    migrations = Migrations()
-    migrations.has_migrations = True
-    instances = {table.name: table}
-    migrations.migrate(instances)
+#     from kryptone.conf import settings
+#     settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
+#     migrations = Migrations()
+#     migrations.has_migrations = True
+#     instances = {table.name: table}
+#     migrations.migrate(instances)
 
 
-def migrate(*tables):
-    """Applies the migrations from the local
-    `migrations.json` file to the database"""
-    import pathlib
+# def migrate(*tables):
+#     """Applies the migrations from the local
+#     `migrations.json` file to the database"""
+#     import pathlib
 
-    from kryptone.conf import settings
-    settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
-    migrations = Migrations()
-    instances = {table.name: table}
-    migrations.check(table_instances=instances)
+#     from kryptone.conf import settings
+#     settings['PROJECT_PATH'] = pathlib.Path(__file__).parent.parent.parent.joinpath('tests/testproject')
+#     migrations = Migrations()
+#     instances = {table.name: table}
+#     migrations.check(table_instances=instances)
 
 
 # make_migrations()
@@ -103,7 +103,7 @@ table.bulk_create([obj('http://example.com')])
 
 # r = table.order_by('rowid')
 
-print(r)
+# print(r)
 
 # import time
 

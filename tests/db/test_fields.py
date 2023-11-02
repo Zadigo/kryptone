@@ -11,7 +11,7 @@ from kryptone.db.tables import Table
 class TestField(unittest.TestCase):
     def test_field_params(self):
         field = Field('name')
-        Table('celebrities', fields=[field])
+        field.table = Table('celebrities')
 
         result = field.field_parameters()
         self.assertListEqual(result, ['name', 'text', 'not null'])
@@ -22,7 +22,7 @@ class TestField(unittest.TestCase):
         self.assertListEqual(
             result,
             # FIXME: There is two times name
-            ['name', 'name', 'text', 'null', 'default', "'Kendall'"]
+            ['name', 'text', 'default', "'Kendall'", 'null']
         )
 
         field.unique = True
@@ -30,7 +30,7 @@ class TestField(unittest.TestCase):
         self.assertListEqual(
             result,
             # FIXME: There is two times name
-            ['name', 'name', 'text', 'null', 'default', "'Kendall'"]
+            ['name', 'text', 'default', "'Kendall'", 'null', 'unique']
         )
 
     def test_to_database(self):

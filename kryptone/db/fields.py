@@ -146,9 +146,10 @@ class CharField(Field):
 class IntegerField(Field):
     python_type = int
 
-    def __init__(self, min_value=None, max_value=None, **kwargs):
+    def __init__(self, name, *, min_value=None, max_value=None, **kwargs):
         self.min_value = min_value
         self.max_value = max_value
+        super().__init__(name, **kwargs)
 
     @property
     def field_type(self):
@@ -189,3 +190,14 @@ class BooleanField(Field):
             if data in self.false_types:
                 return 0
         return data
+
+
+class AutoField(IntegerField):
+    """Represents an alias to the `rowid` field
+    in the database"""
+
+    def __init__(self):
+        super().__init__('id', primary_key=True)
+        self.base_field_parameters.pop('null')
+        self.base_field_parameters.pop('not null')
+        self.base_field_parameters['autoincrement'] = True
