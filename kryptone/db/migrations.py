@@ -5,7 +5,6 @@ from collections import defaultdict
 from functools import cached_property
 
 from kryptone.conf import settings
-from kryptone.db import DATABASE
 from kryptone.db.backends import SQLiteBackend
 from kryptone.db.fields import Field
 from kryptone.db.queries import Query
@@ -18,8 +17,9 @@ class Migrations:
     CACHE = {}
     backend_class = SQLiteBackend
 
-    def __init__(self):
+    def __init__(self, database_name=None):
         self.file = settings.PROJECT_PATH / 'migrations.json'
+        self.database_name = database_name
         self.CACHE = self.read_content
         self.file_id = self.CACHE['id']
 
@@ -36,7 +36,7 @@ class Migrations:
         self.has_migrations = False
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} [{self.file_id}]>'
+        return f'<{self.__class__.__name__} {self.file_id}>'
 
     @cached_property
     def read_content(self):
@@ -62,7 +62,7 @@ class Migrations:
         for index in table.indexes:
             indexes[index.index_name] = index._fields
         return indexes
-    
+
     def create_migration_table(self):
         from kryptone.db.tables import Table
         table_fields = [
@@ -85,7 +85,7 @@ class Migrations:
 
         if errors:
             raise ValueError(*errors)
-        
+
         if not table_instances:
             return
 
@@ -197,7 +197,7 @@ class Migrations:
         file_path = settings.PROJECT_PATH / 'migrations.json'
         if not file_path.exists():
             file_path.touch()
-        
+
         with open(file_path, mode='w') as f:
             migration_content['id'] = secrets.token_hex(5)
             migration_content['date'] = str(datetime.datetime.now())
@@ -211,6 +211,13 @@ class Migrations:
         # Write to the migrations.json file only if
         # necessary e.g. dropped tables, changed fields
         if self.has_migrations:
+            # Since the table does not connect to sqlite
+            # because of the "inline_build=False" we have
+            # to associate each table with a backend
+            # temporary_connection = self.backend_class(
+            #     database_name=self.database_name
+            # )
+
             cache_copy = self.CACHE.copy()
             with open(settings.PROJECT_PATH / 'migrations.json', mode='w+') as f:
                 cache_copy['id'] = secrets.token_hex(5)
@@ -219,6 +226,9 @@ class Migrations:
 
                 cache_copy['tables'] = []
                 for table in tables:
+                    # if table.backend is None:
+                    #     table.backend = temporary_connection
+
                     self._write_fields(table)
                     cache_copy['tables'].append({
                         'name': table.name,
