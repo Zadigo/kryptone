@@ -290,6 +290,7 @@ class Table(AbstractTable):
             database_name=database_name,
             inline_build=inline_build
         )
+        self.fields_map = OrderedDict()
 
         for field in fields:
             if not isinstance(field, Field):
