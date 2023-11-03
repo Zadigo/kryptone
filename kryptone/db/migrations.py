@@ -143,7 +143,7 @@ class Migrations:
 
             self.check_fields(table_instances[database_row['name']], backend)
 
-        cached_results = list(Query.run_multiple(backend, sqls_to_run))
+        Query.run_script(backend, sqls_to_run)
         # self.migrate(table_instances)
 
         # Create indexes for each table
