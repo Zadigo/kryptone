@@ -95,9 +95,7 @@ class Migrations:
         # and not in the database, it needs to be
         # created
         for table_name in self.migration_table_map:
-            table_exists = not any(
-                map(lambda x: x['name'] == table_name, database_tables))
-            if table_exists:
+            if not table_name in database_tables:
                 self.tables_for_creation.add(table_name)
 
         # When the table is not in the migration
