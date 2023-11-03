@@ -137,7 +137,7 @@ class Migrations:
                     database_row['name'] in self.tables_for_deletion):
                 continue
 
-            table_instance = table_instances.get(table_name, None)
+            table_instance = table_instances.get(database_row['name'], None)
             if table_instance is None:
                 continue
 
