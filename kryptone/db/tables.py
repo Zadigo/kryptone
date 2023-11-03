@@ -382,6 +382,11 @@ class Database:
         for table in tables:
             if not isinstance(table, Table):
                 raise ValueError('Value should be an instance of Table')
+            if table.backend is None:
+                table.backend = table.backend_class(
+                    database_name=self.database_name,
+                    table=table
+                )
             self.table_map[table.name] = table
 
         self.database_name = name
