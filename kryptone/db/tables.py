@@ -26,10 +26,13 @@ class AbstractTable(metaclass=BaseTable):
     backend_class = SQLiteBackend
 
     def __init__(self, database_name=None, inline_build=False):
-        self.backend = self.backend_class(
-            database_name=database_name or DATABASE,
-            table=self
-        )
+        self.backend = None
+        self.is_prepared = False
+        if inline_build:
+            self.backend = self.backend_class(
+                database_name=database_name,
+                table=self
+            )
 
     def __hash__(self):
         return hash((self.name))
@@ -282,6 +285,7 @@ class Table(AbstractTable):
         self.name = name
         self.indexes = index
         self.constraints = constraints
+        self.inline_build = inline_build
         super().__init__(
             database_name=database_name,
             inline_build=inline_build
@@ -329,6 +333,13 @@ class Table(AbstractTable):
     def prepare(self):
         """Prepares and creates a table for
         the database"""
+        if not self.inline_build and self.backend is None:
+            message = (
+                "Calling the Table class outside of Database "
+                "requires that you set 'inline_build' to True"
+            )
+            raise ImproperlyConfiguredError(self, message)
+
         field_params = self.build_field_parameters()
         field_params = [
             self.backend.simple_join(params)
