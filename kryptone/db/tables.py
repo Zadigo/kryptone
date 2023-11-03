@@ -1,7 +1,7 @@
 from collections import OrderedDict, namedtuple
 
-from kryptone.db import DATABASE
 from kryptone.db.backends import SQLiteBackend
+from kryptone.db.exceptions import ImproperlyConfiguredError
 from kryptone.db.fields import AutoField, Field
 from kryptone.db.migrations import Migrations
 from kryptone.db.queries import Query, QuerySet
@@ -279,7 +279,6 @@ class Table(AbstractTable):
     ... database.migrate()
     ... table.create(url='http://example.com')
     """
-    fields_map = OrderedDict()
 
     def __init__(self, name, *, database_name=None, inline_build=False, fields=[], index=[], constraints=[]):
         self.name = name
@@ -307,7 +306,7 @@ class Table(AbstractTable):
         self.field_names = field_names
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} [{self.name}]>'
+        return f'<{self.__class__.__name__}: {self.name}>'
 
     def has_field(self, name):
         return name in self.fields_map
@@ -326,6 +325,8 @@ class Table(AbstractTable):
         return [sql]
 
     def build_field_parameters(self):
+        """Returns the paramaters for all
+        the fields present on the table"""
         return [
             field.field_parameters()
             for field in self.fields_map.values()
@@ -349,6 +350,7 @@ class Table(AbstractTable):
         sql = self.create_table_sql(self.backend.comma_join(field_params))
         query = self.query_class(self.backend, sql, table=self)
         query.run(commit=True)
+        self.is_prepared = True
 
 
 class Database:
@@ -377,7 +379,8 @@ class Database:
     migrations_class = Migrations
 
     def __init__(self, name, *tables):
-        self.migrations = self.migrations_class()
+        self.database_name = name
+        self.migrations = self.migrations_class(database_name=name)
         self.table_map = {}
         for table in tables:
             if not isinstance(table, Table):
@@ -389,7 +392,6 @@ class Database:
                 )
             self.table_map[table.name] = table
 
-        self.database_name = name
         self.table_instances = list(tables)
 
     def __repr__(self):
