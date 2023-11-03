@@ -8,7 +8,7 @@ class Query:
 
     def __init__(self, backend, sql_tokens, table=None):
         self._table = table
-        
+
         from kryptone.db.backends import SQLiteBackend
         if not isinstance(backend, SQLiteBackend):
             raise ValueError('Connection should be an instance SQLiteBackend')
@@ -57,12 +57,21 @@ class Query:
             self._backend.connection.commit()
         self.result_cache = list(result)
 
+    @classmethod
+    def run_script(cls, backend, sql_tokens):
+        instance = cls(backend, sql_tokens)
+        if sql_tokens:
+            result = instance._backend.connection.executescript(sql_tokens[0])
+            instance._backend.connection.commit()
+            instance.result_cache = list(result)
+        return instance
+
 
 class QuerySet:
     def __init__(self, query):
         if not isinstance(query, Query):
             raise ValueError(f"{query} should be an instance of Query")
-        
+
         self.query = query
         self.result_cache = []
 
@@ -114,8 +123,8 @@ class QuerySet:
         })
         sql = [previous_sql, order_by_clause]
         new_query = self.query.create(
-            self.query._backend, 
-            sql, 
+            self.query._backend,
+            sql,
             table=self.query._table
         )
         new_query.run()
