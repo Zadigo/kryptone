@@ -46,14 +46,20 @@ class BaseRow:
         return hash((self.rowid))
 
     def __contains__(self, value):
+        # Check that a value exists in
+        # in all the values of the row
         truth_array = []
         for item in self._cached_data.values():
+            if item is None:
+                truth_array.append(False)
+                continue
+
             if isinstance(item, int):
                 item = str(item)
+
             truth_array.append(value in item)
         return any(truth_array)
-        # return any((value in self[key] for key in self._fields))
-
+    
     def __eq__(self, value):
         return any((self[key] == value for key in self._fields))
 
