@@ -1,14 +1,16 @@
 import json
 import re
-import string
 import secrets
+import string
 from collections import Counter, defaultdict
 from functools import cached_property, lru_cache
 from urllib.parse import urlparse
 
-from kryptone.utils.date_functions import get_current_date
+from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
+
 from kryptone.conf import settings
+from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_null, drop_while, keep_while
 
@@ -249,10 +251,12 @@ class SEOMixin(TextMixin):
         """Returns a fitted and transformed
         version of the document's text"""
         script = """
-        return document.body.textContent
+        return document.body.outerHTML
         """
-        text = self.driver.execute_script(script)
-        return self.fit(self.validate_text(text))
+        html = self.driver.execute_script(script)
+        soup = BeautifulSoup(html, 'html.parser')
+        script_tags = [tag.extract() for tag in soup.find_all('script')]
+        return self.fit(soup.text)
     
     @property
     def get_page_keywords(self):
