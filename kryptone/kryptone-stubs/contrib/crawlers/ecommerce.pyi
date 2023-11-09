@@ -1,33 +1,25 @@
-from typing import List, Tuple
+from typing import Any, List, Literal, Tuple
 
 from kryptone.contrib.models import Product
-
+from kryptone.utils.urls import URL
 
 TEMPORARY_PRODUCT_CACHE: set[str] = ...
 
 
 class EcommerceCrawlerMixin:
-    scroll_step: int = ...
+    scroll_step: int = Literal[30]
     products: List = ...
     product_objects: List = ...
     seen_products: List = ...
     model: Product = ...
     found_products_counter: int = ...
+    product_pages: set = ...
 
     def calculate_performance(self) -> None: ...
 
-    def seen_products(self, using: str = ...) -> set[str, int]: ...
-
-    def product_exists(
-        self,
-        product: Product,
-        using: str = ...
-    ) -> bool: ...
-
     def add_product(
         self,
-        data: dict,
-        track_id: bool = ...,
+        data: dict[str, Any],
         collection_id_regex: str = ...,
         avoid_duplicates: bool = ...,
         duplicate_key: str = ...
@@ -35,8 +27,7 @@ class EcommerceCrawlerMixin:
 
     def save_product(
         self,
-        data: dict,
-        track_id: bool = ...,
+        data: dict[str, Any],
         collection_id_regex: str = ...,
         avoid_duplicates: bool = ...,
         duplicate_key: str = ...
@@ -44,16 +35,22 @@ class EcommerceCrawlerMixin:
 
     def bulk_save_products(
         self,
-        data: dict,
+        data: dict[str, Any],
         track_id: bool = ...,
         collection_id_regex: str = ...
     ) -> List[Product]: ...
 
     def save_images(
-        self, 
-        product: Product, 
+        self,
+        product: Product,
         path: str,
         filename: str = ...,
-        debug: bool = ...,
         download_first: bool = ...
+    ) -> None: ...
+
+    def capture_product_page(
+        self,
+        current_url: URL,
+        element_class: str = ...,
+        element_id: str = ...
     ) -> None: ...
