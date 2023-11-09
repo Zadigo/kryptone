@@ -1,20 +1,21 @@
-import datetime
-import pandas
 import asyncio
-import pathlib
+import datetime
 import mimetypes
+import pathlib
 from urllib.parse import urlparse
-import pytz
 
+import pandas
+import pytz
 import requests
 
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
-from kryptone.utils.file_readers import read_json_document, write_json_document
+from kryptone.utils.file_readers import (get_media_folder, read_json_document,
+                                         write_json_document)
+from kryptone.utils.functions import create_filename
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import clean_dictionnary
-
 
 TEMPORARY_PRODUCT_CACHE = set()
 
@@ -29,6 +30,7 @@ class EcommerceCrawlerMixin:
     seen_products = []
     model = Product
     found_products_counter = 0
+    product_pages = set()
 
     def calculate_performance(self):
         super().calculate_performance()
@@ -46,7 +48,7 @@ class EcommerceCrawlerMixin:
         if not data or data is None:
             logger.warning(f'Product not added to product list with {data}')
             return False
-        
+
         data = clean_dictionnary(data)
         product = self.model(**data)
 
@@ -66,7 +68,7 @@ class EcommerceCrawlerMixin:
         TEMPORARY_PRODUCT_CACHE.add(product[duplicate_key])
         return True, product
 
-    def save_product(self, data, track_id=False, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
+    def save_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds an saves a product to the backends
 
         >>> instance.save_product([{...}], track_id=False)
@@ -81,7 +83,7 @@ class EcommerceCrawlerMixin:
             products_file = pathlib.Path(
                 settings.PROJECT_PATH / 'products.json'
             )
-            
+
             previous_products_data = []
             if not products_file.exists():
                 write_json_document('products.json', [])
@@ -104,12 +106,14 @@ class EcommerceCrawlerMixin:
         write_json_document('products.json', self.products)
         return new_product
 
-    def bulk_save_products(self, data, track_id=False, collection_id_regex=None):
+    def bulk_save_products(self, data, collection_id_regex=None):
         """Adds multiple products at once"""
         products = []
         for item in data:
             product = self.save_product(
-                item, track_id=track_id, collection_id_regex=collection_id_regex)
+                item,
+                collection_id_regex=collection_id_regex
+            )
             products.append(product)
         return products
 
@@ -197,3 +201,30 @@ class EcommerceCrawlerMixin:
         df = pandas.DataFrame(self.products, columns=columns_to_keep)
         df = df.sort_values(sort_by or 'name')
         return df.drop_duplicates()
+
+    def capture_product_page(self, current_url, element_class=None, element_id=None):
+        """Use an element ID or the class on the current page
+        to identify a product page. This will also create a
+        screenshot of the given page"""
+        element = None
+        if element_id is not None:
+            element = self.driver.execute_script(
+                f"""return document.querySelector('*[id="{element_id}"]')"""
+            )
+
+        if element_class is not None:
+            element = self.driver.execute_script(
+                f"""return document.querySelector('*[class="{element_class}"]')"""
+            )
+
+        if element is not None:
+            self.product_pages.add(str(current_url))
+            logger.info(f'{len(self.product_pages)} product pages identified')
+
+            screen_shots_folder = settings.MEDIA_FOLDER.joinpath('screenshots')
+            if not screen_shots_folder.exists():
+                screen_shots_folder.mkdir()
+
+            filename = create_filename(extension='png', suffix_with_date=True)
+            file_path = screen_shots_folder.joinpath(filename)
+            self.driver.save_screenshot(file_path)
