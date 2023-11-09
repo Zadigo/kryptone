@@ -394,7 +394,7 @@ class BaseCrawler(metaclass=Crawler):
     def get_page_urls(self, current_url, refresh=False):
         """Gets all the urls present on the
         actual visited page"""
-        raw_urls = self.get_page_link_elements
+        raw_urls = set(self.get_page_link_elements)
         logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
 
         # Specifically indicate to the crawler to
