@@ -82,14 +82,13 @@ class EcommerceCrawlerMixin:
                 settings.PROJECT_PATH / 'products.json'
             )
             
+            previous_products_data = []
             if not products_file.exists():
                 write_json_document('products.json', [])
             else:
                 previous_products_data = read_json_document('products.json')
-                self.products = previous_products_data if previous_products_data else []
-            # for item in previous_products_data:
-            #     if isinstance(item, dict):
-            #         self.product_objects.append(self.model(**item))
+                self.products = previous_products_data
+
             self.product_objects = list(
                 map(lambda x: self.model(**x),
                     previous_products_data))
