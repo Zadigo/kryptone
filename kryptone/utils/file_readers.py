@@ -19,7 +19,7 @@ def tokenize(func):
 
 def get_media_folder(filename):
     if settings.PROJECT_PATH is not None:
-        return settings.PROJECT_PATH / filename
+        return settings.PROJECT_PATH.joinpath('media', filename)
     return filename
 
 
