@@ -37,7 +37,7 @@ from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
     'domains', 'url_ignore_tests',
-    'debug_mode', 'site_language', 'default_scroll_step',
+    'debug_mode', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
     'ignore_queries', 'ignore_images', 'restrict_search_to',
     'url_gather_ignore_tests', 'database'
@@ -104,7 +104,6 @@ class CrawlerOptions:
         self.domains = []
         self.url_ignore_tests = []
         self.debug_mode = False
-        self.site_language = 'en'
         self.default_scroll_step = 80
         self.router = None
         self.crawl = True
@@ -188,7 +187,6 @@ class BaseCrawler(metaclass=Crawler):
     visited_pages_count = 0
     list_of_seen_urls = set()
     browser_name = None
-    debug_mode = False
     timezone = 'UTC'
     default_scroll_step = 80
 
@@ -255,7 +253,7 @@ class BaseCrawler(metaclass=Crawler):
         return urlunparse((
             self._start_url_object.scheme,
             self._start_url_object.netloc,
-            self._start_url_object.path,
+            None,
             None,
             None,
             None
@@ -283,6 +281,7 @@ class BaseCrawler(metaclass=Crawler):
         for url in self.list_of_seen_urls:
             bisect.insort(sorted_urls, url)
         write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+
         # db_signal.send(
         #     self,
         #     data_type='urls',
@@ -343,7 +342,7 @@ class BaseCrawler(metaclass=Crawler):
             urls_kept = set()
             urls_removed = set()
             final_urls_filtering_audit = OrderedDict()
-            
+
             for url, truth_array in results.items():
                 final_urls_filtering_audit[url] = any(truth_array)
 
@@ -354,7 +353,10 @@ class BaseCrawler(metaclass=Crawler):
                     continue
                 urls_kept.add(url)
 
-            logger.info(f"Filters completed. {len(urls_removed)} url(s) removed")
+            logger.info(
+                f"Filters completed. {len(urls_removed)} "
+                "url(s) removed"
+            )
             return urls_kept
         return valid_urls
 
@@ -398,8 +400,8 @@ class BaseCrawler(metaclass=Crawler):
         logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
 
         # Specifically indicate to the crawler to
-        # not try and get urls on pages that
-        # match the regex values
+        # not try and collect urls on pages that
+        # match the specified regex values
         if self._meta.url_gather_ignore_tests:
             matched_pattern = None
             for regex in self._meta.url_gather_ignore_tests:
@@ -476,7 +478,7 @@ class BaseCrawler(metaclass=Crawler):
         self.list_of_seen_urls.update(invalid_urls)
 
         if valid_urls:
-            logger.info(f'Kept {len(valid_urls)} valid url(s)')
+            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
 
         newly_discovered_urls = []
         for url in valid_urls:
@@ -485,8 +487,10 @@ class BaseCrawler(metaclass=Crawler):
 
         if newly_discovered_urls:
             logger.info(
-                f'Discovered {len(newly_discovered_urls)} unseen url(s)')
-            
+                f"Discovered {len(newly_discovered_urls)} "
+                "unseen url(s)"
+            )
+
         filtered_valid_urls = self.url_filters(valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
 
@@ -996,13 +1000,15 @@ class JSONCrawler:
                                 data_or_dataframe = await self.clean(self.current_raw_data)
                                 if isinstance(data_or_dataframe, pandas.DataFrame):
                                     data = data_or_dataframe.to_json(
-                                        orient='records', 
+                                        orient='records',
                                         force_ascii=False
                                     )
                                 else:
                                     data = data_or_dataframe
 
-                                logger.info(f'Received {len(self.current_raw_data)} elements')
+                                logger.info(
+                                    f"Received {len(self.current_raw_data)} elements"
+                                )
 
                                 if self.paginate_data:
                                     self.max_pages = data[self.max_pages_key]
