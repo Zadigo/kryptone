@@ -154,4 +154,4 @@ class LoadStartUrls:
             # if self.filename.endswith('.json'):
             #     return set(json.load(f))
             # elif self.filename.endswith('.csv'):
-            return list(itertools.chain(*csv.reader(f)))
+            return set(list(itertools.chain(*csv.reader(f))))
