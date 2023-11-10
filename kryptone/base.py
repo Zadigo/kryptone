@@ -667,7 +667,10 @@ class SiteCrawler(BaseCrawler):
         #         data = memcache.get('cache', [])
         #     else:
         #         data = read_json_document('cache.json')
-        data = read_json_document('cache.json')
+        try:
+            data = read_json_document('cache.json')
+        except FileNotFoundError:
+            write_json_document('cache.json', [])
 
         # Before reloading the urls, run the filters
         # in case previous urls to exclude were
@@ -676,8 +679,20 @@ class SiteCrawler(BaseCrawler):
         self.urls_to_visit = set(valid_urls)
         self.visited_urls = set(data['visited_urls'])
 
-        previous_seen_urls = read_csv_document('seen_urls.csv', flatten=True)
-        self.list_of_seen_urls = set(previous_seen_urls)
+        try:
+            previous_seen_urls = read_csv_document('seen_urls.csv', flatten=True)
+        except FileNotFoundError:
+            write_csv_document('seen_urls.csv', [])
+        else:
+            self.list_of_seen_urls = set(previous_seen_urls)
+
+        try:
+            previous_statistics = read_json_document('performance.json')
+        except:
+            pass
+        else:
+            self.statistics = previous_statistics
+
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
