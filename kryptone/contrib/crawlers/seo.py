@@ -56,8 +56,12 @@ class SEOCrawler(SiteCrawler, SEOMixin):
             )
 
         async def main():
-            coroutines = [write_audit_documents(), write_vocabulary(), write_website_text()]
-            for coroutine in asyncio.as_completed(coroutines):
+            task1 = asyncio.create_task(write_audit_documents())
+            task2 = asyncio.create_task(write_vocabulary())
+            task3 = asyncio.create_task(write_website_text())
+            tasks = [task1, task2, task3]
+            
+            for coroutine in asyncio.as_completed(tasks):
                 await coroutine
 
         asyncio.run(main())
