@@ -218,9 +218,11 @@ class AbstractTable(metaclass=BaseTable):
             'table': self.name
         })
 
+        # TODO: Create a query and only run it when
+        # we need with QuerySet for the other functions
         query = Query(self.backend, [sql], table=self)
         query._table = self
-        query.run()
+        # query.run()
         # return query.result_cache
         return QuerySet(query)
 
