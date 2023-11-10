@@ -5,6 +5,8 @@ from kryptone.utils import file_readers
 
 
 class LeadsCrawler(SiteCrawler, EmailMixin):
+    """A crawler specialize in finding emails on a website"""
+
     def run_actions(self, current_url, **kwargs):
         self.emails(
             self.get_transformed_raw_page_text,

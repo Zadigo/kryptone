@@ -5,6 +5,9 @@ from kryptone.utils import file_readers
 
 
 class SEOCrawler(SiteCrawler, SEOMixin):
+    """A crawler specialized for running
+    SEO tasks on a given website"""
+    
     def resume(self, **kwargs):
         data = file_readers.read_json_document('cache.json')
 
