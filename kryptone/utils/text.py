@@ -66,10 +66,10 @@ class Text:
         cleaned_text = cleaned_text.lower()
 
         if self.punctation:
-            text = remove_punctuation(cleaned_text)
+            cleaned_text = remove_punctuation(cleaned_text)
 
         if self.accents:
-            text = remove_accents(cleaned_text)
+            cleaned_text = remove_accents(cleaned_text)
 
         return cleaned_text
 
@@ -104,7 +104,11 @@ def remove_accents(text):
 
 
 def clean_dictionnary(item, accents=False, punctation=False):
-    """Cleans each text values of a dictionnary"""
+    """Cleans each text values stored in a dictionnary
+
+    >>> items = clean_dictionnary({'name': ' Kendall'})
+    ... {'name': 'Kendall}
+    """
     new_item = {}
     for key, value in item.items():
         if isinstance(value, str):
@@ -126,3 +130,14 @@ def normalize_spaces(text_or_tokens):
     else:
         tokens = text_or_tokens
     return ' '.join(drop_null(tokens))
+
+
+def slugify(text):
+    """Transforms a normal text into a slug
+
+    >>> result = slugify('my text')
+    ... 'my-text'
+    """
+    if not isinstance(text, str):
+        raise ValueError(f'Value should be a text. Got: {type(text)}')
+    return text.replace(' ', '-').lower()
