@@ -5,6 +5,8 @@ import time
 from kryptone.checks.core import checks_registry
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
         parser.add_argument(
             '--settings',

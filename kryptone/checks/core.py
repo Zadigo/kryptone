@@ -1,5 +1,4 @@
-import warnings
-from collections import OrderedDict, deque
+from collections import OrderedDict
 
 from kryptone.conf import settings
 from kryptone.exceptions import ProjectExistsError
@@ -37,7 +36,7 @@ class ApplicationChecks(GlobalMixins):
         (PROJECT_PATH, PROXIES...) are correctly implemented 
         as they are intended to be
         """
-        required_values = ['PROJECT_PATH', 'SPIDERS']
+        required_values = ['PROJECT_PATH', 'WEBDRIVER', 'WEBSITE_LANGUAGE']
         keys = settings.keys()
         for value in required_values:
             if value not in keys:
@@ -46,10 +45,7 @@ class ApplicationChecks(GlobalMixins):
                     "required in your settings file."
                 )
 
-        requires_list_or_tuple = [
-            'SPIDERS', 'ACTIVE_STORAGE_BACKENDS', 
-            'WAIT_TIME_RANGE'
-        ]
+        requires_list_or_tuple = ['ACTIVE_STORAGE_BACKENDS', 'WAIT_TIME_RANGE']
         for item in requires_list_or_tuple:
             value = getattr(settings, item)
             if not isinstance(value, (list, tuple)):
@@ -111,4 +107,3 @@ class ApplicationChecks(GlobalMixins):
 
 
 checks_registry = ApplicationChecks()
-# register = checks_registry.register

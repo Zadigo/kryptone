@@ -1,18 +1,31 @@
 import dataclasses
-import pathlib
 import re
 from dataclasses import field
 from functools import cached_property
 from urllib.parse import urlparse
 
 from kryptone.db.models import BaseModel
-from kryptone.utils.text import clean_text, remove_accents, remove_punctuation
+from kryptone.utils.text import clean_text
+
+
+@dataclasses.dataclass
+class Products(BaseModel):
+    """A database to store products present on
+    an e-commerce products page"""
+
+    name: str
+    price: str
+    url: str
+    image: str = None
+    colors: list = field(default=list)
+    other_information: str = None
 
 
 @dataclasses.dataclass
 class Product(BaseModel):
     """A simple database for storing pieces
-    of information from an e-commerce product"""
+    of information from an e-commerce 
+    product page"""
 
     name: str
     description: str
@@ -28,6 +41,8 @@ class Product(BaseModel):
     images: list = dataclasses.field(default_factory=list)
     composition: str = None
     color: str = None
+    date: str = None
+    sizes: list = dataclasses.field(default_factory=list)
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))
@@ -42,26 +57,7 @@ class Product(BaseModel):
     @cached_property
     def number_of_images(self):
         return len(self.images)
-
-    # TODO: Deprecate in favor of directory_from_url
-    def build_directory_from_url(self, exclude=[]):
-        """Build the logical local directory in the local project
-        using the natural structure of the product url
-
-        >>> self.build_directory_from_url('/ma/woman/clothing/dresses/short-dresses/shirt-dress-1.html', exclude=['ma'])
-        ... "/woman/clothing/dresses/short-dresses"
-        """
-        tokens = self.url_object.path.split('/')
-        tokens = filter(lambda x: x not in exclude and x != '', tokens)
-
-        def clean_token(token):
-            result = token.replace('-', '_')
-            return remove_accents(remove_punctuation(result.lower()))
-        tokens = list(map(clean_token, tokens))
-
-        tokens.pop(-1)
-        return pathlib.Path('/'.join(tokens))
-
+    
     def set_collection_id(self, regex):
         """Set the product's collection ID from the url
 
@@ -75,7 +71,9 @@ class Product(BaseModel):
         if result:
             group_dict = result.groupdict()
             self.collection_id = group_dict.get(
-                'collection_id', result.group(1))
+                'collection_id', 
+                result.group(1)
+            )
 
     def complex_name(self):
         name = clean_text(self.name.lower())

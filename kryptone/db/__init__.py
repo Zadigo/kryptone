@@ -4,3 +4,6 @@ class BaseConnection:
 
     def connect(self):
         pass
+
+DATABASE = 'scraping'
+

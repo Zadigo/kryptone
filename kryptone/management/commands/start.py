@@ -8,18 +8,19 @@ from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
+        parser.add_argument(
+            'name',
+            help='Spider name to execute',
+            type=str
+        )
         parser.add_argument(
             '-l',
             '--language',
             help='Specify the website language',
             default='fr',
-            type=str
-        )
-        parser.add_argument(
-            '-n',
-            '--name',
-            help='Spider name to execute',
             type=str
         )
         parser.add_argument(
@@ -42,17 +43,7 @@ class Command(ProjectCommand):
 
         params = {
             'start_urls': namespace.start_urls,
-            # 'wait_time': namespace.wait_time,
             'language': namespace.language
         }
-
-        if namespace.name is not None:
-            spider_config = registry.get_spider(namespace.name)
-
-            # Starts the Twisted server
-            # process = BaseProcess()
-            # process.start(spider_config=spider_config)
-            
-            spider_config.run(**params)
-        else:
-            registry.run_all_spiders(**params)
+        spider_config = registry.get_spider(namespace.name)
+        spider_config.run(**params)

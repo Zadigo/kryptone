@@ -2,8 +2,6 @@ from functools import cached_property
 from typing import Any, List
 from urllib.parse import ParseResult
 
-import pandas
-
 
 class BaseModel:
     def __getitem__(self, key: str) -> Any: ...

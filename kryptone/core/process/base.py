@@ -2,12 +2,12 @@ import datetime
 import signal
 
 import pytz
-from scrapy.utils.reactor import CallLaterOnce
 from twisted.internet import interfaces, reactor
 from twisted.internet.base import ThreadedResolver
 from twisted.internet.defer import (Deferred, DeferredList, inlineCallbacks,
                                     maybeDeferred)
 from twisted.internet.task import LoopingCall
+# from twisted.utils.reactor import CallLaterOnce
 from zope.interface.declarations import implementer
 
 

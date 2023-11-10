@@ -51,9 +51,19 @@ def directory_from_url(path, exclude=[]):
     return pathlib.Path('/'.join(tokens))
 
 
-def create_filename(length=5, extension=None):
+def create_filename(length=5, extension=None, suffix=None, suffix_with_date=False):
     characters = string.ascii_lowercase + string.digits
     name = ''.join(random.choice(characters) for _ in range(length))
+
+    if suffix is not None:
+        name = f'{name}_{suffix}'
+
+    if suffix is None and suffix_with_date:
+        from kryptone.utils.date_functions import get_current_date
+
+        current_date = str(get_current_date().date()).replace('-', '_')
+        name = f'{name}_{current_date}'
+
     if extension is not None:
         return f'{name}.{extension}'
     return name

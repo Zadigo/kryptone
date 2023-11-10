@@ -5,7 +5,14 @@ from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
+        parser.add_argument(
+            'name',
+            help='Spider name to execute',
+            type=str
+        )
         parser.add_argument(
             '-a',
             '--run-audit',
@@ -27,12 +34,6 @@ class Command(ProjectCommand):
             default='fr',
             type=str
         )
-        parser.add_argument(
-            '-n',
-            '--name',
-            help='Spider name to execute',
-            type=str
-        )
 
     def execute(self, namespace):
         kryptone.setup()
@@ -44,14 +45,6 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        params = {
-            'debug_mode': namespace.debug_mode,
-            'run_audit': namespace.run_audit,
-            'language': namespace.language
-        }
-
-        if namespace.name is not None:
-            spider_config = registry.get_spider(namespace.name)
-            spider_config.run(**params)
-        else:
-            registry.run_all_spiders(**params)
+        params = {}
+        spider_config = registry.get_spider(namespace.name)
+        spider_config.resume(**params)

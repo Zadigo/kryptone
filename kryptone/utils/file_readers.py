@@ -1,9 +1,7 @@
-import itertools
 import csv
+import itertools
 import json
-from functools import cached_property, lru_cache, wraps
-from io import FileIO
-import pathlib
+from functools import cached_property, lru_cache
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -20,7 +18,7 @@ def tokenize(func):
 
 def get_media_folder(filename):
     if settings.PROJECT_PATH is not None:
-        return settings.PROJECT_PATH / filename
+        return settings.PROJECT_PATH.joinpath('media', filename)
     return filename
 
 
@@ -59,8 +57,13 @@ def write_json_document(filename, data):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
     with open(path, mode='w+', encoding='utf-8') as f:
-        json.dump(data, f, indent=4, ensure_ascii=False,
-                  cls=DefaultJsonEncoder)
+        json.dump(
+            data,
+            f,
+            indent=4,
+            ensure_ascii=False,
+            cls=DefaultJsonEncoder
+        )
 
 
 def read_csv_document(filename, flatten=False):
@@ -116,11 +119,12 @@ class LoadJS:
         self._project_path = settings.PROJECT_PATH
         self.files = []
         if self._project_path is not None:
-            self.files = list(self._project_path.joinpath('js').glob('**/*.js'))
+            self.files = list(
+                self._project_path.joinpath('js').glob('**/*.js'))
 
     def __repr__(self):
         return f'<{self.__class__.__name__} "{self.filename}">'
-    
+
     @cached_property
     def content(self):
         file = list(filter(lambda x: x.name == self.filename, self.files))
@@ -130,3 +134,24 @@ class LoadJS:
                 return data
         logger.warning('No JS file named {self.filename} found in the project')
         return ''
+
+
+class LoadStartUrls:
+    """Loads the start urls from a csv file.
+    The filename should be provided without
+    the file extension"""
+
+    def __init__(self, filename='start_urls'):
+        self.filename = f'{filename}.csv'
+
+    def __iter__(self):
+        for url in self.content:
+            yield url
+
+    @cached_property
+    def content(self):
+        with open(self.filename, mode='r', encoding='utf-8') as f:
+            # if self.filename.endswith('.json'):
+            #     return set(json.load(f))
+            # elif self.filename.endswith('.csv'):
+            return set(list(itertools.chain(*csv.reader(f))))

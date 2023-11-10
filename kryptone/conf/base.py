@@ -10,11 +10,6 @@ GLOBAL_KRYPTONE_PATH = pathlib.Path(__file__).parent.parent.absolute()
 PROJECT_PATH = None
 
 
-# Register spiders to crawl
-# pages on a website
-SPIDERS = []
-
-
 # Indicates the Selenium
 # browser to use
 WEBDRIVER = 'Chrome'
@@ -119,3 +114,9 @@ LOAD_IMAGES = True
 
 # Load JS codes when launching the browser
 LOAD_JS = True
+
+
+# Use a proxy addresses
+USE_PROXY_ADDRESS = False
+
+PROXY_IP_ADDRESS = None
