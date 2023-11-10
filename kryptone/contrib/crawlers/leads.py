@@ -1,7 +1,7 @@
-from kryptone.base import SiteCrawler
-from kryptone.utils import file_readers
 from kryptone import logger
+from kryptone.base import SiteCrawler
 from kryptone.mixins import EmailMixin
+from kryptone.utils import file_readers
 
 
 class LeadsCrawler(SiteCrawler, EmailMixin):
