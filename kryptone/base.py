@@ -25,8 +25,8 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
 from kryptone.db.tables import Database
+from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import file_readers
 from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
