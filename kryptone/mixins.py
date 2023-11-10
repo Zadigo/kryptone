@@ -406,7 +406,9 @@ class SEOMixin(TextMixin):
         return matrix, vectorizer
 
     def global_audit(self):
-        """Returns the global audit for the website"""
+        """Returns the global audit for all the
+        pages that have already been audited 
+        on the website"""
         # TODO:
         _, vectorizer = self.vectorize_documents()
         vocabulary = vectorizer.vocabulary_
