@@ -9,7 +9,7 @@ class LeadsCrawler(SiteCrawler, EmailMixin):
 
     def run_actions(self, current_url, **kwargs):
         self.emails(
-            self.get_transformed_raw_page_text,
+            self.get_page_text,
             elements=self.get_page_link_elements
         )
         # Format each email as [[...], ...] in order to comply
