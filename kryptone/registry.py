@@ -6,13 +6,11 @@ from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
+
 from kryptone import logger
 from kryptone.exceptions import SpiderExistsError
 
-
 SPIDERS_MODULE = 'spiders'
-
-AUTOMATERS_MODULE = 'automaters'
 
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
@@ -27,9 +25,7 @@ class SpiderConfig:
         self.name = name
         self.dotted_path = None
         self.registry = None
-        self.initial_start_urls = []
         self.spider_class = getattr(spiders_module, name, None)
-        self.is_automater = False
 
         self.MODULE = spiders_module
 
@@ -83,14 +79,6 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            # thread = threading.Thread(
-            #     target=spider_instance.start,
-            #     name=self.name,
-            #     kwargs=kwargs,
-            #     daemon=True
-            # )
-            # thread.start()
-            # thread.join()
             spider_instance.start(**kwargs)
         except KeyboardInterrupt:
             spider_instance.create_dump()
@@ -99,19 +87,7 @@ class SpiderConfig:
             spider_instance.create_dump()
             logger.error(e)
             raise Exception(e)
-        
-    async def arun(self, **kwargs):
-        spider_instance = self.get_spider_instance()
 
-        try:
-            await spider_instance.start(**kwargs)
-        except KeyboardInterrupt:
-            await spider_instance.create_dump()
-            sys.exit(0)
-        except Exception as e:
-            await spider_instance.create_dump()
-            raise Exception(e)
-        
     def resume(self, **kwargs):
         spider_instance = self.get_spider_instance()
 

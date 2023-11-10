@@ -47,4 +47,5 @@ class Command(ProjectCommand):
 
         params = {}
         spider_config = registry.get_spider(namespace.name)
+        registry.has_running_spiders = True
         spider_config.resume(**params)

@@ -46,4 +46,5 @@ class Command(ProjectCommand):
             'language': namespace.language
         }
         spider_config = registry.get_spider(namespace.name)
+        registry.has_running_spiders = True
         spider_config.run(**params)

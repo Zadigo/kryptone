@@ -1,13 +1,9 @@
 import pathlib
 
-
 GLOBAL_KRYPTONE_PATH = pathlib.Path
 
 
 PROJECT_PATH: pathlib.Path
-
-
-SPIDERS: list
 
 
 WEBDRIVER: str
@@ -56,3 +52,9 @@ DEFAULT_FROM_EMAIL: str
 
 
 WEBSITE_LANGUAGE: str
+
+
+USE_PROXY_ADDRESS: bool
+
+
+PROXY_IP_ADDRESS: bool
