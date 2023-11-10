@@ -53,5 +53,6 @@ class EcommerceCrawlerMixin:
         current_url: URL,
         element_class: str = ...,
         element_id: str = ...,
+        prefix: str = ...,
         force: bool = ...
     ) -> None: ...
