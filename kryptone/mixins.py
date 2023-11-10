@@ -69,6 +69,18 @@ class TextMixin:
         return len(text)
 
     @property
+    def get_page_text(self):
+        """Returns a fitted and transformed
+        version of the document's text"""
+        script = """
+        return document.body.outerHTML
+        """
+        html = self.driver.execute_script(script)
+        soup = BeautifulSoup(html, 'html.parser')
+        script_tags = [tag.extract() for tag in soup.find_all('script')]
+        return self.fit(soup.text)
+
+    @property
     def _fitted_text_tokens(self):
         result = ' '.join(self.fitted_page_documents)
         return result.split(' ')
@@ -245,18 +257,6 @@ class SEOMixin(TextMixin):
         """
         text = self.driver.execute_script(script)
         return self.fit(self.validate_text(text))
-
-    @property
-    def get_page_text(self):
-        """Returns a fitted and transformed
-        version of the document's text"""
-        script = """
-        return document.body.outerHTML
-        """
-        html = self.driver.execute_script(script)
-        soup = BeautifulSoup(html, 'html.parser')
-        script_tags = [tag.extract() for tag in soup.find_all('script')]
-        return self.fit(soup.text)
     
     @property
     def get_page_keywords(self):
