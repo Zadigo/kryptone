@@ -202,7 +202,7 @@ class EcommerceCrawlerMixin:
         df = df.sort_values(sort_by or 'name')
         return df.drop_duplicates()
 
-    def capture_product_page(self, current_url, element_class=None, element_id=None):
+    def capture_product_page(self, current_url, element_class=None, element_id=None, force=False):
         """Use an element ID or the class on the current page
         to identify a product page. This will also create a
         screenshot of the given page"""
@@ -217,7 +217,7 @@ class EcommerceCrawlerMixin:
                 f"""return document.querySelector('*[class="{element_class}"]')"""
             )
 
-        if element is not None:
+        if force or element is not None:
             self.product_pages.add(str(current_url))
             logger.info(f'{len(self.product_pages)} product pages identified')
 
