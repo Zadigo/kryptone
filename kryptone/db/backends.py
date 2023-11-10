@@ -1,156 +1,495 @@
+import sqlite3
 
-from venv import logger
-
-import airtable
-import gspread
-import requests
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
-from kryptone import logger
-from kryptone.conf import settings
-from kryptone.db import BaseConnection
-from kryptone.db.connections import redis_connection
-from kryptone.utils.file_readers import write_json_document
-
-AIRTABLE_ID_CACHE = set()
+from kryptone.db.functions import Functions
+from kryptone.db.queries import Query
 
 
-def airtable_backend(sender, **kwargs):
-    """Use Airtable as a storage backend"""
-    if 'airtable' in settings.ACTIVE_STORAGE_BACKENDS:
-        config = settings.STORAGE_BACKENDS.get('airtable', None)
-        if config is None:
-            return False
-        table = airtable.Airtable(
-            config.get('base_id', None),
-            config.get('table_name', None),
-            config.get('api_key', None)
-        )
-        records = []
-        for item in sender.final_result:
-            record = {}
-            for key, value in item.items():
-                if key == 'id':
-                    AIRTABLE_ID_CACHE.add(value)
+class BaseRow:
+    """Adds additional functionalities to
+    the default SQLite `Row` class. Rows
+    allows the data that comes from the database
+    to be interfaced
 
-                if key == 'id' and value in AIRTABLE_ID_CACHE:
-                    continue
+    >>> row = table.get(name='Kendall')
+    ... <BaseRow [{'rowid': 1}]>
+    ... row['rowid']
+    ... 1
+    """
 
-                record[key.title()] = value
-            records.append(record)
-        AIRTABLE_ID_CACHE.clear()
-        return table.batch_insert(records)
+    _marked_for_update = False
+
+    def __init__(self, cursor, fields, data):
+        self._cursor = cursor
+        self._fields = fields
+        self._cached_data = data
+        self._backend = None
+        self._table = None
+
+        for key, value in self._cached_data.items():
+            setattr(self, key, value)
+
+    def __repr__(self):
+        id_or_rowid = getattr(self, 'rowid', getattr(self, 'id', None))
+        return f'<id: {id_or_rowid}>'
+
+    def __setitem__(self, key, value):
+        self._marked_for_update = True
+        setattr(self, key, value)
+        result = self._backend.save_row(self, [key, value])
+        self._marked_for_update = False
+        return result
+
+    def __getitem__(self, name):
+        return getattr(self, name)
+
+    def __hash__(self):
+        return hash((self.rowid))
+
+    def __contains__(self, value):
+        # Check that a value exists in
+        # in all the values of the row
+        truth_array = []
+        for item in self._cached_data.values():
+            if item is None:
+                truth_array.append(False)
+                continue
+
+            if isinstance(item, int):
+                item = str(item)
+
+            truth_array.append(value in item)
+        return any(truth_array)
+
+    def __eq__(self, value):
+        return any((self[key] == value for key in self._fields))
+
+    def delete(self):
+        pass
 
 
-def notion_backend(sender, **kwargs):
-    """Use Notion as a storage backend"""
-    if 'notion' in settings.ACTIVE_STORAGE_BACKENDS:
-        config = settings.STORAGE_BACKENDS.get('notion', None)
-        if config is None:
-            return False
-        headers = {
-            'Authorization': f'Bearer {config["token"]}',
-            'Content-Type': 'application/json',
-            'Notion-Version': '2022-02-22'
-        }
-        try:
-            url = f'https://api.notion.com/v1/databases/{config["database_id"]}'
-            response = requests.post(url, headers=headers)
-        except:
-            return False
+def row_factory(backend):
+    """Base function to generate row that implement
+    additional functionnalities on the results
+    of the database"""
+    def inner_factory(cursor, row):
+        fields = [column[0] for column in cursor.description]
+        data = {key: value for key, value in zip(fields, row)}
+        instance = BaseRow(cursor, fields, data)
+        instance._backend = backend
+        return instance
+    return inner_factory
+
+
+class SQL:
+    """Base sql compiler"""
+
+    ALTER_TABLE = 'alter table {table} add column {params}'
+    CREATE_TABLE = 'create table if not exists {table} ({fields})'
+    CREATE_INDEX = 'create index {name} on {table} ({fields})'
+    DROP_TABLE = 'drop table if exists {table}'
+    DROP_INDEX = 'drop index if exists {value}'
+    DELETE = 'delete from {table}'
+    INSERT = 'insert into {table} ({fields}) values({values})'
+    SELECT = 'select {fields} from {table}'
+    UPDATE = 'update {table} set {params}'
+
+    AND = 'and {rhv}'
+    OR = 'or {rhv}'
+
+    CONDITION = '{field}{operator}{value}'
+    EQUALITY = '{field}={value}'
+    LIKE = '{field} like {conditions}'
+    BETWEEN = '{field} between {lhv} and {rhv}'
+    IN = '{field} in ({values})'
+    NOT_LIKE = '{field} not like {wildcard}'
+    WHERE_CLAUSE = 'where {params}'
+    WHERE_NOT = 'where not ({params})'
+
+    WILDCARD_MULTIPLE = '%'
+    WILDCARD_SINGLE = '_'
+
+    ASCENDING = '{field} asc'
+    DESCENDNIG = '{field} desc'
+
+    ORDER_BY = 'order by {conditions}'
+    # UNIQUE_INDEX = 'create unique index {name} ON {table}({fields})'
+
+    LOWER = 'lower({field})'
+    UPPER = 'upper({field})'
+    LENGTH = 'length({field})'
+    MAX = 'max({field})'
+    MIN = 'min({field})'
+
+    STRFTIME = 'strftime({format}, {value})'
+
+    CHECK_CONSTRAINT = 'check ({conditions})'
+
+    @staticmethod
+    def quote_value(value):
+        if isinstance(value, int):
+            return value
+
+        if value.startswith("'"):
+            return value
+        return f"'{value}'"
+
+    @staticmethod
+    def comma_join(values):
+        def check_integers(value):
+            if isinstance(value, (int, float)):
+                return str(value)
+            return value
+        values = map(check_integers, values)
+        return ', '.join(values)
+
+    @staticmethod
+    def operator_join(values, operator='and'):
+        """Joins a set of values using a valid
+        operator
+
+        >>> self.condition_join(["name='Kendall'", "surname='Jenner'"])
+        ... "name='Kendall' and surname='Jenner'"
+        """
+        return f' {operator} '.join(values)
+
+    @staticmethod
+    def simple_join(values, space_characters=True):
+        def check_integers(value):
+            if isinstance(value, (int, float)):
+                return str(value)
+            return value
+        values = map(check_integers, values)
+
+        if space_characters:
+            return ' '.join(values)
+        return ''.join(values)
+
+    @staticmethod
+    def finalize_sql(sql):
+        if sql.endswith(';'):
+            return sql
+        return f'{sql};'
+
+    @staticmethod
+    def de_sqlize_statement(sql):
+        if sql.endswith(';'):
+            return sql.removesuffix(';')
+        return sql
+
+    @staticmethod
+    def wrap_parenthentis(value):
+        return f"({value})"
+
+    def quote_startswith(self, value):
+        """Adds a wildcard to quoted value
+
+        >>> self.quote_startswith(self, 'kendall')
+        ... "'kendall%'"
+        """
+        value = value + '%'
+        return self.quote_value(value)
+
+    def quote_endswith(self, value):
+        """Adds a wildcard to quoted value
+
+        >>> self.quote_endswith(self, 'kendall')
+        ... "'%kendall'"
+        """
+        value = '%' + value
+        return self.quote_value(value)
+
+    def quote_like(self, value):
+        """Adds a wildcard to quoted value
+
+        >>> self.quote_like(self, 'kendall')
+        ... "'%kendall%'"
+        """
+        value = f'%{value}%'
+        return self.quote_value(value)
+
+    def dict_to_sql(self, data, quote_values=True):
+        """Convert a values nested into a dictionnary
+        to a sql usable values. The values are quoted
+        by default before being returned
+
+        >>> self.dict_to_sql({'name__eq': 'Kendall'})
+        ... (['name'], ["'Kendall'"])
+        """
+        fields = list(data.keys())
+        if quote_values:
+            quoted_value = list(
+                map(lambda x: self.quote_value(x), data.values()))
+            return fields, quoted_value
         else:
-            if response.ok:
-                return response.json()
-            return False
+            return fields, data.values()
+
+    def build_script(self, *sqls):
+        return '\n'.join(map(lambda x: self.finalize_sql(x), sqls))
+
+    def decompose_filters(self, **kwargs):
+        """Decompose a set of filters to a list of
+        key, operator and value list
+
+        >>> self.decompose_filters({'rowid__eq': '1'})
+        ... [('rowid', '=', '1')]
+        """
+        base_filters = {
+            'eq': '=',
+            'lt': '<',
+            'gt': '>',
+            'lte': '<=',
+            'gte': '>=',
+            'contains': 'like',
+            'startswith': 'startswith',
+            'endswith': 'endswith',
+            'range': 'between',
+            'ne': '!=',
+            'in': 'in',
+            'isnull': 'isnull'
+        }
+        filters_map = []
+        for key, value in kwargs.items():
+            if '__' not in key:
+                key = f'{key}__eq'
+
+            tokens = key.split('__', maxsplit=1)
+            if len(tokens) > 2:
+                raise ValueError(f'Filter is not valid. Got: {key}')
+
+            lhv, rhv = tokens
+            operator = base_filters.get(rhv)
+            if operator is None:
+                raise ValueError(
+                    f'Operator is not recognized. Got: {key}'
+                )
+            filters_map.append((lhv, operator, value))
+        return filters_map
+
+    def build_filters(self, items):
+        """Tranform a list of decomposed filters to
+        be usable conditions in an sql statement
+
+        >>> self.build_filters([('rowid', '=', '1')])
+        ... ["rowid = '1'"]
+
+        >>> self.build_filters([('rowid', 'startswith', '1')])
+        ... ["rowid like '1%'"]
 
 
-def google_sheets_backend(sender, **kwargs):
-    """Use Google Sheets as a storage backend"""
-    # if 'google sheets' in settings.ACTIVE_STORAGE_BACKENDS:
-    google_sheet_settings = settings.STORAGE_BACKENDS['google_sheets']
-    project_path = settings.PROJECT_PATH
+        >>> self.build_filters([('url', '=', Lower('url')])
+        ... ["lower(url)"]
+        """
+        built_filters = []
+        for item in items:
+            field, operator, value = item
 
-    if project_path is None:
-        logger.critical("Cannot find 'creds.json' for Google sheet API")
-    else:
-        file_path = project_path / google_sheet_settings['credentials']
-        worksheet = gspread.service_account(filename=file_path)
+            if operator == 'in':
+                if not isinstance(value, (tuple, list)):
+                    raise ValueError(
+                        'The value when using "in" should be a tuple or a list')
 
-        # connect to your sheet (between "" = the name of your G Sheet, keep it short)
-        sheet = worksheet.open(google_sheet_settings['sheet_name']).sheet1
+                quoted_list_values = (self.quote_value(item) for item in value)
+                operator_and_value = self.IN.format_map({
+                    'field': field,
+                    'values': self.comma_join(quoted_list_values)
+                })
+                built_filters.append(operator_and_value)
+                continue
 
-        # get the values from cells a2 and b2
-        name = sheet.acell("a2").value
-        website = sheet.acell("b2").value
-        print(name, website)
+            if operator == 'like':
+                operator_and_value = self.LIKE.format_map({
+                    'field': field,
+                    'conditions': self.quote_like(value)
+                })
+                built_filters.append(operator_and_value)
+                continue
 
-        # write values in cells a3 and b3
-        sheet.update('a3', 'Chat GPT')
-        sheet.update("b3", "openai.com")
+            if operator == 'startswith':
+                operator_and_value = self.LIKE.format_map({
+                    'field': field,
+                    'conditions': self.quote_startswith(value)
+                })
+                built_filters.append(operator_and_value)
+                continue
+
+            if operator == 'endswith':
+                operator_and_value = self.LIKE.format_map({
+                    'field': field,
+                    'conditions': self.quote_endswith(value)
+                })
+                built_filters.append(operator_and_value)
+                continue
+
+            if operator == 'between':
+                lhv, rhv = value
+                operator_and_value = self.BETWEEN.format_map({
+                    'field': field,
+                    'lhv': lhv,
+                    'rhv': rhv
+                })
+                built_filters.append(operator_and_value)
+                continue
+
+            if operator == 'isnull':
+                if value:
+                    operator_and_value = f'{field} is null'
+                else:
+                    operator_and_value = f'{field} is not null'
+                built_filters.append(operator_and_value)
+                continue
+
+            value = self.quote_value(value)
+            built_filters.append(
+                self.simple_join((field, operator, value))
+            )
+        return built_filters
+
+    def build_annotation(self, **conditions):
+        function_filters = {}
+        for key, function in conditions.items():
+            if isinstance(function, Functions):
+                function.backend = self
+                # Use key as alias instead of column named
+                # "lower(value)" in the returned results
+                function_filters[key] = self.simple_join(
+                    [function.function_sql(), f'as {key}']
+                )
+
+        joined_fields = self.comma_join(function_filters.values())
+        return [joined_fields]
 
 
-def redis_backend(sender, **kwargs):
-    """Use Redis as a storage backend"""
-    if 'redis' in settings.ACTIVE_STORAGE_BACKENDS:
-        instance = redis_connection()
-        if instance:
-            instance.hset('cache', None)
+class SQLiteBackend(SQL):
+    """Class that initiates and encapsulates a
+    new connection to the database"""
 
+    def __init__(self, database_name=None, table=None):
+        if database_name is None:
+            database_name = ':memory:'
+        else:
+            database_name = f'{database_name}.sqlite'
+        self.database_name = database_name
 
-class GoogleSheets(BaseConnection):
-    def __init__(self):
-        self.credentials = None
-        self.service = None
+        connection = sqlite3.connect(database_name)
+        # connection.create_function('hash', 1, Hash())
+        # connection.row_factory = BaseRow
+        connection.row_factory = row_factory(self)
+        self.connection = connection
+        self.table = table
 
-        storage_backends = settings.STORAGE_BACKENDS
-        self.connection_settings = storage_backends.get(
-            'google_sheets', None
+    def list_table_columns_sql(self, table):
+        sql = f'pragma table_info({table.name})'
+        query = Query(self, [sql], table=table)
+        query.run()
+        return query.result_cache
+
+    def drop_indexes_sql(self, row):
+        sql = self.DROP_INDEX.format_map({
+            'value': row['name']
+        })
+        return sql
+
+    def create_table_fields(self, table, columns_to_create):
+        field_params = []
+        if columns_to_create:
+            while columns_to_create:
+                column_to_create = columns_to_create.pop()
+                field = table.fields_map[column_to_create]
+                field_params.append(field.field_parameters())
+
+            statements = [self.simple_join(param) for param in field_params]
+            for i, statement in enumerate(statements):
+                if i > 1:
+                    statement = f'add table {statement}'
+                statements[i] = statement
+
+            alter_sql = self.ALTER_TABLE.format_map({
+                'table': table.name,
+                'params': self.simple_join(statements)
+            })
+            query = Query(self, [alter_sql], table=table)
+            query.run(commit=True)
+
+    def list_tables_sql(self):
+        sql = self.SELECT.format(
+            fields=self.comma_join(['rowid', 'name']),
+            table='sqlite_schema'
         )
+        not_like_clause = self.NOT_LIKE.format(
+            field='name',
+            wildcard=self.quote_value('sqlite_%')
+        )
+        where_clause = self.WHERE_CLAUSE.format(
+            params=self.simple_join([
+                self.EQUALITY.format(
+                    field='type',
+                    value=self.quote_value('table')
+                ),
+                self.AND.format(rhv=not_like_clause)
+            ])
+        )
+        query = Query(self, [sql, where_clause])
+        query.run()
+        return query.result_cache
 
-        if self.connection_settings is None:
+    def list_database_indexes(self):
+        base_fields = ['type', 'name', 'tbl_name', 'sql']
+        select_sql = self.SELECT.format_map({
+            'fields': self.comma_join(base_fields),
+            'table': 'sqlite_master'
+        })
+        where_clause = self.WHERE_CLAUSE.format_map({
+            'params': self.EQUALITY.format_map({
+                'field': 'type',
+                'value': self.quote_value('index')
+            })
+        })
+        sql = [select_sql, where_clause]
+        query = Query(self, sql)
+        query.run()
+        return query.result_cache
+
+    def list_table_indexes(self, table):
+        sql = f'PRAGMA index_list({self.quote_value(table.name)})'
+        query = Query(self, sql, table=table)
+        query.run()
+        return query.result_cache
+
+    def save_row(self, row, updated_values):
+        if not isinstance(row, BaseRow):
             raise ValueError()
 
-        project_path = settings.PROJECT_PATH
-        if project_path is None:
-            logger.critical(
-                f"{self.__class__.__name__} connection "
-                "should be a ran in a project"
-            )
-        else:
-            try:
-                tokens_file_path = project_path / \
-                    self.connection_settings['credentials']
-            except KeyError:
-                raise
-            else:
-                if tokens_file_path.exists():
-                    self.credentials = Credentials.from_authorized_user_file(
-                        tokens_file_path,
-                        self.connection_settings['scopes']
-                    )
+        if row._marked_for_update:
+            # TODO: Pass the current table somewhere
+            # either in the row or [...]
+            update_sql = self.UPDATE.format_map({
+                'table': 'seen_urls',
+                'params': self.EQUALITY.format_map({
+                    'field': updated_values[0],
+                    'value': self.quote_value(updated_values[1])
+                })
+            })
+            where_clause = self.WHERE_CLAUSE.format_map({
+                'params': self.EQUALITY.format_map({
+                    'field': 'rowid',
+                    'value': row['rowid']
+                })
+            })
+            sql = [update_sql, where_clause]
 
-                if not self.credentials is None or not self.credentials.valid:
-                    if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                        self.credentials.refresh(Request())
-                    else:
-                        flow = InstalledAppFlow.from_client_secrets_file(
-                            tokens_file_path,
-                            self.connection_settings['scopes']
-                        )
-                        self.credentials = flow.run_local_server(port=0)
+            query = Query(self, sql, table=None)
+            query.run(commit=True)
+        return row
 
-                    # Save the credentials for the next run
-                    write_json_document(
-                        self.connection_settings['credentials'],
-                        self.credentials.to_json()
-                    )
-
-    def connect(self):
-        try:
-            self.service = build('sheets', 'v4', credentials=self.credentials)
-        except HttpError as e:
-            logger.error(e.args)
+    # def delete(self):
+    #     backend = self.initialize_backend
+    #     delete_sql = backend.DELETE.format(table='')
+    #     where_clause = backend.WHERE_CLAUSE.format_map({
+    #         'params': backend.EQUALITY.format_map({
+    #             'lhv': 'rowid',
+    #             'rhv': self['rowid']
+    #         })
+    #     })
+    #     sql = [delete_sql, where_clause]
+    #     query = Query(backend, sql, table=None)
+    #     query.run(commit=True)

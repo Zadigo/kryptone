@@ -1,17 +1,14 @@
 import asyncio
 import bisect
 import datetime
-import json
+import os
 import random
-import re
-import string
-import asyncio
 import time
-from collections import defaultdict, namedtuple
+from collections import OrderedDict, defaultdict, namedtuple
 from urllib.parse import unquote, urlparse, urlunparse
+from urllib.robotparser import RobotFileParser
 
 import pandas
-import pytz
 import requests
 from lxml import etree
 from requests import Session
@@ -19,55 +16,35 @@ from requests.models import Request
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import exceptions, logger
-# from kryptone.cache import Cache
+from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
-from kryptone.db import backends
-from kryptone.db.connections import memcache_connection, redis_connection
-from kryptone.mixins import EmailMixin, SEOMixin
-from kryptone.signals import Signal
-from kryptone.utils import file_readers
-from kryptone.utils.date_functions import get_current_date, is_expired
-from kryptone.utils.file_readers import (read_csv_document,
+from kryptone.db.tables import Database
+from kryptone.utils.date_functions import get_current_date
+from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
                                          read_json_document,
                                          write_csv_document,
                                          write_json_document)
-from kryptone.utils.iterators import AsyncIterator, JPEGImagesIterator
+from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, URLsLoader, URLGenerator
+from kryptone.utils.urls import URL, pathlib
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
-    'domains', 'audit_page', 'url_passes_tests',
-    'debug_mode', 'site_language', 'default_scroll_step',
-    'gather_emails', 'router', 'crawl'
+    'domains', 'url_ignore_tests',
+    'debug_mode', 'default_scroll_step',
+    'router', 'crawl', 'start_urls',
+    'ignore_queries', 'ignore_images', 'restrict_search_to',
+    'url_gather_ignore_tests', 'database'
 }
 
 
-post_init = Signal()
-navigation = Signal()
-db_signal = Signal()
-
-
-def collect_images_receiver(sender, current_url=None, **kwargs):
-    """Collects every images present on the
-    actual webpage and classifies them"""
-    try:
-        image_elements = sender.driver.find_elements(By.TAG_NAME, 'img')
-    except:
-        pass
-    else:
-        instance = JPEGImagesIterator(current_url, image_elements)
-        logger.info(f'Collected {len(instance)} images')
-        # cache.extend_list('images', instance.urls)
-
-
-def get_selenium_browser_instance(browser_name=None):
+def get_selenium_browser_instance(browser_name=None, headless=False, load_images=True, load_js=True):
     """Creates a new selenium browser instance
 
     >>> browser = get_selenium_browser_instance()
@@ -81,7 +58,35 @@ def get_selenium_browser_instance(browser_name=None):
     options_klass = ChromeOptions if browser_name == 'Chrome' else EdgeOptions
     options = options_klass()
     options.add_argument('--remote-allow-origins=*')
-    options.add_argument(f'user-agent={RANDOM_USER_AGENT()}')
+    options.add_argument(f'--user-agent={RANDOM_USER_AGENT()}')
+    options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+
+    # Allow Selenium to be launched
+    # in headless mode
+    if headless:
+        options.headless = True
+
+    # 0 = Default, 1 = Allow, 2 = Block
+    preferences = {
+        'profile.default_content_setting_values': {
+            'images': 0 if load_images else 2,
+            'javascript': 0 if load_js else 2,
+            'popups': 2,
+            'geolocation': 2,
+            'notifications': 2
+        }
+    }
+    options.add_experimental_option('prefs', preferences)
+
+    # Proxies
+    if settings.USE_PROXY_ADDRESS:
+        proxy = Proxy()
+        proxy.proxy_type = ProxyType.MANUAL
+        proxy.http_proxy = settings.PROXY_IP_ADDRESS
+        options.add_argument(
+            f'--proxy-server=http://{settings.PROXY_IP_ADDRESS}'
+        )
+        options.add_argument('--disable-gpu')
 
     service = Service(manager_instance().install())
     return browser(service=service, options=options)
@@ -97,15 +102,21 @@ class CrawlerOptions:
         self.initial_spider_meta = None
 
         self.domains = []
-        self.audit_page = False
-        self.url_passes_tests = None
+        self.url_ignore_tests = []
         self.debug_mode = False
-        self.site_language = 'en'
         self.default_scroll_step = 80
-        self.gather_emails = False
         self.router = None
         self.crawl = True
         self.start_urls = []
+        # Restrict url retrieval only to
+        # to specific sections of the page
+        # e.g. body, div[class="example"]
+        self.restrict_search_to = []
+        # Ignore urls with query strings
+        self.ignore_queries = False
+        self.ignore_images = False
+        self.url_gather_ignore_tests = []
+        self.database = None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -113,22 +124,26 @@ class CrawlerOptions:
     @property
     def has_start_urls(self):
         return len(self.start_urls) > 0
-    
+
     def add_meta_options(self, options):
         for name, value in options:
             if name not in DEFAULT_META_OPTIONS:
                 raise ValueError(
-                    "Meta for model '{name}' received "
-                    "an illegal option '{option}'".format(
-                        name=self.verbose_name,
-                        option=name
-                    )
+                    f"Meta for model '{self.verbose_name}' received "
+                    f"an illegal option '{name}'"
                 )
             setattr(self, name, value)
 
     def prepare(self):
         if isinstance(self.start_urls, URLGenerator):
             self.start_urls = list(self.start_urls)
+
+        if self.database is not None:
+            if not isinstance(self.database, Database):
+                raise ValueError(
+                    f"{type(self.database)} should be "
+                    "an instance of Database"
+                )
 
 
 class Crawler(type):
@@ -169,17 +184,22 @@ class Crawler(type):
 class BaseCrawler(metaclass=Crawler):
     urls_to_visit = set()
     visited_urls = set()
+    visited_pages_count = 0
     list_of_seen_urls = set()
     browser_name = None
-    debug_mode = False
     timezone = 'UTC'
     default_scroll_step = 80
 
     def __init__(self, browser_name=None):
         self._start_url_object = None
+
         self.driver = get_selenium_browser_instance(
-            browser_name=browser_name or self.browser_name
+            browser_name=browser_name or self.browser_name,
+            headless=settings.HEADLESS,
+            load_images=settings.LOAD_IMAGES,
+            load_js=settings.LOAD_JS
         )
+        self.url_distribution = defaultdict(list)
 
         # navigation.connect(collect_images_receiver, sender=self)
 
@@ -191,41 +211,59 @@ class BaseCrawler(metaclass=Crawler):
         return f'<{self.__class__.__name__}>'
 
     @property
-    def get_html_page_content(self):
-        """Returns HTML elements of the
-        current page"""
-        return self.driver.page_source
-
-    @property
     def get_page_link_elements(self):
-        """Returns all the selenium `<a></a>` anchor tags
-        of the current page"""
-        return self.driver.find_elements(By.TAG_NAME, 'a')
+        """Returns all the links present on the
+        currently visited page"""
+        if self._meta.restrict_search_to:
+            found_urls = []
+            for selector in self._meta.restrict_search_to:
+                script = f"""
+                const urls = Array.from(document.querySelectorAll('{selector} a'))
+                return urls.map(x => x.href)
+                """
+                urls = self.driver.execute_script(script)
 
-    @property
-    def name(self):
-        return 'site_crawler'
+                if urls:
+                    logger.info(
+                        f"Found {len(urls)} url(s) "
+                        f"in page section: '{selector}'"
+                    )
+                found_urls.extend(urls)
 
-    @property
-    def get_html_page_content(self):
-        """Returns HTML elements of the
-        current page"""
-        return self.driver.page_source
+            # If no urls were found in the specific
+            # section of the page, we'll just return
+            # the whole page urls
+            if found_urls:
+                return found_urls
 
-    @property
-    def get_page_link_elements(self):
-        """Returns all the selenium `<a></a>` anchor tags
-        of the current page"""
-        return self.driver.find_elements(By.TAG_NAME, 'a')
+        urls = self.driver.execute_script(
+        """
+        const urls = Array.from(document.querySelectorAll('a'))
+        return urls.map(x => x.href)
+        """
+        )
+        return urls
 
     @property
     def get_title_element(self):
         return self.driver.find_element(By.TAG_NAME, 'title')
 
+    @property
+    def get_origin(self):
+        return urlunparse((
+            self._start_url_object.scheme,
+            self._start_url_object.netloc,
+            None,
+            None,
+            None,
+            None
+        ))
+
     def _backup_urls(self):
-        """Backs up the urls both in memory
-        cache and file cache"""
-        d = self.get_current_date()
+        """Backs up the urls both in memory 
+        and file cache which can then be resumed
+        on a next run"""
+        d = get_current_date(timezone=self.timezone)
 
         urls_data = {
             'spider': self.__class__.__name__,
@@ -233,7 +271,6 @@ class BaseCrawler(metaclass=Crawler):
             'urls_to_visit': list(self.urls_to_visit),
             'visited_urls': list(self.visited_urls)
         }
-        # cache.set_value('urls_data', urls_data)
 
         write_json_document(
             f'{settings.CACHE_FILE_NAME}.json',
@@ -244,11 +281,27 @@ class BaseCrawler(metaclass=Crawler):
         for url in self.list_of_seen_urls:
             bisect.insort(sorted_urls, url)
         write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+
         # db_signal.send(
         #     self,
         #     data_type='urls',
         #     urls_data=urls_data
         # )
+
+    def _get_robot_txt_parser(self):
+        """Checks if an url can be crawled
+        using the Robots.txt file"""
+        instance = RobotFileParser()
+        robots_txt_url = urlunparse((
+            self._start_url_object.scheme,
+            self._start_url_object.netloc,
+            'robots.txt',
+            None,
+            None,
+            None
+        ))
+        instance.set_url(robots_txt_url)
+        return instance
 
     def urljoin(self, path):
         """Returns the domain of the current
@@ -264,147 +317,182 @@ class BaseCrawler(metaclass=Crawler):
         ))
         return unquote(result)
 
-    def create_filename(self, length=5, extension=None):
-        characters = string.ascii_lowercase + string.digits
-        name = ''.join(random.choice(characters) for _ in range(length))
-        if extension is not None:
-            return f'{name}.{extension}'
-        return name
+    def url_structural_check(self, url):
+        """Checks the structure of an
+        incoming url"""
+        url = str(url)
+        clean_url = unquote(url)
+        if url.startswith('/'):
+            clean_url = self.urljoin(clean_url)
+        return clean_url, urlparse(clean_url)
 
-    def build_headers(self, options):
-        headers = {
-            'User-Agent': RANDOM_USER_AGENT(),
-            'Accept-Language': 'en-US,en;q=0.9'
-        }
-        items = [f"--header={key}={value})" for key, value in headers.items()]
-        options.add_argument(' '.join(items))
-
-    def run_filters(self):
+    def url_filters(self, valid_urls):
         """Excludes urls in the list of urls to visit based
-        on the return value of the function in `url_filters`
+        on the return value of the function in `url_filters`.
+        All conditions should be true for the url to be
+        considered to be visited.
         """
-        if self._meta.url_passes_tests:
+        if self._meta.url_ignore_tests:
             results = defaultdict(list)
-            for url in self.urls_to_visit:
+            for url in valid_urls:
                 truth_array = results[url]
-                for instance in self._meta.url_passes_tests:
+                for instance in self._meta.url_ignore_tests:
                     truth_array.append(instance(url))
 
-            filtered_urls = []
+            urls_kept = set()
+            urls_removed = set()
+            final_urls_filtering_audit = OrderedDict()
+
             for url, truth_array in results.items():
-                if not all(truth_array):
+                final_urls_filtering_audit[url] = any(truth_array)
+
+                # Expect all the test results to
+                # be true. Otherwise the url is invalid
+                if any(truth_array):
+                    urls_removed.add(url)
                     continue
-                filtered_urls.append(url)
-            message = f"Url filter completed"
-            logger.info(message)
-            return filtered_urls
-        # Ensure that we return the original
-        # urls to visit if there are no filters
-        # or this might return nothing
-        return self.urls_to_visit
+                urls_kept.add(url)
+
+            logger.info(
+                f"Filters completed. {len(urls_removed)} "
+                "url(s) removed"
+            )
+            return urls_kept
+        return valid_urls
 
     def add_urls(self, *urls_or_paths):
         """Manually add urls to the current urls to
         visit. This is useful for cases where urls are
         nested in other elements than links and that
         cannot actually be retrieved by the spider"""
-        for item in urls_or_paths:
-            new_url = str(item)
-            if item.startswith('/'):
-                new_url = urlunparse((
-                    self._start_url_object.scheme,
-                    self._start_url_object.netloc,
-                    item,
-                    None,
-                    None,
-                    None
-                ))
-
-            if new_url in self.visited_urls:
+        counter = 0
+        valid_urls = set()
+        invalid_urls = set()
+        for url in urls_or_paths:
+            if url is None:
                 continue
 
-            if new_url in self.urls_to_visit:
+            clean_url, url_object = self.url_structural_check(url)
+            self.list_of_seen_urls.add(clean_url)
+
+            if url in self.visited_urls:
+                invalid_urls.add(url)
                 continue
 
-            self.urls_to_visit.add(new_url)
-        logger.info(f'{len(urls_or_paths)} url(s) added')
-
-    def get_page_urls(self):
-        """Returns all the urls present on the
-        actual given page"""
-        elements = self.get_page_link_elements
-        logger.info(f"Found {len(elements)} urls")
-
-        for element in elements:
-            link = element.get_attribute('href')
-
-            # Turn the url into a Python object
-            # to make it more usable for us
-            link_object = urlparse(link)
-
-            # We do not want to add an item
-            # to the list if it already exists,
-            # if it is invalid or None
-            if link in self.urls_to_visit:
+            if url in self.urls_to_visit:
+                invalid_urls.add(url)
                 continue
 
-            if link in self.visited_urls:
+            if url_object.netloc == '' and url_object.path == '':
+                invalid_urls.add(url)
                 continue
 
-            if link is None or link == '':
+            counter = counter + 1
+            valid_urls.add(clean_url)
+        filtered_valid_urls = self.url_filters(valid_urls)
+        self.urls_to_visit.update(filtered_valid_urls)
+        logger.info(f'{counter} url(s) added')
+
+    def get_page_urls(self, current_url, refresh=False):
+        """Gets all the urls present on the
+        actual visited page"""
+        raw_urls = set(self.get_page_link_elements)
+        logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
+
+        # Specifically indicate to the crawler to
+        # not try and collect urls on pages that
+        # match the specified regex values
+        if self._meta.url_gather_ignore_tests:
+            matched_pattern = None
+            for regex in self._meta.url_gather_ignore_tests:
+                if current_url.test_url(regex):
+                    matched_pattern = regex
+                    break
+
+            if matched_pattern is not None:
+                self.list_of_seen_urls.update(raw_urls)
+                logger.warning(
+                    f"Url collection ignored on current url "
+                    f"by '{matched_pattern}'"
+                )
+                return
+
+        valid_urls = set()
+        invalid_urls = set()
+        for url in raw_urls:
+            clean_url, url_object = self.url_structural_check(url)
+
+            if refresh:
+                # If we are for example paginating a page,
+                # then we only need to keep the new urls
+                # that have appeared and that we have
+                # not yet seen
+                if url in self.list_of_seen_urls:
+                    invalid_urls.add(clean_url)
+                    continue
+
+            if url_object.netloc != self._start_url_object.netloc:
+                invalid_urls.add(clean_url)
                 continue
 
-            # Links such as http://exampe.com/path#
-            # are useless and can create
-            # useless repetition for us
-            if link.endswith('#'):
+            if url is None or url == '':
+                invalid_urls.add(clean_url)
                 continue
 
-            # If the link is similar to the initially
-            # visited url, skip it. NOTE: This is essentially
-            # a  security measure
-            if link_object.netloc != self._start_url_object.netloc:
+            if url_object.fragment:
+                invalid_urls.add(clean_url)
                 continue
 
-            # If the url contains a fragment, it is the same
-            # as visiting the root page, for example:
-            # example.com/#google is the same as example.com/
-            if link_object.fragment:
+            if url.endswith('#'):
+                invalid_urls.add(clean_url)
                 continue
 
-            # If we have already visited the home page then
-            # skip all urls that include the '/' path.
-            # NOTE: This is another security measure
-            if link_object.path == '/' and self._start_url_object.path == '/':
+            if url_object.path == '/' and self._start_url_object.path == '/':
+                invalid_urls.add(clean_url)
                 continue
 
-            # Reconstruct a partial url for example
-            # /google becomes https://example.com/google
-            if link_object.path != '/' and link.startswith('/'):
-                # link = f'{self._start_url_object.scheme}://{self._start_url_object.netloc}{link}'
-                link = urlunparse((
-                    self._start_url_object.scheme,
-                    self._start_url_object.netloc,
-                    link,
-                    None,
-                    None,
-                    None
-                ))
+            if self._meta.ignore_queries:
+                if url_object.query:
+                    invalid_urls.add(clean_url)
+                    continue
 
-            self.urls_to_visit.add(link)
+            if self._meta.ignore_images:
+                url_as_path = pathlib.Path(clean_url)
+                if url_as_path.suffix != '':
+                    suffix = url_as_path.suffix.removeprefix('.')
+                    if suffix in constants.IMAGE_EXTENSIONS:
+                        invalid_urls.add(clean_url)
+                        continue
 
-            # For statistics, we'll keep track of all the
-            # urls that we have gathered during crawl
-            self.list_of_seen_urls.add(link)
+            if clean_url in self.visited_urls:
+                invalid_urls.add(clean_url)
+                continue
 
-        # Finally, run all the filters to exclude
-        # urls that the user does not want to visit
-        # from the list of urls. NOTE: This re-initializes
-        # the list of urls to visit
-        # previous_state = self.urls_to_visit.copy()
-        self.urls_to_visit = set(self.run_filters())
-        # excluded_urls = previous_state.difference(self.urls_to_visit)
-        # logger.info(f'Ignored {len(excluded_urls)} urls')
+            if clean_url in self.visited_urls:
+                invalid_urls.add(clean_url)
+                continue
+
+            valid_urls.add(clean_url)
+
+        self.list_of_seen_urls.update(valid_urls)
+        self.list_of_seen_urls.update(invalid_urls)
+
+        if valid_urls:
+            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+
+        newly_discovered_urls = []
+        for url in valid_urls:
+            if url not in self.list_of_seen_urls:
+                newly_discovered_urls.append(url)
+
+        if newly_discovered_urls:
+            logger.info(
+                f"Discovered {len(newly_discovered_urls)} "
+                "unseen url(s)"
+            )
+
+        filtered_valid_urls = self.url_filters(valid_urls)
+        self.urls_to_visit.update(filtered_valid_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
@@ -455,13 +543,6 @@ class BaseCrawler(metaclass=Crawler):
             if wait_time is not None:
                 time.sleep(wait_time)
 
-    def evaluate_xpath(self, path):
-        script = """
-        const result = document.evaluate('{path}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)
-        return result.singleNodeValue
-        """.format(path=path)
-        return self.driver.execute_script(script)
-
     def scroll_page_section(self, xpath=None, css_selector=None):
         """Scrolls a specific portion on the page"""
         if css_selector:
@@ -491,31 +572,35 @@ class BaseCrawler(metaclass=Crawler):
         return script
 
     def calculate_performance(self):
-        """Returns the amount of time for which the
-        spider has been running"""
-        self._end_date = self.get_current_date()
+        """Calculate the overall spider performance"""
+        # Calculate global performance
+        self._end_date = get_current_date(timezone=self.timezone)
         days = (self._start_date - self._end_date).days
         completed_time = round(time.time() - self._start_time, 1)
         days = 0 if days < 0 else days
-        return self.performance_audit(days, completed_time)
+        global_performance = self.performance_audit(days, completed_time)
 
-    def calculate_completion_percentage(self):
-        """Indicates the level of completion
-        for the current crawl session"""
+        # Calculate performance related to urls
         total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
         result = len(self.visited_urls) / total_urls
-        percentage = round(result, 5)
-        logger.info(f'{percentage * 100}% of total urls visited')
-        return self.urls_audit(
+        percentage = round(result * 100, 3)
+        logger.info(f'{percentage}% of total urls visited')
+
+        urls_performance = self.urls_audit(
             count_urls_to_visit=len(self.urls_to_visit),
             count_visited_urls=len(self.visited_urls),
             total_urls=total_urls,
-            completion_percentage=percentage
+            completion_percentage=percentage,
+            visited_pages_count=self.visited_pages_count
         )
 
-    def get_current_date(self):
-        timezone = pytz.timezone(self.timezone)
-        return datetime.datetime.now(tz=timezone)
+        self.statistics.update({
+            'days': global_performance.days,
+            'duration': global_performance.duration,
+            'count_urls_to_visit': urls_performance.count_urls_to_visit,
+            'count_visited_urls': urls_performance.count_visited_urls
+        })
+        return global_performance, urls_performance
 
     def post_visit_actions(self, **kwargs):
         """Actions to run on the page just after
@@ -535,15 +620,16 @@ class BaseCrawler(metaclass=Crawler):
         """
 
 
-class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
+class SiteCrawler(BaseCrawler):
     start_url = None
 
     def __init__(self, browser_name=None):
         super().__init__(browser_name=browser_name)
-        self._start_date = self.get_current_date()
 
+        self._start_date = get_current_date(timezone=self.timezone)
         self._start_time = time.time()
         self._end_time = None
+
         self.performance_audit = namedtuple(
             'Performance',
             ['days', 'duration']
@@ -551,14 +637,17 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         self.urls_audit = namedtuple(
             'URLsAudit',
             ['count_urls_to_visit', 'count_visited_urls',
-             'completion_percentage', 'total_urls']
+             'completion_percentage', 'total_urls',
+             'visited_pages_count']
         )
-
         self.statistics = {}
 
-    # def update_statistics(self):
-    #     current_date = self.get_current_date().date()
-    #     self.date_history[current_date] = self.date_history[current_date] + 1
+    def __del__(self):
+        try:
+            self.driver.quit()
+        except:
+            pass
+        logger.info('Project stopped')
 
     def resume(self, **kwargs):
         """From a previous list of urls to visit
@@ -566,24 +655,44 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         crawling session.
 
             * Redis is checked as the primary database for a cache
-            * Memcache is checked afterwards if no connection
+            * Memcache is checked in second place
             * Finally, the file cache is used as a final resort
         """
-        redis = redis_connection()
-        if redis:
-            data = redis.get('cache')
-        else:
-            memcache = memcache_connection()
-            if memcache:
-                data = memcache.get('cache', [])
-            else:
-                data = read_json_document('cache.json')
+        # redis = backends.redis_connection()
+        # if redis:
+        #     data = redis.get('cache')
+        # else:
+        #     memcache = backends.memcache_connection()
+        #     if memcache:
+        #         data = memcache.get('cache', [])
+        #     else:
+        #         data = read_json_document('cache.json')
+        try:
+            data = read_json_document('cache.json')
+        except FileNotFoundError:
+            write_json_document('cache.json', [])
 
-        self.urls_to_visit = set(data['urls_to_visit'])
+        # Before reloading the urls, run the filters
+        # in case previous urls to exclude were
+        # present
+        valid_urls = self.url_filters(data['urls_to_visit'])
+        self.urls_to_visit = set(valid_urls)
         self.visited_urls = set(data['visited_urls'])
-        self.list_of_seen_urls = set(
-            read_csv_document('seen_urls.csv', flatten=True)
-        )
+
+        try:
+            previous_seen_urls = read_csv_document('seen_urls.csv', flatten=True)
+        except FileNotFoundError:
+            write_csv_document('seen_urls.csv', [])
+        else:
+            self.list_of_seen_urls = set(previous_seen_urls)
+
+        try:
+            previous_statistics = read_json_document('performance.json')
+        except:
+            pass
+        else:
+            self.statistics = previous_statistics
+
         self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
@@ -608,7 +717,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 continue
             start_urls.append(sub_children[0].text)
         return start_urls
-        # self.start(start_urls=start_urls, **kwargs)
 
     def start_from_html_sitemap(self, url, **kwargs):
         """Start crawling from the sitemap HTML page
@@ -648,12 +756,22 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone...')
 
-        if isinstance(start_urls, URLsLoader):
-            self.urls_to_visit = start_urls.urls_to_visit
-            self.visited_urls = start_urls.visited_urls
+        start_urls = start_urls or self._meta.start_urls
 
-        if self.start_url is None:
-            raise ValueError('No start url provided')
+        # If we have absolutely no start_url and at the
+        # same time we have no start_urls, raise an error
+        if self.start_url is None and not start_urls:
+            raise exceptions.BadImplementationError(
+                "No start url. Provide either a "
+                "start url or start urls in the Meta"
+            )
+
+        if self.start_url is None and start_urls:
+            if isinstance(start_urls, (LoadStartUrls)):
+                start_urls = list(start_urls)
+            self.list_of_seen_urls.update(*start_urls)
+            self.start_url = start_urls.pop()
+        self._start_url_object = urlparse(self.start_url)
 
         # If we have no urls to visit in
         # the array, try to eventually
@@ -661,18 +779,17 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
         if not self.urls_to_visit:
             # Start spider from .xml page
             is_xml_page = self.start_url.endswith('.xml')
-            if not is_xml_page:
+            if is_xml_page:
+                start_urls = self.start_from_sitemap_xml(self.start_url)
+            else:
                 # Add the start_url to the list of
                 # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
-            else:
-                start_urls = self.start_from_sitemap_xml(self.start_url)
-        self._start_url_object = urlparse(self.start_url)
 
         if start_urls:
             self.add_urls(*start_urls)
 
-        webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
+        # webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
 
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
@@ -680,13 +797,6 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             if current_url is None:
                 continue
-
-            # In the case where the user has provided a
-            # set of urls directly in the function,
-            # start_url would be None
-            if self.start_url is None:
-                self.start_url = current_url
-                self._start_url_object = urlparse(self.start_url)
 
             current_url_object = urlparse(current_url)
             # If we are not on the same domain as the
@@ -696,12 +806,30 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 continue
 
             logger.info(f'Going to url: {current_url}')
-            self.driver.get(current_url)
 
-            # Always wait for the body section of
-            # the page to be located  or visible
-            wait = WebDriverWait(self.driver, 8)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+            # By security measure, do not go to an url
+            # that is an image if it happened to be in
+            # the urls_to_visit
+            if self._meta.ignore_images:
+                path = pathlib.Path(current_url_object.path)
+                if path.suffix != '':
+                    suffix = path.suffix.removeprefix('.')
+                    if suffix in constants.IMAGE_EXTENSIONS:
+                        continue
+
+            self.driver.get(current_url)
+            self.visited_pages_count = self.visited_pages_count + 1
+
+            try:
+                # Always wait for the body section of
+                # the page to be located  or visible
+                wait = WebDriverWait(self.driver, 5)
+                wait.until(
+                    EC.presence_of_element_located((By.TAG_NAME, 'body'))
+                )
+            except:
+                logger.error('Body element of page was not detected')
+
             self.post_visit_actions(current_url=current_url)
 
             # Post navigation signal
@@ -714,68 +842,42 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
 
             self.visited_urls.add(current_url)
 
-            # TODO: Check performance issues here
+            url_instance = URL(current_url)
+
             if self._meta.crawl:
-                self.get_page_urls()
+                # s = time.time()
+                self.get_page_urls(url_instance)
+                # e = round(time.time() - s, 2)
+                # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
-            if self._meta.audit_page:
-                self.audit_page(current_url)
-                write_json_document('audit.json', self.page_audits)
-
-                # Write vocabulary as JSON
-                vocabulary = self.global_audit()
-                write_json_document('global_audit.json', vocabulary)
-
-                # Write vocabulary as CSV
-                rows = []
-                for key, value in vocabulary.items():
-                    rows.append([key, value])
-                write_csv_document('global_audit.csv', rows)
-
-                # Save the website's text
-                website_text = ' '.join(self.fitted_page_documents)
-                file_readers.write_text_document(
-                    'website_text.txt', website_text)
-
-                # cache.set_value('page_audit', self.page_audits)
-                # cache.set_value('global_audit', vocabulary)
-                db_signal.send(
-                    self,
-                    page_audit=self.page_audits,
-                    global_audit=vocabulary
-                )
-
-                logger.info('Audit complete...')
-
-            if self._meta.gather_emails:
-                self.emails(
-                    self.get_transformed_raw_page_text,
-                    elements=self.get_page_link_elements
-                )
-                # Format each email as [[...], ...] in order to comply
-                # with the way that the csv writer outputs the rows
-                emails = list(map(lambda x: [x], self.emails_container))
-                write_csv_document('emails.csv', emails)
-                db_signal.send(
-                    self,
-                    emails=self.emails_container
-                )
-
-            # Run custom user actions once
-            # everything is completed
-            url_instance = URL(current_url)
             try:
+                # Run custom user actions once
+                # everything is completed
                 self.run_actions(url_instance)
             except TypeError:
-                raise TypeError("run_actions should accept arguments")
-            except Exception:
+                raise TypeError(
+                    "'self.run_actions' should be able to accept arguments"
+                )
+            except Exception as e:
+                logger.error(e)
                 raise ExceptionGroup(
-                    "An exception occured within 'run_actions'",
+                    "An exception occured while trying "
+                    "to execute 'self.run_actions'",
                     [
+                        Exception(e),
                         exceptions.SpiderExecutionError()
                     ]
                 )
+            else:
+                # Refresh the urls once the
+                # user actions have been completed
+                # for example scrolling down a page
+                # that could generate new urls to
+                # disover or changing a filter
+                if self._meta.crawl:
+                    self.get_page_urls(url_instance, refresh=True)
+                    self._backup_urls()
 
             # Run routing actions aka, base on given
             # url path, route to a function that
@@ -784,20 +886,16 @@ class SiteCrawler(SEOMixin, EmailMixin, BaseCrawler):
                 self._meta.router.resolve(url_instance, self)
 
             if self._meta.crawl:
-                performance = self.calculate_performance()
-                urls_performance = self.calculate_completion_percentage()
-                performance_document = {
-                    'days': performance.days,
-                    'duration': performance.duration,
-                    'count_urls_to_visit': urls_performance.count_urls_to_visit,
-                    'count_visited_urls': urls_performance.count_visited_urls
-                }
-                write_json_document('performance.json', performance_document)
+                self.calculate_performance()
+                write_json_document('performance.json', self.statistics)
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
                 stop = settings.WAIT_TIME_RANGE[1]
                 wait_time = random.randrange(start, stop)
+
+            if os.getenv('KYRPTONE_TEST_RUN') is not None:
+                break
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
@@ -808,7 +906,8 @@ class JSONCrawler:
     the data given an interval in minutes"""
 
     base_url = None
-    receveived_data = []
+    received_data = []
+    date_sorted_data = defaultdict(list)
     iterator = AsyncIterator
 
     def __init__(self, chunks=10):
@@ -821,6 +920,7 @@ class JSONCrawler:
         self.max_pages_key = None
         self.paginate_data = False
         self.pagination = 0
+        self.current_raw_data = {}
 
         if self.base_url is None:
             raise ValueError("'base_url' cannot be None")
@@ -829,15 +929,19 @@ class JSONCrawler:
 
     @property
     def data(self):
-        return self.iterator(self.receveived_data, by=self.chunks)
+        return self.iterator(self.received_data, by=self.chunks)
 
-    async def clean(self, dataframe):
+    async def create_dump(self):
+        pass
+
+    async def clean(self, data):
         """Use this function to run additional logic
         on the retrieved data"""
-        return dataframe.to_json()
+        return pandas.DataFrame(data)
 
     async def start(self, interval=15):
-        logger.info('Starting JSON crawler')
+        logger.info(f'Starting {self.__class__.__name__}')
+        logger.info(f'A request will be made every {interval} minutes')
 
         session = Session()
         request = Request(
@@ -858,8 +962,11 @@ class JSONCrawler:
             while True:
                 while not queue.empty():
                     data = await queue.get()
-                    # self.receveived_data.extend(data)
-                    # await webhooks.resolve(data)
+
+                    self.received_data.extend(data)
+                    self.date_sorted_data[str(get_current_date())] = data
+                    await webhooks.resolve(data)
+
                     await asyncio.sleep(5)
                 await asyncio.sleep(15)
 
@@ -895,30 +1002,42 @@ class JSONCrawler:
                     except:
                         logger.error('Request failed')
                     else:
-                        df = pandas.DataFrame(data=response.json())
-                        data_or_dataframe = await self.clean(df)
-                        if isinstance(data_or_dataframe, pandas.DataFrame):
-                            data = data_or_dataframe.to_json(orient='records', force_ascii=False)
-                        else:
-                            data = data_or_dataframe
+                        if response.ok:
+                            logger.info('Request successfully completed')
+                            try:
+                                self.current_raw_data = response.json()
+                            except requests.exceptions.JSONDecodeError as e:
+                                logger.error(
+                                    f"Could not decode content as JSON "
+                                    "got: {response.content[:50]} - {e}"
+                                )
+                            else:
+                                data_or_dataframe = await self.clean(self.current_raw_data)
+                                if isinstance(data_or_dataframe, pandas.DataFrame):
+                                    data = data_or_dataframe.to_json(
+                                        orient='records',
+                                        force_ascii=False
+                                    )
+                                else:
+                                    data = data_or_dataframe
 
-                        if self.paginate_data: 
-                            self.max_pages = data[self.max_pages_key]
-                            self.current_page = data[self.current_page]
+                                logger.info(
+                                    f"Received {len(self.current_raw_data)} elements"
+                                )
 
-                        end_time = round(time.time() - start_time, 1)
-                        await queue.put(data)
-                    
+                                if self.paginate_data:
+                                    self.max_pages = data[self.max_pages_key]
+                                    self.current_page = data[self.current_page]
+
+                                await queue.put(data)
+
+                    end_time = round(time.time() - start_time, 1)
                     next_date = next_date + interval
                     self.request_sent = self.request_sent + 1
-                    
+                    self.current_raw_data = {}
+
                     logger.info(f'Request completed in {end_time}s')
 
                 await asyncio.sleep(60)
 
         await asyncio.gather(sender(), receiver())
-
-
-# c = JSONCrawler()
-# c.base_url = 'https://jsonplaceholder.typicode.com/todos'
-# asyncio.run(c.start(interval=1))

@@ -2,23 +2,25 @@ import multiprocessing
 
 import kryptone
 from kryptone.checks.core import checks_registry
+from kryptone.core.process import BaseProcess
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
+        parser.add_argument(
+            'name',
+            help='Spider name to execute',
+            type=str
+        )
         parser.add_argument(
             '-l',
             '--language',
             help='Specify the website language',
             default='fr',
-            type=str
-        )
-        parser.add_argument(
-            '-n',
-            '--name',
-            help='Spider name to execute',
             type=str
         )
         parser.add_argument(
@@ -41,32 +43,7 @@ class Command(ProjectCommand):
 
         params = {
             'start_urls': namespace.start_urls,
-            # 'wait_time': namespace.wait_time,
             'language': namespace.language
         }
-
-        if namespace.name is not None:
-            spider_config = registry.get_spider(namespace.name)
-            spider_config.run(**params)
-            # process = multiprocessing.Process(
-            #     target=spider_config.run,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()
-        else:
-            registry.run_all_spiders(**params)
-            # process = multiprocessing.Process(
-            #     target=registry.run_all_spiders,
-            #     kwargs=params
-            # )
-            # try:
-            #     process.start()
-            # except:
-            #     raise
-            # else:
-            #     process.join()
+        spider_config = registry.get_spider(namespace.name)
+        spider_config.run(**params)

@@ -1,0 +1,215 @@
+// version 1
+function gatherComments () {
+    const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
+    
+    return Array.from(commentsWrapper).map((item) => {
+        let dataReviewId = item.dataset['reviewId']
+    
+        let text = ''
+        let period = null
+        let rating = null
+        const textSection = item.querySelector("*[class='MyEned']")
+    
+        try {
+            // Sometimes there is a read more button
+            // that we have to click
+            
+            moreButton = (
+                // Try the "Voir plus" button"
+                item.querySelector('button[aria-label="Voir plus"]') ||
+                // Try the "See more" button"
+                item.querySelector('button[aria-label="See more"]') ||
+                // On last resort try "aria-expanded"
+                item.querySelector('button[aria-expanded="false"]')
+            )
+            moreButton.click()
+        } catch (e) {
+            console.log('No additional data for', dataReviewId)
+        }
+        
+        try {
+            // Or, item.querySelector('.rsqaWe').innerText
+            period = item.querySelector('.DU9Pgb').innerText
+        } catch (e) {
+            // pass
+        }
+    
+        try {
+            rating = item.querySelector('span[role="img"]').ariaLabel
+        } catch (e) {
+            // pass
+        }
+    
+        try {
+            text = textSection.innerText
+        } catch (e) {
+            // pass
+        }
+    
+        try {
+            reviewerName = item.querySelector('class*="d4r55"').innerText
+            reviewerNumberOfReviews = item.querySelector('*[class*="RfnDt"]').innerText
+        } catch (e) {
+            // pass
+        }
+    
+        return {
+            text: text,
+            rating: rating,
+            period: period
+        }
+    })
+}
+
+// Version 1.5
+
+function gatherComments () {
+    const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
+
+    function getText (el) {
+        return el && el.textContent.trim()
+    }
+
+    return Array.from(commentsWrapper).map((item) => {
+        moreButton = (
+            // Try the "Voir plus" button"
+            item.querySelector('button[aria-label="Voir plus"]') ||
+            // Try the "See more" button"
+            item.querySelector('button[aria-label="See more"]') ||
+            // On last resort try "aria-expanded"
+            item.querySelector('button[aria-expanded="false"]')
+        )
+        moreButton && moreButton.click()
+
+        let dataReviewId = item.dataset['reviewId']
+        let period = getText(item.querySelector('.DU9Pgb'))
+        let rating = getText(item.querySelector('span[role="img"]'))
+        let text = getText(item.querySelector("*[class='MyEned']"))
+        let reviewerName = getText(item.querySelector('class*="d4r55"'))
+        let reviewerNumberOfReviews = getText(item.querySelector('*[class*="RfnDt"]'))
+
+        return {
+            id: dataReviewId,
+            rating,
+            period,
+            text,
+            reviewer: reviewerName,
+            reviewer_comments: reviewerNumberOfReviews
+        }
+    })
+}
+
+
+// Version 2
+function sortComments() {
+    let sortButton = (
+        document.querySelector('button[aria-label*="Sort reviews"][data-value^="Sort"]') ||
+        document.querySelector('button[aria-label*="Trier les avis"][data-value^="Trier"]')
+    )
+    sortButton && sortButton.click()
+
+    let menu = document.querySelector('div[id="action-menu"][role="menu"]')
+    let menuOption = menu && menu.querySelectorAll('div[role="menuitemradio"]')
+
+    let newestRadio = menuOption[1]
+    
+    try {
+        newestRadio && newestRadio.click()
+    } catch (e) {
+        console.error(e)
+    }
+}
+
+function getText (el) {
+    return el && el.textContent.trim()
+}
+
+function resolveXpath (xpath) {
+    return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
+}
+
+function evaluateXpath (xpath) {
+    var result = resolveXpath(xpath)
+    return getText(result)
+}
+
+function gatherComments() {
+    const commentsWrapper = document.querySelectorAll("div[data-review-id^='Ch'][class*='fontBodyMedium ']")
+
+    Array.from(commentsWrapper).forEach((item) => {
+        let dataReviewId = item.dataset['reviewId']
+        try {
+            // Sometimes there is a read more button
+            // that we have to click
+
+            moreButton = (
+                // Try the "Voir plus" button"
+                item.querySelector('button[aria-label="Voir plus"]') ||
+                // Try the "See more" button"
+                item.querySelector('button[aria-label="See more"]') ||
+                // On last resort try "aria-expanded"
+                item.querySelector('button[aria-expanded="false"]')
+            )
+            moreButton.click()
+        } catch (e) {
+            console.log('No "see more" button for review', dataReviewId)
+        }
+    })
+
+    return Array.from(commentsWrapper).map((item) => {
+        let dataReviewId = item.dataset['reviewId']
+
+        // Or, .rsqaWe
+        let period = getText(item.querySelector('.DU9Pgb'))
+        let rating = item.querySelector('span[role="img"]') && item.querySelector('span[role="img"]').ariaLabel
+        let text = getText(item.querySelector("*[class='MyEned']"))
+        let reviewerName = getText(item.querySelector('[class*="d4r55"]'))
+        let reviewerNumberOfReviews = getText(item.querySelector('*[class*="RfnDt"]'))
+
+        return {
+            review_id: dataReviewId,
+            text,
+            rating,
+            period,
+            reviewer: {
+                name: reviewerName,
+                number_of_reviews: reviewerNumberOfReviews
+            }
+        }
+    })
+}
+
+function commentsWrapper () {
+    let comments = gatherComments()
+    let name = getText(document.querySelector('.F5rdzf.isCentered'))
+    
+    let starsXpath = '//div[@role="img"][contains(@aria-label, "stars")]'
+    let rating = resolveXpath(starsXpath).ariaLabel
+    let numberOfReviewsXpath = starsXpath + '//following-sibling::div[contains(text(), "reviews")]'
+    let numberOfReviews = evaluateXpath(numberOfReviewsXpath)
+    let latitudeLongitudeRegex = /\/\@([0-9\.]+)\,?(\-?[0-9\.]+)/g
+    let result = latitudeLongitudeRegex.exec(window.location.href)
+    let latitude = result[1]
+    let longitude = result[2]
+
+    return {
+        name,
+        url: window.location.href,
+        feed_url: null,
+        address: null,
+        rating,
+        latitude,
+        longitude,
+        number_of_reviews: numberOfReviews,
+        additional_information: [],
+        comments
+    }
+}
+
+function getFeedUrls () {
+    let elements = Array.from(document.querySelectorAll('[role="feed"] a'))
+    let urls = elements.map(x => x.href)
+    return urls.filter((url) => {
+        return url.includes('/maps/place/')
+    })
+}

@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 from kryptone import logger
 from kryptone.utils.urls import URL
@@ -18,7 +18,7 @@ class Route:
         self.regex = None
         self.name = None
         self.function_name = None
-        self.matched_urls = []
+        self.matched_urls = deque()
 
     def __repr__(self):
         return f'<Route <{self.path or self.regex}> name={self.name}>'
@@ -38,6 +38,7 @@ class Route:
                 raise ValueError('Both url path and regex cannot be None')
 
             if path is not None:
+                # Make an exact match on the path ?
                 result = current_url.url_object.path == path
 
             if regex is not None:
@@ -53,14 +54,14 @@ class Route:
                         'No corresponding function found'
                     )
                     return False
-                
+
                 func(current_url, route=self)
                 if result:
                     logger.info(
                         f"Routing sucessful for {current_url} "
                         f"to '{self.function_name}'"
                     )
-                    self.matched_urls.append(current_url)
+                    self.matched_urls.appendleft(current_url)
                 return result
             return result
         return self, wrapper
@@ -68,14 +69,8 @@ class Route:
     @classmethod
     def new(cls):
         instance = cls()
-        return instance 
-    
+        return instance
 
-# FIXME: This creates an instance pointing to the
-# same class with this technique, in other words,
-# multiple routes will just be the same base class
-# just with different wrapper functions
-# route = Route()
 
 def route(function_name, *, path=None, regex=None, name=None):
     instance = Route.new()
@@ -135,18 +130,3 @@ class Router:
             state = route(current_url, spider_instance)
             resolution_states.append(state)
         return resolution_states
-
-
-# class Spider:
-#     def get_product(self, current_url, **kwargs):
-#         print(current_url, kwargs)
-
-
-# spider = Spider()
-
-# router = Router([
-#     route('get_product', regex=r'\/google', name='product')
-# ])
-# # route = router.routes['product']
-# # route('http://example.com/google', spider)
-# print(router)

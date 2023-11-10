@@ -5,6 +5,8 @@ from kryptone.core.server import run_server
 
 
 class Command(ProjectCommand):
+    requires_system_checks = True
+    
     def add_arguments(self, parser):
         pass
     

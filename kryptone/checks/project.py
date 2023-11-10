@@ -27,16 +27,6 @@ E006 = (
 )
 
 
-@checks_registry.register('spider_names')
-def check_spiders():
-    errors = []
-    for item in settings.SPIDERS:
-        if not isinstance(item, str):
-            errors.append(E001.format(name=item))
-            
-    return errors
-
-
 @checks_registry.register('webdriver_name')
 def check_webdriver():
     allowed_browsers = ['Chrome', 'Edge']
