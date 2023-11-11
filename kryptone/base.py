@@ -263,24 +263,32 @@ class BaseCrawler(metaclass=Crawler):
         """Backs up the urls both in memory 
         and file cache which can then be resumed
         on a next run"""
-        d = get_current_date(timezone=self.timezone)
 
-        urls_data = {
-            'spider': self.__class__.__name__,
-            'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
-            'urls_to_visit': list(self.urls_to_visit),
-            'visited_urls': list(self.visited_urls)
-        }
+        async def write_cache_file():
+            d = get_current_date(timezone=self.timezone)
+            urls_data = {
+                'spider': self.__class__.__name__,
+                'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
+                'urls_to_visit': list(self.urls_to_visit),
+                'visited_urls': list(self.visited_urls)
+            }
+            write_json_document(
+                f'{settings.CACHE_FILE_NAME}.json',
+                urls_data
+            )
 
-        write_json_document(
-            f'{settings.CACHE_FILE_NAME}.json',
-            urls_data
-        )
+        async def write_seen_urls():
+            sorted_urls = []
+            for url in self.list_of_seen_urls:
+                bisect.insort(sorted_urls, url)
+            write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
 
-        sorted_urls = []
-        for url in self.list_of_seen_urls:
-            bisect.insort(sorted_urls, url)
-        write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+        
+        async def main():
+            await write_cache_file()
+            await write_seen_urls()
+
+        asyncio.run(main())
 
         # db_signal.send(
         #     self,
@@ -574,33 +582,40 @@ class BaseCrawler(metaclass=Crawler):
     def calculate_performance(self):
         """Calculate the overall spider performance"""
         # Calculate global performance
-        self._end_date = get_current_date(timezone=self.timezone)
-        days = (self._start_date - self._end_date).days
-        completed_time = round(time.time() - self._start_time, 1)
-        days = 0 if days < 0 else days
-        global_performance = self.performance_audit(days, completed_time)
+        async def performance():
+            self._end_date = get_current_date(timezone=self.timezone)
+            days = (self._start_date - self._end_date).days
+            completed_time = round(time.time() - self._start_time, 1)
+            days = 0 if days < 0 else days
+            return self.performance_audit(days, completed_time)
 
         # Calculate performance related to urls
-        total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
-        result = len(self.visited_urls) / total_urls
-        percentage = round(result * 100, 3)
-        logger.info(f'{percentage}% of total urls visited')
+        async def performance_urls():
+            total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
+            result = len(self.visited_urls) / total_urls
+            percentage = round(result * 100, 3)
+            logger.info(f'{percentage}% of total urls visited')
 
-        urls_performance = self.urls_audit(
-            count_urls_to_visit=len(self.urls_to_visit),
-            count_visited_urls=len(self.visited_urls),
-            total_urls=total_urls,
-            completion_percentage=percentage,
-            visited_pages_count=self.visited_pages_count
-        )
+            return self.urls_audit(
+                count_urls_to_visit=len(self.urls_to_visit),
+                count_visited_urls=len(self.visited_urls),
+                total_urls=total_urls,
+                completion_percentage=percentage,
+                visited_pages_count=self.visited_pages_count
+            )
 
-        self.statistics.update({
-            'days': global_performance.days,
-            'duration': global_performance.duration,
-            'count_urls_to_visit': urls_performance.count_urls_to_visit,
-            'count_visited_urls': urls_performance.count_visited_urls
-        })
-        return global_performance, urls_performance
+        async def main():
+            global_performance  = await performance()
+            urls_performance = await performance_urls()
+
+            self.statistics.update({
+                'days': global_performance.days,
+                'duration': global_performance.duration,
+                'count_urls_to_visit': urls_performance.count_urls_to_visit,
+                'count_visited_urls': urls_performance.count_visited_urls
+            })
+            return global_performance, urls_performance
+        return asyncio.run(main())
 
     def post_visit_actions(self, **kwargs):
         """Actions to run on the page just after
@@ -913,7 +928,7 @@ class SiteCrawler(BaseCrawler):
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
-    def boost_start(self, start_urls=[], *, windows=3, **kwargs):
+    def boost_start(self, start_urls=[], *, windows=1, **kwargs):
         """Works just like start but opens multiple windows
         or tabs to accelerate url visitation"""
         self.before_start(start_urls, **kwargs)
