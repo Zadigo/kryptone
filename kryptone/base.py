@@ -883,7 +883,8 @@ class SiteCrawler(BaseCrawler):
                 # Run custom user actions once
                 # everything is completed
                 self.run_actions(url_instance)
-            except TypeError:
+            except TypeError as e:
+                logger.error(e)
                 raise TypeError(
                     "'self.run_actions' should be able to accept arguments"
                 )
@@ -961,6 +962,7 @@ class SiteCrawler(BaseCrawler):
                         continue
                     current_urls.append(current_url)
 
+            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
             url_instances = []
 
             for i, handle in enumerate(self.driver.window_handles):
@@ -1025,7 +1027,8 @@ class SiteCrawler(BaseCrawler):
                     # Run custom user actions once
                     # everything is completed
                     self.run_actions(url_instance)
-                except TypeError:
+                except TypeError as e:
+                    logger.info(e)
                     raise TypeError(
                         "'self.run_actions' should be able to accept arguments"
                     )
