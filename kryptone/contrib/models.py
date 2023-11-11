@@ -5,7 +5,7 @@ from functools import cached_property
 from urllib.parse import urlparse
 
 from kryptone.db.models import BaseModel
-from kryptone.utils.text import clean_text
+from kryptone.utils.text import Text
 
 
 @dataclasses.dataclass
@@ -37,12 +37,12 @@ class Product(BaseModel):
     collection_id: str = None
     number_of_colors: int = 1
     id_or_reference: str = None
-    id: int = None
     images: list = dataclasses.field(default_factory=list)
     composition: str = None
     color: str = None
     date: str = None
     sizes: list = dataclasses.field(default_factory=list)
+    out_of_stock: bool = None
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))
@@ -57,7 +57,7 @@ class Product(BaseModel):
     @cached_property
     def number_of_images(self):
         return len(self.images)
-    
+
     def set_collection_id(self, regex):
         """Set the product's collection ID from the url
 
@@ -71,12 +71,12 @@ class Product(BaseModel):
         if result:
             group_dict = result.groupdict()
             self.collection_id = group_dict.get(
-                'collection_id', 
+                'collection_id',
                 result.group(1)
             )
 
     def complex_name(self):
-        name = clean_text(self.name.lower())
+        name = str(Text(self.name, punctation=True, accents=True))
         name = name.replace(' ', '_')
         if self.id_or_reference is not None:
             return f'{name}_{self.id_or_reference}'
