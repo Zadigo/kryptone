@@ -39,8 +39,8 @@ class BaseRow:
         self._marked_for_update = False
         return result
 
-    def __getitem__(self, key):
-        return getattr(self, key)
+    def __getitem__(self, name):
+        return getattr(self, name)
 
     def __hash__(self):
         return hash((self.rowid))
@@ -59,7 +59,7 @@ class BaseRow:
 
             truth_array.append(value in item)
         return any(truth_array)
-    
+
     def __eq__(self, value):
         return any((self[key] == value for key in self._fields))
 

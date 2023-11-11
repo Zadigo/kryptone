@@ -1,14 +1,16 @@
 import datetime
 import inspect
 import os
+import asyncio
 import sys
 from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from kryptone import logger
-from kryptone.exceptions import SpiderExistsError
 
+from kryptone import logger
+from kryptone.conf import settings
+from kryptone.exceptions import SpiderExistsError
 
 SPIDERS_MODULE = 'spiders'
 
@@ -76,22 +78,21 @@ class SpiderConfig:
         if self.spider_class is not None and self.name is not None:
             self.is_ready = True
 
-    def run(self, **kwargs):
+    def run(self, windows=1, **params):
         """Runs the spider by calling the spider class
         which in return calls "start" method on the
         spider via the __init__ method"""
         spider_instance = self.get_spider_instance()
 
         try:
-            # thread = threading.Thread(
-            #     target=spider_instance.start,
-            #     name=self.name,
-            #     kwargs=kwargs,
-            #     daemon=True
-            # )
-            # thread.start()
-            # thread.join()
-            spider_instance.start(**kwargs)
+            # This will tell the driver to open
+            # one more window in more of the one
+            # that is opened
+            if windows >= 1:
+                spider_instance.boost_start(windows=windows, **params)
+            else:
+                spider_instance.start(**params)
+            settings['ACTIVE_SPIDER'] = spider_instance
         except KeyboardInterrupt:
             spider_instance.create_dump()
             sys.exit(0)
@@ -99,19 +100,7 @@ class SpiderConfig:
             spider_instance.create_dump()
             logger.error(e)
             raise Exception(e)
-        
-    async def arun(self, **kwargs):
-        spider_instance = self.get_spider_instance()
 
-        try:
-            await spider_instance.start(**kwargs)
-        except KeyboardInterrupt:
-            await spider_instance.create_dump()
-            sys.exit(0)
-        except Exception as e:
-            await spider_instance.create_dump()
-            raise Exception(e)
-        
     def resume(self, **kwargs):
         spider_instance = self.get_spider_instance()
 

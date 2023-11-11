@@ -38,6 +38,8 @@
             "program": "../myscrap/manage.py",
             "args": [
                 "start",
+                "Accenture",
+                "--windows=2"
             ],
             "console": "integratedTerminal",
             "justMyCode": true,

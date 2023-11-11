@@ -79,9 +79,16 @@ class QuerySet:
         self.load_cache()
         return f'<{self.__class__.__name__} {self.result_cache}>'
 
-    # def __str__(self):
-    #     self.load_cache()
-    #     return str(self.result_cache)
+    def __str__(self):
+        self.load_cache()
+        return str(self.result_cache)
+
+    def __getitem__(self, index):
+        self.load_cache()
+        try:
+            return self.result_cache[index]
+        except:
+            return None
 
     def __iter__(self):
         self.load_cache()
@@ -108,6 +115,21 @@ class QuerySet:
                 descending_fields.add(field)
             else:
                 ascending_fields.add(field)
+
+        # There might a case where the result_cache
+        # is not yet loaded especially using
+        # chained statements 
+        # e.g. table.annotate().order_by()
+        # In that specific case, the QuerySet
+        # of annotate would have cache
+        # Solution 2: Delegate the execution
+        # of the final query from annotate
+        # to the query of order_by in that
+        # sense we would not execute two
+        # different queries but just one
+        # single one modified
+        self.load_cache()
+        
         previous_sql = self.query._backend.de_sqlize_statement(self.query._sql)
         ascending_statements = [
             self.query._backend.ASCENDING.format_map({'field': field})
@@ -127,9 +149,10 @@ class QuerySet:
             sql,
             table=self.query._table
         )
-        new_query.run()
+        # new_query.run()
         # return QuerySet(new_query)
-        return new_query.result_cache
+        # return new_query.result_cache
+        return QuerySet(new_query)
 
     def values(self, *fields):
         self.load_cache()
