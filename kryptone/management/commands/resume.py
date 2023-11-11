@@ -14,25 +14,18 @@ class Command(ProjectCommand):
             type=str
         )
         parser.add_argument(
-            '-a',
-            '--run-audit',
-            help='Audit the website',
-            type=bool,
-            default=False
-        )
-        parser.add_argument(
-            '-d',
-            '--debug-mode',
-            help='Run the crawler in debug mode',
-            default=False,
-            type=bool
-        )
-        parser.add_argument(
             '-l',
             '--language',
             help='Specify the website language',
             default='fr',
             type=str
+        )
+        parser.add_argument(
+            '-w',
+            '--windows',
+            type=int,
+            default=3,
+            help='Number of windows to launch for a spider'
         )
 
     def execute(self, namespace):
@@ -47,4 +40,11 @@ class Command(ProjectCommand):
 
         params = {}
         spider_config = registry.get_spider(namespace.name)
+        if namespace.windows < 0 or namespace.windows > 5:
+            raise ValueError('Number of windows should be between 2 and 5')
+
+        spider_config.run(
+            windows=namespace.windows,
+            **params
+        )
         spider_config.resume(**params)

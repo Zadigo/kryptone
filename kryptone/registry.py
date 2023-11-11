@@ -85,7 +85,10 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            if windows > 1:
+            # This will tell the driver to open
+            # one more window in more of the one
+            # that is opened
+            if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
                 spider_instance.start(**params)

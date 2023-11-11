@@ -928,7 +928,7 @@ class SiteCrawler(BaseCrawler):
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
-    def boost_start(self, start_urls=[], *, windows=3, **kwargs):
+    def boost_start(self, start_urls=[], *, windows=1, **kwargs):
         """Works just like start but opens multiple windows
         or tabs to accelerate url visitation"""
         self.before_start(start_urls, **kwargs)
