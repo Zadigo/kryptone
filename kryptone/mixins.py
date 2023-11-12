@@ -1,26 +1,20 @@
+import asyncio
 import json
 import re
-import secrets
-from kryptone.utils.functions import create_filename
-
-import string
-import time
 from collections import Counter, defaultdict, deque
-from functools import cached_property, lru_cache
-from urllib.parse import urlparse
+from functools import cached_property
 
 import requests
 from bs4 import BeautifulSoup
 from matplotlib import pyplot
-from selenium.webdriver.common.by import By
 
 from kryptone.conf import settings
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
-from kryptone.utils.iterators import drop_null, drop_while, keep_while
+from kryptone.utils.functions import create_filename
+from kryptone.utils.iterators import keep_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.text import clean_text, remove_accents, remove_punctuation, slugify
-from kryptone.utils.text import clean_dictionnary
+from kryptone.utils.text import (remove_punctuation, slugify)
 
 EMAIL_REGEX = r'\S+\@\S+'
 
@@ -163,6 +157,7 @@ class SEOMixin(TextMixin):
     website_tokens = deque()
     stemmed_tokens = deque()
     page_audits = defaultdict(dict)
+    website_word_frequency = {}
 
     @property
     def grouped_text(self):
@@ -175,8 +170,7 @@ class SEOMixin(TextMixin):
         let el = document.querySelector('meta[name="description"]')
         return el && el.attributes.content.textContent
         """
-        text = self.driver.execute_script(script)
-        return self.fit(self.validate_text(text))
+        return self.driver.execute_script(script)
 
     @property
     def get_page_title(self):
@@ -204,7 +198,7 @@ class SEOMixin(TextMixin):
         with open(path, encoding='utf-8') as f:
             content = f.read()
         return content
-
+    
     def create_word_cloud(self, frequency):
         from wordcloud import WordCloud
 
@@ -255,6 +249,7 @@ class SEOMixin(TextMixin):
 
         stemmer = SnowballStemmer('french')
         stemmed_words = [stemmer.stem(word=word) for word in tokens]
+        self.stemmed_tokens.extendleft(stemmed_words)
         return stemmed_words
 
     def audit_structure(self, audit):
@@ -380,6 +375,7 @@ class SEOMixin(TextMixin):
 
         frequency, sorted_frequencies = self.calculate_word_frequency(tokens)
         self.word_frequency_by_page[str(current_url)] = dict(frequency)
+        self.website_word_frequency.update(dict(frequency))
 
         if generate_graph:
             x_values = [x[0] for x in sorted_frequencies]
@@ -389,24 +385,18 @@ class SEOMixin(TextMixin):
         audit = {
             'date': get_current_date(),
             'title': self.get_page_title,
-            # 'title_length': self.get_text_length(self.get_page_title),
-            # 'title_is_valid': self.title_is_valid,
             'description': self.get_page_description,
-            # 'description_length': self.get_text_length(self.get_page_description),
-            # 'description_is_valid': self.description_is_valid,
             'url': str(current_url),
-            'page_content_length': len(self.get_page_text),
-            # 'status_code': None,
+            'page_content_length': len(self.get_page_text()),
             'is_https': current_url.is_secured,
-            # 'has_h1': has_head_title
         }
 
         self.audit_structure(audit)
-        self.audit_head(audit)
+        # self.audit_head(audit)
         # self.audit_structured_data(audit)
         # self.audit_images(audit)
         # self.audit_page_speed(audit)
-        # self.audit_page_status_code(audit)
+        self.audit_page_status_code(current_url, audit)
 
         self.page_audits[str(current_url)] = audit
         return audit
