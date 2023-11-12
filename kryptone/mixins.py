@@ -263,7 +263,27 @@ class SEOMixin(TextMixin):
             self.get_page_title is not None,
             self.get_page_title != ''
         ])
-        audit['has_h1'] = has_head_title
+        audit['has_title'] = has_head_title
+
+        # Check if the page has an H1 tag
+        script = """
+        const el = document.querySelector('h1')
+        return el && el.textContent
+        """
+        result = self.driver.execute_script(script)
+        audit['has_h1'] = False
+        if result is not None:
+            audit['has_h1'] = True
+            audit['h1'] = result
+        else:
+            filename = create_filename(suffix='h1')
+
+            screenshots_folder = settings.MEDIA_FOLDER / 'screenshots'
+            if not screenshots_folder.exists():
+                screenshots_folder.mkdir()
+
+            path = screenshots_folder / filename
+            self.driver.get_screenshot_as_file(path)
 
     def audit_head(self, audit):
         """Checks the head section of the
