@@ -457,9 +457,9 @@ class EmailMixin(TextMixin):
 # c = TestClass()
 # # c.start()
 
-response = requests.get('https://www.noiise.com/agences/lille/')
-s = BeautifulSoup(response.content, 'html.parser')
-r = [tag.extract() for tag in s.find_all('script')]
-m = TextMixin()
-text, tokens = m.fit_transform(text=s.text)
-print(text)
+# response = requests.get('https://www.noiise.com/agences/lille/')
+# s = BeautifulSoup(response.content, 'html.parser')
+# r = [tag.extract() for tag in s.find_all('script')]
+# m = TextMixin()
+# text, tokens = m.fit_transform(text=s.text)
+# print(text)
