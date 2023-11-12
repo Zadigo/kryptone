@@ -359,10 +359,16 @@ class SEOMixin(TextMixin):
         result = self.driver.execute_script(self.page_speed_script)
         audit['timing'] = result
 
-    def audit_page_status_code(self, audit, current_url):
-        headers = {'User-Agent': RANDOM_USER_AGENT()}
-        response = requests.get(str(current_url), headers=headers)
-        audit['status_code'] = response.status_code
+    def audit_page_status_code(self, current_url, audit):
+        async def sender():
+            headers = {'User-Agent': RANDOM_USER_AGENT()}
+            response = requests.get(str(current_url), headers=headers)
+            audit['status_code'] = response.status_code
+        
+        async def main():
+            await sender()
+
+        asyncio.run(main())
 
     def audit_page(self, current_url, generate_graph=False):
         raw_text = self.get_page_text()
