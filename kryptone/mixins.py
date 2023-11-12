@@ -145,11 +145,13 @@ class TextMixin:
             tokens = self._remove_stop_words_multipass(tokens)
         else:
             tokens = self._remove_stop_words(tokens, language=language)
-        # tokens = (token for token in tokens if token != '')
+
         lowered_tokens = list((token.lower() for token in tokens))
-        self.fitted_page_documents.append(lowered_tokens)
-        tokens = self.run_processors(tokens)
-        return ' '.join(lowered_tokens).strip()
+        lowered_tokens = self.run_processors(lowered_tokens)
+
+        final_text = ' '.join(lowered_tokens).strip()
+        self.fitted_page_documents.extend([final_text])
+        return final_text
 
 
 class SEOMixin(TextMixin):
