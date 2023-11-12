@@ -745,7 +745,7 @@ class SiteCrawler(BaseCrawler):
         self.visited_urls = set(data['visited_urls'])
 
         try:
-            previous_seen_urls = read_csv_document(
+            previous_seen_urls = file_readers.read_csv_document(
                 'seen_urls.csv',
                 flatten=True
             )
@@ -1061,7 +1061,10 @@ class SiteCrawler(BaseCrawler):
 
                 if self._meta.crawl:
                     self.calculate_performance()
-                    write_json_document('performance.json', self.statistics)
+                    file_readers.write_json_document(
+                        'performance.json', 
+                        self.statistics
+                    )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
