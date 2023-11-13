@@ -13,6 +13,7 @@ from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.functions import create_filename
 from kryptone.utils.iterators import keep_while
+from kryptone.utils.text import clean_text
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import (remove_punctuation, slugify)
 
@@ -269,7 +270,7 @@ class SEOMixin(TextMixin):
         audit['has_h1'] = False
         if result is not None:
             audit['has_h1'] = True
-            audit['h1'] = result
+            audit['h1'] = clean_text(result)
         else:
             filename = create_filename(suffix='h1')
 
@@ -357,8 +358,14 @@ class SEOMixin(TextMixin):
     def audit_page_status_code(self, current_url, audit):
         async def sender():
             headers = {'User-Agent': RANDOM_USER_AGENT()}
-            response = requests.get(str(current_url), headers=headers)
-            audit['status_code'] = response.status_code
+            try:
+                response = requests.get(str(current_url), headers=headers)
+            except:
+                # If we get an error when trying to send
+                # the request, just put status code 0
+                audit['status_code'] = 0
+            else:
+                audit['status_code'] = response.status_code
         
         async def main():
             await sender()

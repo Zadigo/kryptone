@@ -654,6 +654,10 @@ class SiteCrawler(BaseCrawler):
         )
         self.statistics = {}
 
+        self.cached_json_items = []
+        self.current_item_iterator = 0
+        self.enrichment_mode = False
+
     def __del__(self):
         try:
             self.driver.quit()
@@ -805,6 +809,26 @@ class SiteCrawler(BaseCrawler):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
+    def start_from_json(self, windows=0, **kwargs):
+        """Enrich a JSON document that with additional
+        data by """
+        try:
+            self.cached_json_items = file_readers.read_json_document('start_urls.json')
+        except:
+            logger.error("'start_urls.json' file not found")
+        
+        try:
+            urls = [item['url'] for item in self.cached_json_items]
+        except KeyError:
+            logger.error("JSON file should have an url field")
+        else:
+            self.enrichment_mode = True
+
+            if windows >= 1:
+                self.boost_start(start_urls=urls, windows=windows, **kwargs)
+            else:
+                self.start(start_urls=urls, **kwargs)
+
     def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
 
@@ -877,10 +901,17 @@ class SiteCrawler(BaseCrawler):
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
+            run_action_params = {}
+
             try:
+                if self.enrichment_mode:
+                    current_json_object = self.cached_json_items[self.current_item_iterator]
+                    run_action_params.update({'current_json_object': current_json_object})
+                    self.current_item_iterator = self.current_item_iterator + 1
+
                 # Run custom user actions once
                 # everything is completed
-                self.run_actions(url_instance)
+                self.run_actions(url_instance, **run_action_params)
             except TypeError as e:
                 logger.error(e)
                 raise TypeError(
