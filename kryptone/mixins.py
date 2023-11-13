@@ -1,39 +1,35 @@
+import asyncio
 import json
 import re
-import secrets
-import string
-from collections import Counter, defaultdict
-from functools import cached_property, lru_cache
-from urllib.parse import urlparse
+from collections import Counter, defaultdict, deque
+from functools import cached_property
 
+import requests
 from bs4 import BeautifulSoup
-from selenium.webdriver.common.by import By
+from matplotlib import pyplot
 
 from kryptone.conf import settings
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
-from kryptone.utils.iterators import drop_null, drop_while, keep_while
+from kryptone.utils.functions import create_filename
+from kryptone.utils.iterators import keep_while
+from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.text import (remove_punctuation, slugify)
 
 EMAIL_REGEX = r'\S+\@\S+'
 
 
-class TextMixin:
-    """A mixin for analyzing text"""
+def long_text_processor(tokens):
+    for token in tokens:
+        if len(token) <= 30:
+            return True
+        return False
 
+
+class TextMixin:
     page_documents = []
     fitted_page_documents = []
-
-    @cached_property
-    def stop_words_english(self):
-        global_path = settings.GLOBAL_KRYPTONE_PATH
-        filename = global_path / 'data/stop_words_english.txt'
-        return read_document(filename, as_list=True)
-
-    @cached_property
-    def stop_words_french(self):
-        global_path = settings.GLOBAL_KRYPTONE_PATH
-        filename = global_path / 'data/stop_words_french.txt'
-        return read_document(filename, as_list=True)
+    text_processors = [long_text_processor]
 
     @cached_property
     def stop_words_html(self):
@@ -41,192 +37,140 @@ class TextMixin:
         filename = global_path / 'data/html_tags.txt'
         return read_document(filename, as_list=True)
 
-    @lru_cache(maxsize=10)
+    @staticmethod
+    def tokenize(text):
+        return text.split(' ')
+    
     def stop_words(self, language='en'):
-        natural_language_stop_words = self.stop_words_english if language == 'en' else self.stop_words_french
-        data = natural_language_stop_words + self.stop_words_html
-        return list(drop_null(data))
+        global_path = settings.GLOBAL_KRYPTONE_PATH
+        if language == 'en':
+            file_language = 'english'
+        elif language == 'fr':
+            file_language = 'french'
+        filename = global_path / f'data/stop_words_{file_language}.txt'
+        return read_document(filename, as_list=True)
 
-        # regular_language_stop_words = read_document(path)
-        # html_names_stop_words = read_document(
-        #     global_path / 'data/html_tags.txt'
-        # )
-        # data = regular_language_stop_words.split('\n')
-        # data.extend(html_names_stop_words.split('\n'))
-        # return list(drop_null(data))
-
-        # from sklearn.feature_extraction.text import TfidfVectorizer
-        # tokenizer = TfidfVectorizer().build_tokenizer()
-        # tokenized_stop_words = [tokenizer(word) for word in data]
-        # return list(itertools.chain(*tokenized_stop_words))
-
-    @staticmethod
-    def get_text_length(text):
-        """Get the length of the
-        incoming text"""
-        if text is None:
-            return 0
-        return len(text)
-
-    @property
-    def _fitted_text_tokens(self):
-        result = ' '.join(self.fitted_page_documents)
-        return result.split(' ')
-
-    @staticmethod
-    def _tokenize(text):
-        tokens = text.split(' ')
-        return list(drop_null(tokens))
-
-    @staticmethod
-    def simple_clean_text(text, encoding='utf-8'):
-        """Applies simple cleaning techniques on the
-        text by removing newlines, lowering the characters
-        and removing extra spaces"""
-        lowered_text = str(text).lower().strip()
-        text = lowered_text.encode(encoding).decode(encoding)
-        normalized_text = text.replace('\n', ' ')
-        return normalized_text.strip()
-
-    def _remove_punctuation(self, text):
-        # We should not replace the "@" in the document since
-        # this could affect email extraction
-        punctuation = string.punctuation.replace('@', '')
-        return text.translate(str.maketrans('', '', punctuation))
-
-    def _remove_stop_words(self, text, language='en'):
-        """Removes all stop words from a given document"""
-        tokens = self._tokenize(text)
-        stop_words = self.stop_words(language=language)
-        result = drop_while(lambda x: x in stop_words, tokens)
-        return ' '.join(result)
-
-    def _remove_stop_words_multipass(self, text):
-        """Remove stop words from a given document
-        against both french and english language"""
-        tokens = self._tokenize(text)
-
-        stop_words = self.stop_words_english + \
-            self.stop_words_french + self.stop_words_html
-        result = drop_while(lambda x: x in stop_words, tokens)
-        return ' '.join(result)
-
-    def _common_words(self, text):
-        tokens = self._tokenize(text)
+    def _common_words(self, tokens):
         counter = Counter(tokens)
         return counter.most_common()[1:5]
 
-    def _rare_words(self, text):
-        tokens = self._tokenize(text)
+    def _rare_words(self, tokens):
         counter = Counter(tokens)
         return counter.most_common()[:-5:-1]
 
-    def _run_processors(self, tokens, processors):
-        if processors:
-            new_tokens = []
-            for processor in processors:
-                if not callable(processor):
-                    continue
+    def _remove_stop_words(self, tokens, language='en'):
+        """Removes all stop words from a given document"""
+        stop_words = self.stop_words(language=language)
+        return list((token for token in tokens if token not in stop_words))
 
-                for token in tokens:
-                    result = processor(token)
-                    # Processors should return a boolean.
-                    # On fail, just return the token as is
-                    if not isinstance(result, bool):
-                       new_tokens.append(token)
+    def _remove_stop_words_multipass(self, tokens):
+        """Remove stop words from a given document
+        against both french and english language, and,
+        html tags that can pollute a document"""
+        english_stop_words = self.stop_words(language='en')
+        french_stop_words = self.stop_words(language='fr')
+        html_stop_words = self.stop_words_html
 
-                    if result:
-                        new_tokens.append(token)
-        else:
-            return tokens
+        stop_words = english_stop_words + french_stop_words + html_stop_words
+        return list((token for token in tokens if token not in stop_words))
 
-    def normalize_spaces(self, text):
-        return ' '.join(self._tokenize(text))
-    
-    def validate_text(self, text):
-        if text is None:
-            return ''
-        return text
+    def get_page_text(self):
+        """Returns a raw extraction of 
+        the document's text"""
+        script = """
+        return document.body.outerHTML
+        """
+        html = self.driver.execute_script(script)
+        soup = BeautifulSoup(html, 'html.parser')
+        script_tags = [tag.extract() for tag in soup.find_all('script')]
+        # return self.fit(soup.text)
+        return soup.text
 
-    def fit(self, text):
+    def run_processors(self, tokens):
+        result = []
+        for processor in self.text_processors:
+            if not callable(processor):
+                continue
+            if result:
+                result = list(filter(processor, result))
+            else:
+                result = list(filter(processor, tokens))
+        return result
+
+    def fit_transform(self, text, language='en', email_exception=False):
+        text = self.fit(
+            text,
+            language=language,
+            email_exception=email_exception
+        )
+
+        tokens = text.split(' ')
+        clean_tokens = list((
+            token for token in tokens
+            if token not in self.stop_words(language='fr'))
+        )
+        text = ' '.join(clean_tokens)
+        return text, clean_tokens
+
+    def fit(self, raw_text, email_exception=False, use_multipass=False, language='en'):
         """Normalize the document by removing newlines,
         useless spaces, special characters, punctuations 
         and null values. The fit method fits the text 
-        before running in depth text transformation"""
-        if text is None:
+        before running in depth transformation"""
+        if raw_text is None:
             return None
 
-        text = re.sub('\W', ' ', text)
-        normalized_text = self.simple_clean_text(text)
-        final_text = self.normalize_spaces(
-            self._remove_punctuation(normalized_text)
-        )
-        self.page_documents.append(final_text)
-        return final_text
+        from nltk.tokenize import LineTokenizer, SpaceTokenizer
 
-    def fit_transform(self, text=None, language='en', use_multipass=False, text_processors=[]):
-        """Fit a document and then transform it into
-        a usable element for text analysis"""
-        fitted_text = self.fit(text)
-        if fitted_text is not None:
-            self.page_documents.append(fitted_text)
+        tokenizer = LineTokenizer()
+        tokens = tokenizer.tokenize(raw_text)
 
-        from nltk.stem import PorterStemmer
-        from nltk.stem.snowball import SnowballStemmer
+        text = ' '.join(tokens)
+        no_punctuation_text = remove_punctuation(
+            text, email_exception=email_exception)
 
-        if language == 'en':
-            stemmer = SnowballStemmer('english')
-        elif language == 'fr':
-            stemmer = SnowballStemmer('french')
+        tokenizer = SpaceTokenizer()
+        tokens = tokenizer.tokenize(no_punctuation_text)
+
+        # If a text can contain both english
+        # and french, use the multipass to
+        # remove both fr/en stop words
+        if use_multipass:
+            tokens = self._remove_stop_words_multipass(tokens)
         else:
-            stemmer = SnowballStemmer('english')
+            tokens = self._remove_stop_words(tokens, language=language)
 
-        for document in self.page_documents:
-            # 1. Remove stop words
-            if use_multipass:
-                result1 = self._remove_stop_words_multipass(document)
-            else:
-                result1 = self._remove_stop_words(document, language=language)
+        lowered_tokens = list((token.lower() for token in tokens))
+        lowered_tokens = self.run_processors(lowered_tokens)
 
-            # 2. Remove special carachters
-            # result2 = re.sub('\W', ' ', result1)
-
-            # 3. Remove rare and common words
-            rare_words = self._rare_words(result1)
-            common_words = self._common_words(result1)
-
-            words_to_remove = rare_words + common_words
-            words_to_remove = list(map(lambda x: list(x)[0], words_to_remove))
-
-            tokenized_text = self._tokenize(result1)
-            simplified_text = list(drop_while(
-                lambda x: x in words_to_remove,
-                tokenized_text
-            ))
-
-            # 4. Run custom text processors
-            simplified_text = self._run_processors(
-                simplified_text, text_processors
-            )
-
-            # 5. Use stemmer
-            stemmed_words = [
-                stemmer.stem(word=word)
-                for word in simplified_text
-            ]
-            result3 = ' '.join(stemmed_words)
-
-            self.fitted_page_documents.append(result3)
-        return self.fitted_page_documents
+        final_text = ' '.join(lowered_tokens).strip()
+        self.fitted_page_documents.extend([final_text])
+        return final_text
 
 
 class SEOMixin(TextMixin):
     """A mixin for auditing a web page"""
 
-    raw_texts = []
-    error_pages = set()
+    word_frequency_by_page = {}
     text_by_page = defaultdict(str)
+    text_tokens_by_page = defaultdict(list)
+    website_tokens = deque()
+    stemmed_tokens = deque()
     page_audits = defaultdict(dict)
+    website_word_frequency = {}
+
+    @property
+    def grouped_text(self):
+        """Returns the body's text, description text
+        and keyword text of an HTML document"""
+
+    @property
+    def get_page_description(self):
+        script = """
+        let el = document.querySelector('meta[name="description"]')
+        return el && el.attributes.content.textContent
+        """
+        return self.driver.execute_script(script)
 
     @property
     def get_page_title(self):
@@ -238,27 +182,6 @@ class SEOMixin(TextMixin):
         return self.fit(text)
 
     @property
-    def get_page_description(self):
-        script = """
-        let el = document.querySelector('meta[name="description"]')
-        return el && el.attributes.content.textContent
-        """
-        text = self.driver.execute_script(script)
-        return self.fit(self.validate_text(text))
-
-    @property
-    def get_page_text(self):
-        """Returns a fitted and transformed
-        version of the document's text"""
-        script = """
-        return document.body.outerHTML
-        """
-        html = self.driver.execute_script(script)
-        soup = BeautifulSoup(html, 'html.parser')
-        script_tags = [tag.extract() for tag in soup.find_all('script')]
-        return self.fit(soup.text)
-    
-    @property
     def get_page_keywords(self):
         script = """
         let el = document.querySelector('[name="keywords"]')
@@ -267,48 +190,6 @@ class SEOMixin(TextMixin):
         text = self.driver.execute_script(script)
         return self.fit(self.validate_text(text))
 
-    @property
-    def has_head_title(self):
-        return all([
-            self.get_page_title is not None,
-            self.get_page_title != ''
-        ])
-
-    @property
-    def title_is_valid(self):
-        page_title = self.get_page_title
-        if page_title is None:
-            return False
-        return len(page_title) <= 60
-
-    @property
-    def description_is_valid(self):
-        page_description = self.get_page_description
-        if page_description is None:
-            return False
-        return len(page_description) <= 150
-
-    
-    @property
-    def get_grouped_text(self):
-        """Returns a fitted and transformed version
-        of the document's text including keywords
-        and description"""
-        body_text = self.get_page_text
-        description = self.get_page_description
-        keywords = self.get_page_keywords
-        return ' '.join([body_text, description, keywords])
-
-    @staticmethod
-    def normalize_integers(items):
-        # The vectorizer returns int32 integers
-        # which crashes the JSON output. Convert
-        # these integers to normal ones.
-        new_item = {}
-        for key, value in items.items():
-            new_item[key] = int(value)
-        return new_item
-        
     @cached_property
     def page_speed_script(self):
         path = settings.GLOBAL_KRYPTONE_PATH.joinpath(
@@ -318,21 +199,102 @@ class SEOMixin(TextMixin):
             content = f.read()
         return content
     
-    def get_page_speed(self, audit):
-        result = self.driver.execute_script(self.page_speed_script)
-        audit['timing'] = result
+    def create_word_cloud(self, frequency):
+        from wordcloud import WordCloud
 
-    def get_page_status_code(self):
-        pass
+        page_title = self.get_page_title
+        wordcloud = WordCloud()
+        wordcloud.generate_from_frequencies(frequency)
 
-    def get_internal_urls(self, audit):
+        fig = pyplot.figure(figsize=[10, 10])
+        pyplot.imshow(wordcloud)
+        pyplot.axis('off')
+        fig.savefig(f'{slugify(page_title)}')
+
+    def create_graph(self, current_url, x_values, y_values):
+        page_title = self.get_page_title
+        fig = pyplot.figure()
+        fig, axes = pyplot.subplots(figsize=[15, 6])
+        axes.set_xlabel('Words')
+        axes.set_ylabel('Count')
+        axes.set_title(f"Words for {page_title}")
+        axes.tick_params(which='major', width=1.00, length=5)
+        # axes.text(20, 35, 'Some text')
+        # axes.annotate('Something', xy=[30, 40], xytext=[14, 31], arrowprops={
+        #               'facecolor': 'black', 'shrink': 0.05})
+        # axes.set_xticks([0, 30, 70, 100])
+        axes.legend()
+        # axes.plot(x, y, 'o', label='words')
+        axes.bar(x_values, y_values, color='b')
+        fig.savefig(f'{slugify(page_title)}')
+
+    def calculate_word_frequency(self, tokens):
+        from nltk import FreqDist
+
+        frequency = FreqDist(tokens)
+
+        # Return only the values (text) for the
+        # n-words which are most present in the
+        # current document
+        frequency_values = list(frequency.items())
+        sorted_frequency = sorted(
+            frequency_values,
+            key=lambda x: x[1],
+            reverse=True
+        )[0:10]
+        return frequency, sorted_frequency
+
+    def create_stemmed_words(self, tokens):
+        from nltk.stem import SnowballStemmer
+
+        stemmer = SnowballStemmer('french')
+        stemmed_words = [stemmer.stem(word=word) for word in tokens]
+        self.stemmed_tokens.extendleft(stemmed_words)
+        return stemmed_words
+
+    def audit_structure(self, audit):
+        """Audits the structural design of the page"""
+        has_head_title = all([
+            self.get_page_title is not None,
+            self.get_page_title != ''
+        ])
+        audit['has_title'] = has_head_title
+
+        # Check if the page has an H1 tag
         script = """
-        return Array.from(document.querySelectorAll('a')).map(x => x.href).filter(x => x !== "")
+        const el = document.querySelector('h1')
+        return el && el.textContent
         """
-        urls = self.driver.execute_script(script)
-        filtered_urls = filter(lambda x: urlparse(x).netloc == self._start_url_object.netloc, urls)
-        audit['internal_urls'] = len(list(filtered_urls))
-    
+        result = self.driver.execute_script(script)
+        audit['has_h1'] = False
+        if result is not None:
+            audit['has_h1'] = True
+            audit['h1'] = result
+        else:
+            filename = create_filename(suffix='h1')
+
+            screenshots_folder = settings.MEDIA_FOLDER / 'screenshots'
+            if not screenshots_folder.exists():
+                screenshots_folder.mkdir()
+
+            path = screenshots_folder / filename
+            self.driver.get_screenshot_as_file(path)
+
+    def audit_head(self, audit):
+        """Checks the head section of the
+        given page"""
+        page_title = self.get_page_title
+        audit['title_is_valid'] = False
+        if page_title is None:
+            audit['title_length'] = len(page_title)
+            audit['title_is_valid'] = len(page_title) <= 60
+
+        page_description = self.get_page_description
+        audit['description_is_valid'] = False
+        if page_description is None:
+            audit['description_length'] = len(page_description)
+            audit['description_is_valid'] = len(page_description) <= 150
+
     def audit_images(self, audit):
         """Checks that the images of the current
         page has ALT attributes to them"""
@@ -363,7 +325,7 @@ class SEOMixin(TextMixin):
             audit['pct_images_with_no_alt'] = 0
             audit['image_alts'] = []
             return 0, set()
-    
+
     def audit_structured_data(self, audit):
         """
         Checks if the website has structured data
@@ -388,77 +350,59 @@ class SEOMixin(TextMixin):
         audit['structured_data_type'] = structured_data_type
         return has_structured_data, structured_data_type
 
-    def vectorize_documents(self):
-        from sklearn.feature_extraction.text import CountVectorizer
-        vectorizer = CountVectorizer()
-        matrix = vectorizer.fit_transform(self.fitted_page_documents)
-        return matrix, vectorizer
+    def audit_page_speed(self, audit):
+        result = self.driver.execute_script(self.page_speed_script)
+        audit['timing'] = result
 
-    def vectorize_page(self, text):
-        from sklearn.feature_extraction.text import CountVectorizer
-        vectorizer = CountVectorizer()
-        self.raw_texts.append(text)
-        transformed_text = self.fit_transform(
-            text=text, 
-            language=settings.WEBSITE_LANGUAGE
-        )
-        matrix = vectorizer.fit_transform(transformed_text)
-        return matrix, vectorizer
+    def audit_page_status_code(self, current_url, audit):
+        async def sender():
+            headers = {'User-Agent': RANDOM_USER_AGENT()}
+            response = requests.get(str(current_url), headers=headers)
+            audit['status_code'] = response.status_code
+        
+        async def main():
+            await sender()
 
-    def global_audit(self):
-        """Returns the global audit for the website"""
-        # TODO:
-        _, vectorizer = self.vectorize_documents()
-        vocabulary = vectorizer.vocabulary_
-        return self.normalize_integers(vocabulary)
+        asyncio.run(main())
 
-    def audit_page(self, current_url):
-        """Audit the current page by analyzing different
-        key metrics from the title, the description etc."""  
-        grouped_text = self.get_grouped_text
-        self.text_by_page[str(current_url)] = grouped_text
+    def audit_page(self, current_url, generate_graph=False):
+        raw_text = self.get_page_text()
+        text, tokens = self.fit_transform(raw_text)
+        self.website_tokens.extendleft(tokens)
 
-        matrix, vectorizer = self.vectorize_page(grouped_text)
-        vocabulary = self.normalize_integers(vectorizer.vocabulary_)
+        self.text_by_page[str(current_url)] = text
+        self.text_tokens_by_page[str(current_url)] = tokens
 
-        script = """
-        let el = document.querySelector('h1')
-        return el && el !== null
-        """
-        has_head_title = self.driver.execute_script(script)
+        frequency, sorted_frequencies = self.calculate_word_frequency(tokens)
+        self.word_frequency_by_page[str(current_url)] = dict(frequency)
+        self.website_word_frequency.update(dict(frequency))
 
-        if not has_head_title:
-            self.driver.save_screenshot(f'media/no_h1_{secrets.token_hex(nbytes=5)}.png')
+        if generate_graph:
+            x_values = [x[0] for x in sorted_frequencies]
+            y_values = [x[1] for x in sorted_frequencies]
+            self.create_graph(current_url, x_values, y_values)
 
         audit = {
             'date': get_current_date(),
             'title': self.get_page_title,
-            'title_length': self.get_text_length(self.get_page_title),
-            'title_is_valid': self.title_is_valid,
             'description': self.get_page_description,
-            'description_length': self.get_text_length(self.get_page_description),
-            'description_is_valid': self.description_is_valid,
             'url': str(current_url),
-            'page_content_length': len(self.get_page_text),
-            # 'word_count_analysis': vocabulary,
-            'status_code': None,
+            'page_content_length': len(self.get_page_text()),
             'is_https': current_url.is_secured,
-            'has_h1': has_head_title
         }
-        
-        self.audit_structured_data(audit)
-        self.audit_images(audit)
-        self.get_page_speed(audit)
-        self.get_internal_urls(audit)
+
+        self.audit_structure(audit)
+        # self.audit_head(audit)
+        # self.audit_structured_data(audit)
+        # self.audit_images(audit)
+        # self.audit_page_speed(audit)
+        self.audit_page_status_code(current_url, audit)
 
         self.page_audits[str(current_url)] = audit
         return audit
 
 
 class EmailMixin(TextMixin):
-    """A mixin for extracting emails
-    from a given page"""
-
     emails_container = set()
 
     @staticmethod
@@ -502,14 +446,38 @@ class EmailMixin(TextMixin):
         valid_items = list(filter(validate_values, unvalidated_emails))
         self.emails_container = self.emails_container.union(valid_items)
 
-    def find_emails_from_text(self, text):
+    def find_emails_from_text(self):
         """Return emails embedded in plain text"""
-        fitted_text = self.fit(text)
-        emails_from_text = map(self.identify_email,
-                               self._tokenize(fitted_text))
+        text = self.fit_transform(self.get_page_text(), email_exception=True)
+        emails_from_text = map(
+            self.identify_email,
+            text.split(' ')
+        )
         return set(emails_from_text)
 
     def find_emails_from_links(self, elements):
         """Return emails present in links"""
         emails_from_urls = map(self.parse_url, elements)
         return set(emails_from_urls)
+
+
+# class TestClass(TextMixin):
+#     def __init__(self):
+#         self.driver = None
+
+#     def start(self):
+#         self.driver = get_selenium_browser_instance(browser_name='Edge')
+#         self.driver.get('https://www.noiise.com/agences/lille/')
+#         print(self.fit_transform())
+#         time.sleep(10)
+
+
+# c = TestClass()
+# # c.start()
+
+# response = requests.get('https://www.noiise.com/agences/lille/')
+# s = BeautifulSoup(response.content, 'html.parser')
+# r = [tag.extract() for tag in s.find_all('script')]
+# m = TextMixin()
+# text, tokens = m.fit_transform(text=s.text)
+# print(text)

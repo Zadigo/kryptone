@@ -14,8 +14,6 @@ from kryptone.exceptions import SpiderExistsError
 
 SPIDERS_MODULE = 'spiders'
 
-AUTOMATERS_MODULE = 'automaters'
-
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
 
@@ -29,9 +27,7 @@ class SpiderConfig:
         self.name = name
         self.dotted_path = None
         self.registry = None
-        self.initial_start_urls = []
         self.spider_class = getattr(spiders_module, name, None)
-        self.is_automater = False
 
         self.MODULE = spiders_module
 

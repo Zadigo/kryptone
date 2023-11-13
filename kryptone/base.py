@@ -25,11 +25,8 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
 from kryptone.db.tables import Database
+from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
-                                         read_json_document,
-                                         write_csv_document,
-                                         write_json_document)
 from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
@@ -272,7 +269,7 @@ class BaseCrawler(metaclass=Crawler):
                 'urls_to_visit': list(self.urls_to_visit),
                 'visited_urls': list(self.visited_urls)
             }
-            write_json_document(
+            file_readers.write_json_document(
                 f'{settings.CACHE_FILE_NAME}.json',
                 urls_data
             )
@@ -281,7 +278,7 @@ class BaseCrawler(metaclass=Crawler):
             sorted_urls = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
-            write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+            file_readers.write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
 
         
         async def main():
@@ -695,7 +692,7 @@ class SiteCrawler(BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
-            if isinstance(start_urls, (LoadStartUrls)):
+            if isinstance(start_urls, (file_readers.LoadStartUrls)):
                 start_urls = list(start_urls)
             self.list_of_seen_urls.update(*start_urls)
             self.start_url = start_urls.pop()
@@ -736,9 +733,9 @@ class SiteCrawler(BaseCrawler):
         #     else:
         #         data = read_json_document('cache.json')
         try:
-            data = read_json_document('cache.json')
+            data = file_readers.read_json_document('cache.json')
         except FileNotFoundError:
-            write_json_document('cache.json', [])
+            file_readers.write_json_document('cache.json', [])
 
         # Before reloading the urls, run the filters
         # in case previous urls to exclude were
@@ -748,17 +745,18 @@ class SiteCrawler(BaseCrawler):
         self.visited_urls = set(data['visited_urls'])
 
         try:
-            previous_seen_urls = read_csv_document(
+            previous_seen_urls = file_readers.read_csv_document(
                 'seen_urls.csv',
                 flatten=True
             )
         except FileNotFoundError:
-            write_csv_document('seen_urls.csv', [])
+            file_readers.write_csv_document('seen_urls.csv', [])
         else:
             self.list_of_seen_urls = set(previous_seen_urls)
 
         try:
-            previous_statistics = read_json_document('performance.json')
+            previous_statistics = file_readers.read_json_document(
+                'performance.json')
         except:
             pass
         else:
@@ -916,7 +914,10 @@ class SiteCrawler(BaseCrawler):
 
             if self._meta.crawl:
                 self.calculate_performance()
-                write_json_document('performance.json', self.statistics)
+                file_readers.write_json_document(
+                    'performance.json',
+                    self.statistics
+                )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
@@ -1060,7 +1061,10 @@ class SiteCrawler(BaseCrawler):
 
                 if self._meta.crawl:
                     self.calculate_performance()
-                    write_json_document('performance.json', self.statistics)
+                    file_readers.write_json_document(
+                        'performance.json', 
+                        self.statistics
+                    )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
