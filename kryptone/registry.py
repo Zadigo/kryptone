@@ -118,9 +118,6 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            # This will tell the driver to open
-            # one more window in more of the one
-            # that is opened
             settings['ACTIVE_SPIDER'] = spider_instance
             spider_instance.start_from_json(windows=windows, **params)
         except KeyboardInterrupt:
