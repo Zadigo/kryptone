@@ -141,8 +141,10 @@ class LoadStartUrls:
     The filename should be provided without
     the file extension"""
 
-    def __init__(self, filename='start_urls'):
-        self.filename = f'{filename}.csv'
+    def __init__(self, filename='start_urls', is_json=False):
+        self.is_json = is_json
+        extension = 'json' if self.is_json else 'csv'
+        self.filename = f'{filename}.{extension}'
 
     def __iter__(self):
         for url in self.content:
@@ -150,8 +152,11 @@ class LoadStartUrls:
 
     @cached_property
     def content(self):
-        with open(self.filename, mode='r', encoding='utf-8') as f:
-            # if self.filename.endswith('.json'):
-            #     return set(json.load(f))
-            # elif self.filename.endswith('.csv'):
-            return set(list(itertools.chain(*csv.reader(f))))
+        if self.is_json:
+            with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
+                data = json.load(f)
+                return list(set(item['url'] for item in data))
+        else:
+            with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
+                data = set(list(itertools.chain(*csv.reader(f))))
+                return data

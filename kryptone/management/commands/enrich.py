@@ -44,10 +44,7 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        params = {
-            'start_urls': namespace.start_urls,
-            'language': namespace.language,
-        }
+        params = {'language': namespace.language}
 
         spider_config = registry.get_spider(namespace.name)
         if namespace.windows < 0 or namespace.windows > 5:

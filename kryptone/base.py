@@ -27,6 +27,7 @@ from kryptone.conf import settings
 from kryptone.db.tables import Database
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
+from kryptone.utils.file_readers import LoadStartUrls
 from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
@@ -654,8 +655,7 @@ class SiteCrawler(BaseCrawler):
         )
         self.statistics = {}
 
-        self.cached_json_items = []
-        self.current_item_iterator = 0
+        self.cached_json_items = None
         self.enrichment_mode = False
 
     def __del__(self):
@@ -698,6 +698,7 @@ class SiteCrawler(BaseCrawler):
         if self.start_url is None and start_urls:
             if isinstance(start_urls, (file_readers.LoadStartUrls)):
                 start_urls = list(start_urls)
+
             self.list_of_seen_urls.update(*start_urls)
             self.start_url = start_urls.pop()
         self._start_url_object = urlparse(self.start_url)
@@ -812,22 +813,19 @@ class SiteCrawler(BaseCrawler):
     def start_from_json(self, windows=0, **kwargs):
         """Enrich a JSON document that with additional
         data by """
-        try:
-            self.cached_json_items = file_readers.read_json_document('start_urls.json')
-        except:
-            logger.error("'start_urls.json' file not found")
-        
-        try:
-            urls = [item['url'] for item in self.cached_json_items]
-        except KeyError:
-            logger.error("JSON file should have an url field")
-        else:
-            self.enrichment_mode = True
+        if not isinstance(self._meta.start_urls, LoadStartUrls):
+            raise ValueError("start_urls should be an instance of LoadStartUrls")
 
-            if windows >= 1:
-                self.boost_start(start_urls=urls, windows=windows, **kwargs)
-            else:
-                self.start(start_urls=urls, **kwargs)
+        # Preload the content to fill
+        # the cache
+        self.cached_json_items = pandas.read_json(settings.PROJECT_PATH / 'start_urls.json')
+        self._meta.crawl = False
+        self.enrichment_mode = True
+
+        if windows >= 1:
+            self.boost_start(windows=windows, **kwargs)
+        else:
+            self.start(**kwargs)
 
     def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
@@ -905,9 +903,8 @@ class SiteCrawler(BaseCrawler):
 
             try:
                 if self.enrichment_mode:
-                    current_json_object = self.cached_json_items[self.current_item_iterator]
+                    current_json_object = self.cached_json_items[self.cached_json_items['url'] == current_url]
                     run_action_params.update({'current_json_object': current_json_object})
-                    self.current_item_iterator = self.current_item_iterator + 1
 
                 # Run custom user actions once
                 # everything is completed
