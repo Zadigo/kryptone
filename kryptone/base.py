@@ -761,7 +761,8 @@ class SiteCrawler(BaseCrawler):
 
         try:
             previous_statistics = file_readers.read_json_document(
-                'performance.json')
+                'performance.json'
+            )
         except:
             pass
         else:

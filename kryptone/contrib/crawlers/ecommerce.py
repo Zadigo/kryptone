@@ -31,6 +31,7 @@ class EcommerceCrawlerMixin:
     model = Product
     found_products_counter = 0
     product_pages = set()
+    current_product_file_path = None
 
     def calculate_performance(self):
         super().calculate_performance()
@@ -76,26 +77,12 @@ class EcommerceCrawlerMixin:
         """
         if 'date' not in data:
             data['date'] = datetime.datetime.now(tz=pytz.UTC)
-        # Before writing new products, ensure that we have previous
-        # products from a previous scrap and if so, load the previous
-        # products. This would prevent overwriting the previous file
-        if not self.products:
-            products_file = pathlib.Path(
-                settings.PROJECT_PATH / 'products.json'
-            )
 
-            previous_products_data = []
-            if not products_file.exists():
-                write_json_document('products.json', [])
-            else:
-                previous_products_data = read_json_document('products.json')
-                self.products = previous_products_data
-
-            self.product_objects = list(
-                map(lambda x: self.model(**x),
-                    previous_products_data))
-            message = f"Loaded {len(self.products)} products from 'products.json'"
-            logger.info(message)
+        if self.current_product_file_path is None:
+            filename = f'products_{create_filename()}.json'
+            self.current_product_file_path = settings.MEDIA_FOLDER / filename 
+            if not self.current_product_file_path.exists():
+                write_json_document(self.current_product_file_path, [])
 
         new_product = self.add_product(
             data,
@@ -103,7 +90,7 @@ class EcommerceCrawlerMixin:
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
         )
-        write_json_document('products.json', self.products)
+        write_json_document(self.current_file_name, self.products)
         return new_product
 
     def bulk_save_products(self, data, collection_id_regex=None):
