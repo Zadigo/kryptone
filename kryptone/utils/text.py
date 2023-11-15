@@ -141,4 +141,5 @@ def slugify(text):
     """
     if not isinstance(text, str):
         raise ValueError(f'Value should be a text. Got: {type(text)}')
-    return text.replace(' ', '-').lower()
+    text = text.replace(' ', '-').lower()
+    return remove_accents(text)
