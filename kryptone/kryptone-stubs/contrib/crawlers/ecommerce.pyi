@@ -1,3 +1,4 @@
+import pathlib
 from typing import Any, List, Literal, Tuple
 
 from kryptone.contrib.models import Product
@@ -14,6 +15,7 @@ class EcommerceCrawlerMixin:
     model: Product = ...
     found_products_counter: int = ...
     product_pages: set = ...
+    current_product_file_path: pathlib.Path = ...
 
     def calculate_performance(self) -> None: ...
 
@@ -51,6 +53,8 @@ class EcommerceCrawlerMixin:
     def capture_product_page(
         self,
         current_url: URL,
+        *,
+        product: Product = ...,
         element_class: str = ...,
         element_id: str = ...,
         prefix: str = ...,
