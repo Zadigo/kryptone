@@ -15,7 +15,7 @@ from kryptone.utils.file_readers import (get_media_folder, read_json_document,
                                          write_json_document)
 from kryptone.utils.functions import create_filename
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.text import clean_dictionnary
+from kryptone.utils.text import clean_dictionnary, slugify
 
 TEMPORARY_PRODUCT_CACHE = set()
 
@@ -90,7 +90,7 @@ class EcommerceCrawlerMixin:
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
         )
-        write_json_document(self.current_file_name, self.products)
+        write_json_document(self.current_product_file_path, self.products)
         return new_product
 
     def bulk_save_products(self, data, collection_id_regex=None):
@@ -189,7 +189,7 @@ class EcommerceCrawlerMixin:
         df = df.sort_values(sort_by or 'name')
         return df.drop_duplicates()
 
-    def capture_product_page(self, current_url, element_class=None, element_id=None, prefix=None, force=False):
+    def capture_product_page(self, current_url, *, product=None, element_class=None, element_id=None, prefix=None, force=False):
         """Use an element ID or the class on the current page
         to identify a product page. This will also create a
         screenshot of the given page"""
@@ -213,6 +213,8 @@ class EcommerceCrawlerMixin:
                 screen_shots_folder.mkdir()
 
             filename = create_filename(extension='png', suffix_with_date=True)
+            if product is not None:
+                filename = f'{slugify(product.name)}_{filename}'
             
             if prefix is not None:
                 filename = f'{prefix}_{filename}'
