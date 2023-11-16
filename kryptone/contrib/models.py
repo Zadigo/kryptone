@@ -43,6 +43,8 @@ class Product(BaseModel):
     date: str = None
     sizes: list = dataclasses.field(default_factory=list)
     out_of_stock: bool = None
+    inventory: str = None
+    is_404: bool = False
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))
