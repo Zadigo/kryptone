@@ -615,10 +615,15 @@ class BaseCrawler(metaclass=Crawler):
             return global_performance, urls_performance
         return asyncio.run(main())
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         """Actions to run on the page just after
         the crawler has visited a page e.g. clicking
         on cookie button banner"""
+        pass
+
+    def before_next_page_actions(self, current_url, **kwargs):
+        """Actions to run once the page was visited
+        and all user actions were performed"""
         pass
 
     def run_actions(self, current_url, **kwargs):
@@ -838,8 +843,6 @@ class SiteCrawler(BaseCrawler):
 
         wait_time = settings.WAIT_TIME
 
-        # webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
-
         while self.urls_to_visit:
             current_url = self.urls_to_visit.pop()
             logger.info(f"{len(self.urls_to_visit)} urls left to visit")
@@ -855,6 +858,8 @@ class SiteCrawler(BaseCrawler):
                 continue
 
             logger.info(f'Going to url: {current_url}')
+
+            url_instance = URL(current_url)
 
             # By security measure, do not go to an url
             # that is an image if it happened to be in
@@ -879,7 +884,7 @@ class SiteCrawler(BaseCrawler):
             except:
                 logger.error('Body element of page was not detected')
 
-            self.post_visit_actions(current_url=current_url)
+            self.post_navigation_actions(url_instance)
 
             # Post navigation signal
             # TEST: This has to be tested
@@ -891,7 +896,6 @@ class SiteCrawler(BaseCrawler):
 
             self.visited_urls.add(current_url)
 
-            url_instance = URL(current_url)
 
             if self._meta.crawl:
                 # s = time.time()
@@ -958,6 +962,7 @@ class SiteCrawler(BaseCrawler):
 
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
+            self.before_next_page_actions(url_instance)
 
     def boost_start(self, start_urls=[], *, windows=1, **kwargs):
         """Works just like start but opens multiple windows
@@ -1037,10 +1042,11 @@ class SiteCrawler(BaseCrawler):
                 except:
                     logger.error('Body element of page was not detected')
 
-                self.post_visit_actions(current_url=current_url)
+                url_instance = URL(current_url)
+                self.post_navigation_actions(url_instance)
 
                 self.visited_urls.add(current_url)
-                url_instances.append(URL(current_url))
+                url_instances.append(url_instance)
 
             for i, handle in enumerate(self.driver.window_handles):
                 try:

@@ -21,7 +21,7 @@ class GoogleSearchMixin(SiteCrawler):
         encoded_query = urlencode({'q': query})
         return f'{self.start_url}?{encoded_query}'
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         element = self.evaluate_xpath(
             '//button/div[contains(text(), "Tout accepter")]/..')
         try:

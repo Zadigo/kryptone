@@ -110,7 +110,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             self.transform_to_json(self.final_result)
         )
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         try:
             # Google has a special consent form
             self.driver.execute_script(

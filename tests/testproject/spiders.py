@@ -57,10 +57,9 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
     def create_dump(self):
         print('Dumping data')
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         time.sleep(2)
         self.click_consent_button(element_id='onetrust-accept-btn-handler')
-
         # try:
         #     download_app_button = self.driver.find_element(
         #         By.CSS_SELECTOR,
