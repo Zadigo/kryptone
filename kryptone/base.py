@@ -622,13 +622,17 @@ class BaseCrawler(metaclass=Crawler):
         pass
 
     def before_next_page_actions(self, current_url, **kwargs):
-        """Actions to run once the page was visited
-        and all user actions were performed"""
+        """Actions to run once the page was visited,
+        all user actions were performed and just after
+        the `wait_time` has expired"""
         pass
 
     def run_actions(self, current_url, **kwargs):
-        """Additional custom actions to execute on the page
-        once all the default steps are completed"""
+        """Custom actions to execute on the page
+        
+        >>> def run_actions(self, current_url, **kwargs):
+        ...     text = self.driver.find_element('h1').text
+        """
         pass
 
     def create_dump(self):
