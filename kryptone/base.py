@@ -1052,7 +1052,11 @@ class SiteCrawler(BaseCrawler):
                 if self._meta.crawl:
                     self.get_page_urls(url_instance)
                     self._backup_urls()
-
+                else:
+                    self.visited_urls.add(current_url)
+                    self.list_of_seen_urls.add(current_url)
+                    self._backup_urls()
+                
                 try:
                     # Run custom user actions once
                     # everything is completed
