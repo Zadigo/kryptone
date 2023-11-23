@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import re
 from dataclasses import field
 from functools import cached_property
@@ -32,7 +33,8 @@ class Product(BaseModel):
     price: int
     url: str
     material: str = None
-    old_price: int = None
+    # old_price: int = None
+    discount_price: int = None
     breadcrumb: str = None
     collection_id: str = None
     number_of_colors: int = 1
@@ -42,7 +44,7 @@ class Product(BaseModel):
     color: str = None
     date: str = None
     sizes: list = dataclasses.field(default_factory=list)
-    out_of_stock: bool = None
+    out_of_stock: bool = False
     inventory: str = None
     is_404: bool = False
 

@@ -1,8 +1,11 @@
 import asyncio
+import json
 
 from requests import Session
+import requests
 from requests.auth import HTTPBasicAuth
 from requests.models import Request
+from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.iterators import iterate_chunks
 from kryptone import logger
 
@@ -27,6 +30,13 @@ class BaseWebhook:
         return f'<{self.__class__.__name__}[{self.current_iteration}]>'
 
     async def create_request(self, data, headers):
+        # Reload the data and encode it with our
+        # DefaultJsonEncoder in order to correctly
+        # transform objects like datetimes, URL etc
+        if isinstance(data, dict):
+            data = json.loads(json.dumps(data, cls=DefaultJsonEncoder))
+            data = [data]
+
         request = Request(
             method='post',
             url=self.base_url,
@@ -55,12 +65,15 @@ class BaseWebhook:
 
         try:
             self.response = self.session.send(prepared_request)
-        except:
+        except Exception as e:
             # Fail silently if a webook cannot be sent
-            logger.critical(f'Webhook failed for url: {self.base_url}')
+            logger.error(f'Webhook error: {self.response.json()}')
         else:
-            logger.info(f'Webhook completed for url: {self.base_url}')
-            self.current_iteration = self.current_iteration + 1
+            if self.response.ok:
+                logger.info(f'Webhook completed for url: {self.base_url}')
+            else:
+                logger.error(f'Webhook error: {self.response.json()}')
+            self.current_iteration = self.current_iteration + 1                
 
     async def iter_send(self, data, chunks=100, wait_time=10):
         """Sends chunks of data to the webhook"""
@@ -93,6 +106,9 @@ class Webhooks:
     """Manage requests for multiple webhooks"""
 
     def __init__(self, urls):
+        if not isinstance(urls, (list, tuple)):
+            raise ValueError('Urls should be a list or a tuple')
+        
         self.webhooks = []
         self.responses = []
 
@@ -118,4 +134,8 @@ class Webhooks:
             task = asyncio.create_task(resolver(webhook))
             tasks.append(task)
 
-        self.responses = await asyncio.gather(*tasks)
+        responses = []
+        for task in asyncio.as_completed(tasks):
+            response = await task
+            responses.append(response)
+        # self.responses = await asyncio.gather(*tasks)
