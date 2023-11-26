@@ -7,7 +7,7 @@ from kryptone.conf import settings
 from kryptone.management.base import ProjectCommand
 from kryptone.utils.file_readers import read_json_document
 from kryptone.utils.urls import URLIgnoreTest
-
+from kryptone.utils.functions import create_filename
 
 class Command(ProjectCommand):
     requires_system_checks = True
@@ -34,8 +34,10 @@ class Command(ProjectCommand):
 
         df['ignore_url'] = df['urls'].map(test_result)
         ignored_urls = df[df['ignore_url'] == True]
+
+        filename = create_filename(extension='csv', suffix='extractions')
         ignored_urls['urls'].to_csv(
-            settings.PROJECT_PATH / 'tested_urls.csv',
+            settings.PROJECT_PATH / filename,
             index=False
         )
         ignored_urls = ignored_urls.sort_values('urls')
