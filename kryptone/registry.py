@@ -111,6 +111,7 @@ class SpiderConfig:
             logger.error(e)
             raise Exception(e)
 
+    # TODO: Add enrichment to spider process
     def enrich(self,  windows=1, **params):
         """Runs the spider by calling the spider class
         which in return calls "start_from_json" method on the

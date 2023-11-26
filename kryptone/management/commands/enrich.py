@@ -1,11 +1,6 @@
-import asyncio
-import sys
-import multiprocessing
 
 import kryptone
-from kryptone import logger
 from kryptone.checks.core import checks_registry
-from kryptone.core.process import BaseProcess
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 
@@ -34,6 +29,7 @@ class Command(ProjectCommand):
             help='Number of windows to launch for a spider'
         )
 
+    # TODO: Add enrichment to process
     def execute(self, namespace):
         kryptone.setup()
         checks_registry.run()

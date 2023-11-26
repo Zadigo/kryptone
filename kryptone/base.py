@@ -279,9 +279,9 @@ class BaseCrawler(metaclass=Crawler):
             sorted_urls = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
-            file_readers.write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+            file_readers.write_csv_document(
+                'seen_urls.csv', sorted_urls, adapt_data=True)
 
-        
         async def main():
             await write_cache_file()
             await write_seen_urls()
@@ -603,7 +603,7 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         async def main():
-            global_performance  = await performance()
+            global_performance = await performance()
             urls_performance = await performance_urls()
 
             self.statistics.update({
@@ -629,7 +629,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def current_page_actions(self, current_url, **kwargs):
         """Custom actions to execute on the page
-        
+
         >>> def current_page_actions(self, current_url, **kwargs):
         ...     text = self.driver.find_element('h1').text
         """
@@ -664,8 +664,8 @@ class SiteCrawler(BaseCrawler):
         )
         self.statistics = {}
 
-        self.cached_json_items = None
-        self.enrichment_mode = False
+        # self.cached_json_items = None
+        # self.enrichment_mode = False
 
     def __del__(self):
         try:
@@ -820,22 +820,22 @@ class SiteCrawler(BaseCrawler):
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
 
-    def start_from_json(self, windows=0, **kwargs):
-        """Enrich a JSON document that with additional
-        data by """
-        if not isinstance(self._meta.start_urls, LoadStartUrls):
-            raise ValueError("start_urls should be an instance of LoadStartUrls")
+    # def start_from_json(self, windows=0, **kwargs):
+    #     """Enrich a JSON document containing a set of
+    #     products with additionnal data"""
+    #     if not isinstance(self._meta.start_urls, LoadStartUrls):
+    #         raise ValueError("start_urls should be an instance of LoadStartUrls")
 
-        # Preload the content to fill
-        # the cache
-        self.cached_json_items = pandas.read_json(settings.PROJECT_PATH / 'start_urls.json')
-        self._meta.crawl = False
-        self.enrichment_mode = True
+    #     # Preload the content to fill the cache
+    #     start_urls_path = settings.PROJECT_PATH / 'start_urls.json'
+    #     self.cached_json_items = pandas.read_json(start_urls_path)
+    #     self._meta.crawl = False
+    #     self.enrichment_mode = True
 
-        if windows >= 1:
-            self.boost_start(windows=windows, **kwargs)
-        else:
-            self.start(**kwargs)
+    #     if windows >= 1:
+    #         self.boost_start(windows=windows, **kwargs)
+    #     else:
+    #         self.start(**kwargs)
 
     def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
@@ -900,7 +900,6 @@ class SiteCrawler(BaseCrawler):
 
             self.visited_urls.add(current_url)
 
-
             if self._meta.crawl:
                 # s = time.time()
                 self.get_page_urls(url_instance)
@@ -908,16 +907,19 @@ class SiteCrawler(BaseCrawler):
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
-            run_action_params = {}
+            current_page_actions_params = {}
 
             try:
-                if self.enrichment_mode:
-                    current_json_object = self.cached_json_items[self.cached_json_items['url'] == current_url]
-                    run_action_params.update({'current_json_object': current_json_object})
+                # if self.enrichment_mode:
+                #     current_json_object = self.cached_json_items[self.cached_json_items['url'] == current_url]
+                #     current_page_actions_params.update({'current_json_object': current_json_object})
 
                 # Run custom user actions once
                 # everything is completed
-                self.current_page_actions(url_instance, **run_action_params)
+                self.current_page_actions(
+                    url_instance, 
+                    **current_page_actions_params
+                )
             except TypeError as e:
                 logger.error(e)
                 raise TypeError(
@@ -1066,7 +1068,7 @@ class SiteCrawler(BaseCrawler):
                     self.visited_urls.add(current_url)
                     self.list_of_seen_urls.add(current_url)
                     self._backup_urls()
-                
+
                 try:
                     # Run custom user actions once
                     # everything is completed
@@ -1105,7 +1107,7 @@ class SiteCrawler(BaseCrawler):
                 if self._meta.crawl:
                     self.calculate_performance()
                     file_readers.write_json_document(
-                        'performance.json', 
+                        'performance.json',
                         self.statistics
                     )
 
