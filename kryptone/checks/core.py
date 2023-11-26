@@ -24,7 +24,6 @@ class ApplicationChecks(GlobalMixins):
             self._errors.extend(exceptions)
 
         if self._errors:
-            # raise ImproperlyConfiguredError(self._errors)
             raise ExceptionGroup(
                 "Project is improperly configured",
                 self._errors
@@ -45,7 +44,7 @@ class ApplicationChecks(GlobalMixins):
                     "required in your settings file."
                 )
 
-        requires_list_or_tuple = ['ACTIVE_STORAGE_BACKENDS', 'WAIT_TIME_RANGE']
+        requires_list_or_tuple = ['WAIT_TIME_RANGE', 'ACTIVE_STORAGE_BACKENDS']
         for item in requires_list_or_tuple:
             value = getattr(settings, item)
             if not isinstance(value, (list, tuple)):
@@ -67,8 +66,8 @@ class ApplicationChecks(GlobalMixins):
         PROJECT_PATH = getattr(settings, 'PROJECT_PATH', None)
         if PROJECT_PATH is None:
             raise ValueError((
-                "PROJECT_PATH is empty. If you are using "
-                "Krytpone outside of a project, call .configure(**kwargs)"
+                "PROJECT_PATH is empty. You are calling Kryptone"
+                "outside of a project"
             ))
 
         # Also make sure that the path is one that really
@@ -93,15 +92,14 @@ class ApplicationChecks(GlobalMixins):
             def some_check():
                 pass
         """
-        TAG_NAME = tag
+        tag_name = tag
         def inner(func):
             if not callable(func):
                 raise TypeError(
                     "A system check should be a callable "
                     "function to be registered"
                 )
-            # self._checks.append(func)
-            tag = TAG_NAME or func.__name__
+            tag = tag_name or func.__name__
             self._checks[tag] = func
         return inner
 

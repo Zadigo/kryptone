@@ -77,7 +77,7 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
     options.add_experimental_option('prefs', preferences)
 
     # Proxies
-    if settings.USE_PROXY_ADDRESS:
+    if settings.PROXY_IP_ADDRESS is not None:
         proxy = Proxy()
         proxy.proxy_type = ProxyType.MANUAL
         proxy.http_proxy = settings.PROXY_IP_ADDRESS
