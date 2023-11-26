@@ -129,7 +129,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
         except:
             logger.info('No consent screen')
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         # results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
         results_xpath = "//div[@role='feed']"
         results_is_scrollable = True
@@ -426,7 +426,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 class GoogleMapsPlace(GoogleMaps):
     """Gathers data for a Google Business place"""
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         current_time = time.time()
         business_information = GoogleBusiness()
 

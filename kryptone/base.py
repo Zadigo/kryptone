@@ -627,10 +627,10 @@ class BaseCrawler(metaclass=Crawler):
         the `wait_time` has expired"""
         pass
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         """Custom actions to execute on the page
         
-        >>> def run_actions(self, current_url, **kwargs):
+        >>> def current_page_actions(self, current_url, **kwargs):
         ...     text = self.driver.find_element('h1').text
         """
         pass
@@ -917,17 +917,17 @@ class SiteCrawler(BaseCrawler):
 
                 # Run custom user actions once
                 # everything is completed
-                self.run_actions(url_instance, **run_action_params)
+                self.current_page_actions(url_instance, **run_action_params)
             except TypeError as e:
                 logger.error(e)
                 raise TypeError(
-                    "'self.run_actions' should be able to accept arguments"
+                    "'self.current_page_actions' should be able to accept arguments"
                 )
             except Exception as e:
                 logger.error(e)
                 raise ExceptionGroup(
                     "An exception occured while trying "
-                    "to execute 'self.run_actions'",
+                    "to execute 'self.current_page_actions'",
                     [
                         Exception(e),
                         exceptions.SpiderExecutionError()
@@ -1070,17 +1070,17 @@ class SiteCrawler(BaseCrawler):
                 try:
                     # Run custom user actions once
                     # everything is completed
-                    self.run_actions(url_instance)
+                    self.current_page_actions(url_instance)
                 except TypeError as e:
                     logger.info(e)
                     raise TypeError(
-                        "'self.run_actions' should be able to accept arguments"
+                        "'self.current_page_actions' should be able to accept arguments"
                     )
                 except Exception as e:
                     logger.error(e)
                     raise ExceptionGroup(
                         "An exception occured while trying "
-                        "to execute 'self.run_actions'",
+                        "to execute 'self.current_page_actions'",
                         [
                             Exception(e),
                             exceptions.SpiderExecutionError()

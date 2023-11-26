@@ -29,7 +29,7 @@ class GoogleSearchMixin(SiteCrawler):
         except:
             pass
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         has_next = True
         while has_next:
             state, next_element = self.driver.execute_script(
