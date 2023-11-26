@@ -1,3 +1,4 @@
+import random
 import re
 import string
 import unicodedata
@@ -45,7 +46,7 @@ def clean_text(text, encoding='utf-8'):
     if not isinstance(text, str):
         return text
 
-    text = text.replace('\n', '')
+    text = text.replace('\n', ' ')
     text = unicodedata.normalize('NFKD', text)
     text = text.encode(encoding).decode()
     return normalize_spaces(text)

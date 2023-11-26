@@ -21,6 +21,8 @@ google-auth-oauthlib = "*"
 pymemcache = "*"
 twisted = "*"
 lxml = "*"
+wordcloud = "*"
+matplotlib = "*"
 
 [dev-packages]
 

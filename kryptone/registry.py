@@ -14,8 +14,6 @@ from kryptone.exceptions import SpiderExistsError
 
 SPIDERS_MODULE = 'spiders'
 
-AUTOMATERS_MODULE = 'automaters'
-
 ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
 
 
@@ -29,9 +27,7 @@ class SpiderConfig:
         self.name = name
         self.dotted_path = None
         self.registry = None
-        self.initial_start_urls = []
         self.spider_class = getattr(spiders_module, name, None)
-        self.is_automater = False
 
         self.MODULE = spiders_module
 
@@ -85,11 +81,15 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            if windows > 1:
+            # This will tell the driver to open
+            # one more window in more of the one
+            # that is opened
+            settings['ACTIVE_SPIDER'] = spider_instance
+
+            if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
                 spider_instance.start(**params)
-            settings['ACTIVE_SPIDER'] = spider_instance
         except KeyboardInterrupt:
             spider_instance.create_dump()
             sys.exit(0)
@@ -98,11 +98,28 @@ class SpiderConfig:
             logger.error(e)
             raise Exception(e)
 
-    def resume(self, **kwargs):
+    def resume(self,  windows=1, **params):
         spider_instance = self.get_spider_instance()
 
         try:
-            spider_instance.resume(**kwargs)
+            spider_instance.resume(**params)
+        except KeyboardInterrupt:
+            spider_instance.create_dump()
+            sys.exit(0)
+        except Exception as e:
+            spider_instance.create_dump()
+            logger.error(e)
+            raise Exception(e)
+
+    def enrich(self,  windows=1, **params):
+        """Runs the spider by calling the spider class
+        which in return calls "start_from_json" method on the
+        spider via the __init__ method"""
+        spider_instance = self.get_spider_instance()
+
+        try:
+            settings['ACTIVE_SPIDER'] = spider_instance
+            spider_instance.start_from_json(windows=windows, **params)
         except KeyboardInterrupt:
             spider_instance.create_dump()
             sys.exit(0)

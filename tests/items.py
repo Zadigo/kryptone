@@ -140,16 +140,43 @@ class BaseTestSpider(MockupSpider):
         pass
 
 
-# class AsyncBaseTestSpider(MockupSpider):
-#     def __init__(self):
-#         self.driver = None
+async def main():
+    # async def one():
+    #     a = await asyncio.sleep(1, result='Great!')
+    #     print(a)
+    #     print('a')
 
-#     async def start(self):
-#         async def loop():
-#             while self.urls_to_visit:
-#                 pass
+    # async def two():
+    #     print('b')
 
-#         async def some_function():
-#             pass
+    # await asyncio.gather(one(), two())
 
-#         asyncio.gather(loop(), )
+    async def one():
+        print('a')
+        await asyncio.sleep(3)
+
+    async def two():
+        print('b')
+
+    # t1 = asyncio.create_task(one())
+    # t2 = asyncio.create_task(two())
+
+    # await t1
+    # await t2
+
+    # async with asyncio.TaskGroup() as t:
+    #     t1 = asyncio.create_task(one())
+    #     t2 = asyncio.create_task(two())
+
+    # t1 = asyncio.create_task(one())
+    # t2 = asyncio.create_task(two())
+    # # await asyncio.wait([t1, t2])
+    # r = asyncio.as_completed([t1, t2])
+    # for x in r:
+    #     v = await x
+    #     print(v)
+    return 1
+
+
+w = asyncio.run(main())
+print(w)

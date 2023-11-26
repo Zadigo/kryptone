@@ -1,5 +1,10 @@
-import pathlib
+# This is the main settings file for a
+# Kryptone project. To read more about
+# settings and discover additional settings
+# that you can use please visit:
+# https://github.com/Zadigo/kryptone/wiki/List-of-settings
 
+import pathlib
 
 # Absolute path to the local project
 PROJECT_PATH = pathlib.Path(__file__).parent.absolute()

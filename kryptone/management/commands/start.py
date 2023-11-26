@@ -31,7 +31,7 @@ class Command(ProjectCommand):
             '-w',
             '--windows',
             type=int,
-            default=3,
+            default=0,
             help='Number of windows to launch for a spider'
         )
 

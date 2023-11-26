@@ -25,11 +25,9 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
 from kryptone.db.tables import Database
+from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import (LoadStartUrls, read_csv_document,
-                                         read_json_document,
-                                         write_csv_document,
-                                         write_json_document)
+from kryptone.utils.file_readers import LoadStartUrls
 from kryptone.utils.iterators import AsyncIterator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
@@ -263,24 +261,32 @@ class BaseCrawler(metaclass=Crawler):
         """Backs up the urls both in memory 
         and file cache which can then be resumed
         on a next run"""
-        d = get_current_date(timezone=self.timezone)
 
-        urls_data = {
-            'spider': self.__class__.__name__,
-            'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
-            'urls_to_visit': list(self.urls_to_visit),
-            'visited_urls': list(self.visited_urls)
-        }
+        async def write_cache_file():
+            d = get_current_date(timezone=self.timezone)
+            urls_data = {
+                'spider': self.__class__.__name__,
+                'timestamp': d.strftime('%Y-%M-%d %H:%M:%S'),
+                'urls_to_visit': list(self.urls_to_visit),
+                'visited_urls': list(self.visited_urls)
+            }
+            file_readers.write_json_document(
+                f'{settings.CACHE_FILE_NAME}.json',
+                urls_data
+            )
 
-        write_json_document(
-            f'{settings.CACHE_FILE_NAME}.json',
-            urls_data
-        )
+        async def write_seen_urls():
+            sorted_urls = []
+            for url in self.list_of_seen_urls:
+                bisect.insort(sorted_urls, url)
+            file_readers.write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
 
-        sorted_urls = []
-        for url in self.list_of_seen_urls:
-            bisect.insort(sorted_urls, url)
-        write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+        
+        async def main():
+            await write_cache_file()
+            await write_seen_urls()
+
+        asyncio.run(main())
 
         # db_signal.send(
         #     self,
@@ -574,33 +580,40 @@ class BaseCrawler(metaclass=Crawler):
     def calculate_performance(self):
         """Calculate the overall spider performance"""
         # Calculate global performance
-        self._end_date = get_current_date(timezone=self.timezone)
-        days = (self._start_date - self._end_date).days
-        completed_time = round(time.time() - self._start_time, 1)
-        days = 0 if days < 0 else days
-        global_performance = self.performance_audit(days, completed_time)
+        async def performance():
+            self._end_date = get_current_date(timezone=self.timezone)
+            days = (self._start_date - self._end_date).days
+            completed_time = round(time.time() - self._start_time, 1)
+            days = 0 if days < 0 else days
+            return self.performance_audit(days, completed_time)
 
         # Calculate performance related to urls
-        total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
-        result = len(self.visited_urls) / total_urls
-        percentage = round(result * 100, 3)
-        logger.info(f'{percentage}% of total urls visited')
+        async def performance_urls():
+            total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
+            result = len(self.visited_urls) / total_urls
+            percentage = round(result * 100, 3)
+            logger.info(f'{percentage}% of total urls visited')
 
-        urls_performance = self.urls_audit(
-            count_urls_to_visit=len(self.urls_to_visit),
-            count_visited_urls=len(self.visited_urls),
-            total_urls=total_urls,
-            completion_percentage=percentage,
-            visited_pages_count=self.visited_pages_count
-        )
+            return self.urls_audit(
+                count_urls_to_visit=len(self.urls_to_visit),
+                count_visited_urls=len(self.visited_urls),
+                total_urls=total_urls,
+                completion_percentage=percentage,
+                visited_pages_count=self.visited_pages_count
+            )
 
-        self.statistics.update({
-            'days': global_performance.days,
-            'duration': global_performance.duration,
-            'count_urls_to_visit': urls_performance.count_urls_to_visit,
-            'count_visited_urls': urls_performance.count_visited_urls
-        })
-        return global_performance, urls_performance
+        async def main():
+            global_performance  = await performance()
+            urls_performance = await performance_urls()
+
+            self.statistics.update({
+                'days': global_performance.days,
+                'duration': global_performance.duration,
+                'count_urls_to_visit': urls_performance.count_urls_to_visit,
+                'count_visited_urls': urls_performance.count_visited_urls
+            })
+            return global_performance, urls_performance
+        return asyncio.run(main())
 
     def post_visit_actions(self, **kwargs):
         """Actions to run on the page just after
@@ -642,6 +655,9 @@ class SiteCrawler(BaseCrawler):
         )
         self.statistics = {}
 
+        self.cached_json_items = None
+        self.enrichment_mode = False
+
     def __del__(self):
         try:
             self.driver.quit()
@@ -680,8 +696,9 @@ class SiteCrawler(BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
-            if isinstance(start_urls, (LoadStartUrls)):
+            if isinstance(start_urls, (file_readers.LoadStartUrls)):
                 start_urls = list(start_urls)
+
             self.list_of_seen_urls.update(*start_urls)
             self.start_url = start_urls.pop()
         self._start_url_object = urlparse(self.start_url)
@@ -721,9 +738,9 @@ class SiteCrawler(BaseCrawler):
         #     else:
         #         data = read_json_document('cache.json')
         try:
-            data = read_json_document('cache.json')
+            data = file_readers.read_json_document('cache.json')
         except FileNotFoundError:
-            write_json_document('cache.json', [])
+            file_readers.write_json_document('cache.json', [])
 
         # Before reloading the urls, run the filters
         # in case previous urls to exclude were
@@ -733,17 +750,18 @@ class SiteCrawler(BaseCrawler):
         self.visited_urls = set(data['visited_urls'])
 
         try:
-            previous_seen_urls = read_csv_document(
+            previous_seen_urls = file_readers.read_csv_document(
                 'seen_urls.csv',
                 flatten=True
             )
         except FileNotFoundError:
-            write_csv_document('seen_urls.csv', [])
+            file_readers.write_csv_document('seen_urls.csv', [])
         else:
             self.list_of_seen_urls = set(previous_seen_urls)
 
         try:
-            previous_statistics = read_json_document('performance.json')
+            previous_statistics = file_readers.read_json_document(
+                'performance.json')
         except:
             pass
         else:
@@ -791,6 +809,23 @@ class SiteCrawler(BaseCrawler):
         for element in link_elements:
             urls.append(element.get_attribute('href'))
         self.start(start_urls=urls, **kwargs)
+
+    def start_from_json(self, windows=0, **kwargs):
+        """Enrich a JSON document that with additional
+        data by """
+        if not isinstance(self._meta.start_urls, LoadStartUrls):
+            raise ValueError("start_urls should be an instance of LoadStartUrls")
+
+        # Preload the content to fill
+        # the cache
+        self.cached_json_items = pandas.read_json(settings.PROJECT_PATH / 'start_urls.json')
+        self._meta.crawl = False
+        self.enrichment_mode = True
+
+        if windows >= 1:
+            self.boost_start(windows=windows, **kwargs)
+        else:
+            self.start(**kwargs)
 
     def start(self, start_urls=[], **kwargs):
         """Entrypoint to start the spider
@@ -864,11 +899,18 @@ class SiteCrawler(BaseCrawler):
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
+            run_action_params = {}
+
             try:
+                if self.enrichment_mode:
+                    current_json_object = self.cached_json_items[self.cached_json_items['url'] == current_url]
+                    run_action_params.update({'current_json_object': current_json_object})
+
                 # Run custom user actions once
                 # everything is completed
-                self.run_actions(url_instance)
-            except TypeError:
+                self.run_actions(url_instance, **run_action_params)
+            except TypeError as e:
+                logger.error(e)
                 raise TypeError(
                     "'self.run_actions' should be able to accept arguments"
                 )
@@ -900,7 +942,10 @@ class SiteCrawler(BaseCrawler):
 
             if self._meta.crawl:
                 self.calculate_performance()
-                write_json_document('performance.json', self.statistics)
+                file_readers.write_json_document(
+                    'performance.json',
+                    self.statistics
+                )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
@@ -913,7 +958,7 @@ class SiteCrawler(BaseCrawler):
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
-    def boost_start(self, start_urls=[], *, windows=3, **kwargs):
+    def boost_start(self, start_urls=[], *, windows=1, **kwargs):
         """Works just like start but opens multiple windows
         or tabs to accelerate url visitation"""
         self.before_start(start_urls, **kwargs)
@@ -946,6 +991,7 @@ class SiteCrawler(BaseCrawler):
                         continue
                     current_urls.append(current_url)
 
+            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
             url_instances = []
 
             for i, handle in enumerate(self.driver.window_handles):
@@ -1010,7 +1056,8 @@ class SiteCrawler(BaseCrawler):
                     # Run custom user actions once
                     # everything is completed
                     self.run_actions(url_instance)
-                except TypeError:
+                except TypeError as e:
+                    logger.info(e)
                     raise TypeError(
                         "'self.run_actions' should be able to accept arguments"
                     )
@@ -1042,7 +1089,10 @@ class SiteCrawler(BaseCrawler):
 
                 if self._meta.crawl:
                     self.calculate_performance()
-                    write_json_document('performance.json', self.statistics)
+                    file_readers.write_json_document(
+                        'performance.json', 
+                        self.statistics
+                    )
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
