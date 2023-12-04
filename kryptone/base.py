@@ -325,7 +325,9 @@ class BaseCrawler(metaclass=Crawler):
 
     def url_structural_check(self, url):
         """Checks the structure of an
-        incoming url"""
+        incoming url. When the the string
+        is a path, it is readapted to suit
+        the expected pattern of an url"""
         url = str(url)
         clean_url = unquote(url)
         if url.startswith('/'):
@@ -368,7 +370,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def add_urls(self, *urls_or_paths):
         """Manually add urls to the current urls to
-        visit. This is useful for cases where urls are
+        visit list. This is useful for cases where urls are
         nested in other elements than links and that
         cannot actually be retrieved by the spider"""
         counter = 0
@@ -401,7 +403,13 @@ class BaseCrawler(metaclass=Crawler):
 
     def get_page_urls(self, current_url, refresh=False):
         """Gets all the urls present on the
-        actual visited page"""
+        actual visited page. Fragments, empty strings
+        a ignored by default. Query strings can be ignored using
+        `Meta.ignore_queries` and images with `Meta.ignore_images`.
+        
+        By default, all the urls that were found during a crawling
+        session are save in `list_of_seen_urls` and only valid urls
+        to visit are included in `urls_to_visit`"""
         raw_urls = set(self.get_page_link_elements)
         logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
 
@@ -616,29 +624,31 @@ class BaseCrawler(metaclass=Crawler):
         return asyncio.run(main())
 
     def post_navigation_actions(self, current_url, **kwargs):
-        """Actions to run on the page just after
+        """Actions to run on the page immediately after
         the crawler has visited a page e.g. clicking
         on cookie button banner"""
         pass
 
     def before_next_page_actions(self, current_url, **kwargs):
-        """Actions to run once the page was visited,
-        all user actions were performed and just after
-        the `wait_time` has expired"""
+        """Actions to run once the page was visited and that
+        all user actions were performed. This method runs just 
+        after the `wait_time` has expired"""
         pass
 
     def current_page_actions(self, current_url, **kwargs):
-        """Custom actions to execute on the page
-
-        >>> def current_page_actions(self, current_url, **kwargs):
-        ...     text = self.driver.find_element('h1').text
+        """Custom actions to execute on the current page. 
+    
+        >>> class MyCrawler(SiteCrawler):
+        ...     def current_page_actions(self, current_url, **kwargs):
+        ...         text = self.driver.find_element('h1').text
         """
         pass
 
     def create_dump(self):
-        """Dumps the collected results to a file.
-        This functions is called only when an exception
-        occurs during the crawling process
+        """Dumps the collected results to a file when the driver
+        meets and exception during the crawling process. This method
+        can be customized with a custome action that you would want
+        to run
         """
 
 
@@ -729,13 +739,12 @@ class SiteCrawler(BaseCrawler):
             self.add_urls(*start_urls)
 
     def resume(self, **kwargs):
-        """From a previous list of urls to visit
-        and visited urls, resume a previous
-        crawling session.
+        """From a previous list of urls to visit and visited urls, 
+        resume a previous crawling session. In order :
 
             * Redis is checked as the primary database for a cache
             * Memcache is checked in second place
-            * Finally, the file cache is used as a final resort
+            * Finally, the file cache is used as a final resort if none exists
         """
         # redis = backends.redis_connection()
         # if redis:
@@ -838,10 +847,27 @@ class SiteCrawler(BaseCrawler):
     #         self.start(**kwargs)
 
     def start(self, start_urls=[], **kwargs):
-        """Entrypoint to start the spider
+        """This is the main entrypoint to start the
+        spider. This will open the browser, open an
+        url and call `current_page_actions` which are
+        custom user defined actions to run the current
+        page.
 
-        >>> instance = BaseCrawler()
+        This method could be started inline as shown below:
+
+        >>> instance = SiteCrawler()
         ... instance.start(start_urls=["http://example.com"])
+
+        You can specify `current_page_actions` by subclassing SiteCrawler:
+
+        >>> class MyCrawler(SiteCrawler):
+        ...     start_url = 'http://example.com'
+        ...
+        ...     def current_page_actions(self, current_url, **kwargs):
+        ...         pass
+        ... 
+        ... instance = MyCrawler()
+        ... instance.start()
         """
         self.before_start(start_urls, **kwargs)
 
@@ -971,8 +997,11 @@ class SiteCrawler(BaseCrawler):
             self.before_next_page_actions(url_instance)
 
     def boost_start(self, start_urls=[], *, windows=1, **kwargs):
-        """Works just like start but opens multiple windows
-        or tabs to accelerate url visitation"""
+        """Calling this method will make selenium open either
+        multiple windows or multiple tabs for the project.$
+        Selenium will open an url in each window or tab and
+        sequentically call `current_page_actions` on the
+        given page"""
         self.before_start(start_urls, **kwargs)
 
         wait_time = settings.WAIT_TIME
