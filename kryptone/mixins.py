@@ -13,9 +13,8 @@ from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.functions import create_filename
 from kryptone.utils.iterators import keep_while
-from kryptone.utils.text import clean_text
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.text import (remove_punctuation, slugify)
+from kryptone.utils.text import clean_text, remove_punctuation, slugify
 
 EMAIL_REGEX = r'\S+\@\S+'
 
