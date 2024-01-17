@@ -946,7 +946,7 @@ class SiteCrawler(BaseCrawler):
                 # Run custom user actions once
                 # everything is completed
                 self.current_page_actions(
-                    url_instance, 
+                    url_instance,
                     **current_page_actions_params
                 )
             except TypeError as e:
