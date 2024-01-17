@@ -88,6 +88,10 @@ class EcommerceCrawlerMixin:
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if data is None:
+            logger.warning('Received None when trying to save a product')
+            return (False, None)
+        
         if 'date' not in data:
             data['date'] = datetime.datetime.now(tz=pytz.UTC)
 
