@@ -22,7 +22,9 @@ TEMPORARY_PRODUCT_CACHE = set()
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
-    to crawling ecommerce websites"""
+    to crawling ecommerce websites. The default model
+    is `Product` which you can customize with your custom
+    model"""
 
     scroll_step = 30
     products = []
@@ -70,7 +72,9 @@ class EcommerceCrawlerMixin:
         return True, product
 
     def save_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds an saves a product to the backends
+        """Adds a product data gathered from the website to the
+        underlying model and then creates file called `products_xyz.json`
+        in the current project's media folder
 
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
