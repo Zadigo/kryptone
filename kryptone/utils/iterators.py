@@ -389,6 +389,25 @@ class URLIterator:
         return self._current_url
 
 
+class PagePaginationGenerator:
+    def __init__(self, template, query='page', k=10):
+        self.urls = []
+        self.final_urls = []
+
+        for i in range(k):
+            self.urls.append(template)
+
+        counter = 1
+        for url in self.urls:
+            final_query = urlencode({query: str(counter)}, encoding='utf-8')
+            self.final_urls.append(url + f'?{final_query}')
+            counter = counter + 1
+
+    def __iter__(self):
+        for url in self.final_urls:
+            yield url
+
+
 class URLGenerator:
     """Generates a set of urls using a template
 
