@@ -92,6 +92,7 @@ class SpiderConfig:
                 spider_instance.start(**params)
         except KeyboardInterrupt:
             spider_instance.create_dump()
+            logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
@@ -155,7 +156,9 @@ class MasterRegistry:
         if not self.has_spiders:
             raise ValueError(
                 "Spiders are not yet loaded or "
-                "there are no registered ones."
+                "there are no registered ones in your project. "
+                "Ensure that you spider classes inherit from 'SiteCrawler' "
+                "if you are using for example a mixin like 'EcommerceCrawlerMixin'"
             )
 
     def pre_configure_project(self, dotted_path, settings):
@@ -209,6 +212,7 @@ class MasterRegistry:
         try:
             spiders_module = import_module(f'{dotted_path}.{SPIDERS_MODULE}')
         except Exception as e:
+            logger.critical(e)
             raise ExceptionGroup(
                 f"An error occured when trying to load the project '{self.project_name}'",
                 [
