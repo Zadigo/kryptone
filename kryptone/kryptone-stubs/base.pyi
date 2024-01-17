@@ -1,9 +1,10 @@
 import datetime
 import time
-from typing import (Any, Coroutine, DefaultDict, Iterator, List,
-                    Literal, NamedTuple, Tuple, Union)
+from typing import (Any, Coroutine, DefaultDict, Iterator, List, Literal,
+                    NamedTuple, Tuple, Union)
 from urllib.parse import ParseResult
 from urllib.robotparser import RobotFileParser
+
 import pandas
 from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.remote.webelement import WebElement
@@ -110,6 +111,7 @@ class BaseCrawler(metaclass=Crawler):
         self,
         element_id: str = ...,
         element_class: str = ...,
+        before_click_wait_time: int = ...,
         wait_time: int = ...
     ) -> None: ...
 
