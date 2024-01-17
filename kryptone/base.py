@@ -538,6 +538,9 @@ class BaseCrawler(metaclass=Crawler):
     def click_consent_button(self, element_id=None, element_class=None, wait_time=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
+        if before_click_wait_time:
+            time.sleep(before_click_wait_time)
+
         try:
             element = None
             if element_id is not None:
