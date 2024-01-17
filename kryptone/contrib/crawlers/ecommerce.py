@@ -52,9 +52,9 @@ class EcommerceCrawlerMixin:
         })
 
     def add_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds a product to the internal product container
+        """Adds a product to the internal list product container
 
-        >>> instance.add_product([{...}], track_id=False)
+        >>> instance.add_product({...}, track_id=False)
         ... (True, Product)
         """
         if not data or data is None:
@@ -81,8 +81,8 @@ class EcommerceCrawlerMixin:
         return True, product
 
     def save_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds a product data gathered from the website to the
-        underlying model and then creates file called `products_xyz.json`
+        """Adds a single product data gathered from the website to the
+        underlying container and then creates a file called `products_xyz.json`
         in the current project's media folder
 
         >>> instance.save_product([{...}], track_id=False)
@@ -95,11 +95,7 @@ class EcommerceCrawlerMixin:
         if 'date' not in data:
             data['date'] = datetime.datetime.now(tz=pytz.UTC)
 
-        if self.current_product_file_path is None:
-            filename = f'products_{create_filename()}.json'
-            self.current_product_file_path = settings.MEDIA_FOLDER / filename 
-            if not self.current_product_file_path.exists():
-                write_json_document(self.current_product_file_path, [])
+        self.check_products_json_file()
 
         new_product = self.add_product(
             data,
@@ -109,16 +105,31 @@ class EcommerceCrawlerMixin:
         )
         write_json_document(self.current_product_file_path, self.products)
         return new_product
+    
+    def bulk_add_products(self, data, collection_id_regex=None):
+        """Adds multiple products to the internal list product container
 
-    def bulk_save_products(self, data, collection_id_regex=None):
-        """Adds multiple products at once"""
+        >>> instance.add_product([{...}], track_id=False)
+        ... (True, Product)
+        """
         products = []
         for item in data:
-            product = self.save_product(
-                item,
+            state, product = self.add_product(
+                item, 
                 collection_id_regex=collection_id_regex
             )
             products.append(product)
+        return products
+
+    def bulk_save_products(self, data=None, collection_id_regex=None):
+        """Adds multiple products at once to the underlying container
+        if data is provided otherwise will save the current stored products
+        to the `products_xyz.json` file"""
+        products = []
+        if data is not None:
+            self.bulk_add_products(data)
+        self._check_products_json_file()
+        write_json_document(self.current_product_file_path, self.products)
         return products
 
     def save_images(self, product, path, filename=None, download_first=False):
@@ -197,19 +208,19 @@ class EcommerceCrawlerMixin:
         asyncio.run(main())
 
     def as_dataframe(self, sort_by=None):
-        columns_to_keep = [
-            'name', 'description', 'price', 'url', 'material', 'old_price',
-            'breadcrumb', 'collection_id', 'number_of_colors',
-            'id_or_reference', 'composition', 'color'
-        ]
-        df = pandas.DataFrame(self.products, columns=columns_to_keep)
+        # columns_to_keep = [
+        #     'name', 'description', 'price', 'url', 'material', 'old_price',
+        #     'breadcrumb', 'collection_id', 'number_of_colors',
+        #     'id_or_reference', 'composition', 'color'
+        # ]
+        df = pandas.DataFrame(self.products)
         df = df.sort_values(sort_by or 'name')
         return df.drop_duplicates()
 
     def capture_product_page(self, current_url, *, product=None, element_class=None, element_id=None, prefix=None, force=False):
-        """Use an element ID or the class on the current page
+        """Use an element ID or element class of the current page
         to identify a product page. This will also create a
-        screenshot of the given page"""
+        screenshot of the page"""
         element = None
         if element_id is not None:
             element = self.driver.execute_script(
