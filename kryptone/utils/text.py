@@ -110,6 +110,15 @@ def clean_dictionnary(item, accents=False, punctation=False):
     >>> items = clean_dictionnary({'name': ' Kendall'})
     ... {'name': 'Kendall}
     """
+    if item is None:
+        return {}
+    
+    if isinstance(item, list):
+        return [clean_dictionnary(data) for data in item]
+    
+    if not isinstance(item, dict):
+        raise ValueError('Object to clean should a dictionnary')
+
     new_item = {}
     for key, value in item.items():
         if isinstance(value, str):
