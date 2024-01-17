@@ -35,6 +35,15 @@ class EcommerceCrawlerMixin:
     product_pages = set()
     current_product_file_path = None
 
+    def _check_products_json_file(self):
+        """Checks if the products json file exist and
+        creates an empty one if necessary"""
+        if self.current_product_file_path is None:
+            filename = f'products_{create_filename()}.json'
+            self.current_product_file_path = settings.MEDIA_FOLDER / filename
+            if not self.current_product_file_path.exists():
+                write_json_document(self.current_product_file_path, [])
+
     def calculate_performance(self):
         super().calculate_performance()
         self.statistics.update({
