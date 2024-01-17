@@ -407,6 +407,13 @@ class PagePaginationGenerator:
         for url in self.final_urls:
             yield url
 
+    def __aiter__(self):
+        for url in self.final_urls:
+            yield url
+
+    def __len__(self):
+        return len(self.final_urls)
+
 
 class URLGenerator:
     """Generates a set of urls using a template
