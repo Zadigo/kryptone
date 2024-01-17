@@ -406,7 +406,7 @@ class BaseCrawler(metaclass=Crawler):
         actual visited page. Fragments, empty strings
         a ignored by default. Query strings can be ignored using
         `Meta.ignore_queries` and images with `Meta.ignore_images`.
-        
+
         By default, all the urls that were found during a crawling
         session are save in `list_of_seen_urls` and only valid urls
         to visit are included in `urls_to_visit`"""
@@ -640,7 +640,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def current_page_actions(self, current_url, **kwargs):
         """Custom actions to execute on the current page. 
-    
+
         >>> class MyCrawler(SiteCrawler):
         ...     def current_page_actions(self, current_url, **kwargs):
         ...         text = self.driver.find_element('h1').text
