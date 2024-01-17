@@ -136,6 +136,19 @@ class CrawlerOptions:
         if isinstance(self.start_urls, URLGenerator):
             self.start_urls = list(self.start_urls)
 
+        if isinstance(self.start_urls, list):
+            start_urls = []
+            for item in self.start_urls:
+                if isinstance(item, (URLGenerator, PagePaginationGenerator)):
+                    start_urls.extend(list(item))
+                    continue
+                
+                if isinstance(item, str):
+                    start_urls.extend([item])
+                    continue
+
+            self.start_urls = start_urls
+
         if self.database is not None:
             if not isinstance(self.database, Database):
                 raise ValueError(
