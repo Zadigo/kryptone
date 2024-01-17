@@ -519,6 +519,25 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         filtered_valid_urls = self.url_filters(valid_urls)
+
+        # Apply this filter last just before
+        # we add the urls to the "urls_to_visit"
+        # container. This checks for urls that
+        # match a pattern and should be kept
+        # to visit which differs from the other
+        # traditional filters "url_ignore_tests"
+        # which ignores the urls
+        if self._meta.url_rule_tests:
+            urls_to_keep = set()
+            for url in filtered_valid_urls:
+                instance = URL(url)
+                for regex in self._meta.url_rule_tests:
+                    result = instance.test_url(regex)
+                    if result:
+                        urls_to_keep.add(url)
+                        continue
+            logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
+            filtered_valid_urls = urls_to_keep
         self.urls_to_visit.update(filtered_valid_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
