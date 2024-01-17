@@ -28,13 +28,13 @@ from kryptone.db.tables import Database
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import LoadStartUrls
-from kryptone.utils.iterators import AsyncIterator, URLGenerator
+from kryptone.utils.iterators import AsyncIterator, PagePaginationGenerator, URLGenerator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
-    'domains', 'url_ignore_tests',
+    'domains', 'url_ignore_tests', 'url_rule_tests',
     'debug_mode', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
     'ignore_queries', 'ignore_images', 'restrict_search_to',
@@ -114,6 +114,7 @@ class CrawlerOptions:
         self.ignore_queries = False
         self.ignore_images = False
         self.url_gather_ignore_tests = []
+        self.url_rule_tests = []
         self.database = None
 
     def __repr__(self):
@@ -133,7 +134,10 @@ class CrawlerOptions:
             setattr(self, name, value)
 
     def prepare(self):
-        if isinstance(self.start_urls, URLGenerator):
+        # The user can either use a list of generators or directly
+        # use a generator (URLGenerator, PagePaginationGenerator)
+        # directly in "start_urls"
+        if isinstance(self.start_urls, (URLGenerator, PagePaginationGenerator)):
             self.start_urls = list(self.start_urls)
 
         if isinstance(self.start_urls, list):
