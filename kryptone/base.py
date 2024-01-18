@@ -448,68 +448,81 @@ class BaseCrawler(metaclass=Crawler):
                 )
                 return
 
+        df = pandas.DataFrame({'url': raw_urls})
+
+        def structural_check(url):
+            url = str(url)
+            clean_url = unquote(url)
+
+            if url.startswith('/'):
+                clean_url = self.urljoin(clean_url)
+            
+            return clean_url
+        df['url'] = df['url'].map(structural_check)
+
         valid_urls = set()
         invalid_urls = set()
-        for url in raw_urls:
-            clean_url, url_object = self.url_structural_check(url)
-
-            if refresh:
-                # If we are for example paginating a page,
-                # then we only need to keep the new urls
-                # that have appeared and that we have
-                # not yet seen
-                if url in self.list_of_seen_urls:
-                    invalid_urls.add(clean_url)
-                    continue
-
-            if url_object.netloc != self._start_url_object.netloc:
-                invalid_urls.add(clean_url)
+        for item in df.itertuples():
+            url_object = urlparse(item.url)
+            if item.url in self.list_of_seen_urls:
+                invalid_urls.add(item.url)
                 continue
 
-            if url is None or url == '':
-                invalid_urls.add(clean_url)
+            if url_object.netloc != self._start_url_object.netloc:
+                invalid_urls.add(item.url)
+                continue
+            
+            if item.url is None or item.url == '':
+                invalid_urls.add(item.url)
                 continue
 
             if url_object.fragment:
-                invalid_urls.add(clean_url)
+                invalid_urls.add(item.url)
                 continue
 
-            if url.endswith('#'):
-                invalid_urls.add(clean_url)
+            if item.url.endswith('#'):
+                invalid_urls.add(item.url)
                 continue
 
             if url_object.path == '/' and self._start_url_object.path == '/':
-                invalid_urls.add(clean_url)
+                invalid_urls.add(item.url)
                 continue
 
             if self._meta.ignore_queries:
                 if url_object.query:
-                    invalid_urls.add(clean_url)
+                    invalid_urls.add(item.url)
                     continue
 
-            if self._meta.ignore_images:
-                url_as_path = pathlib.Path(clean_url)
-                if url_as_path.suffix != '':
-                    suffix = url_as_path.suffix.removeprefix('.')
-                    if suffix in constants.IMAGE_EXTENSIONS:
-                        invalid_urls.add(clean_url)
-                        continue
+                if self._meta.ignore_images:
+                    url_as_path = pathlib.Path(item.url)
+                    if url_as_path.suffix != '':
+                        suffix = url_as_path.suffix.removeprefix('.')
+                        if suffix in constants.IMAGE_EXTENSIONS:
+                            invalid_urls.add(item.url)
+                            continue
 
-            if clean_url in self.visited_urls:
-                invalid_urls.add(clean_url)
-                continue
+                if item.url in self.visited_urls:
+                    invalid_urls.add(item.url)
+                    continue
 
-            if clean_url in self.visited_urls:
-                invalid_urls.add(clean_url)
-                continue
+                if item.url in self.visited_urls:
+                    invalid_urls.add(item.url)
+                    continue
 
-            valid_urls.add(clean_url)
-
+                valid_urls.add(item.url)
+        
         self.list_of_seen_urls.update(valid_urls)
         self.list_of_seen_urls.update(invalid_urls)
 
-        if valid_urls:
-            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+        # Use the list of invalid urls to evaluate all the
+        # urls that are valid in the dataframe
+        invalid_urls_df = df[~df.isin({'url': invalid_urls})['url'] == True]
+        for row in invalid_urls_df.itertuples():
+            df.loc[row.Index, 'is_valid'] = True
+
+        valid_urls_df = df[df['is_valid'] == True]
+        if not valid_urls_df.empty:
+            logger.info(f'Kept {len(valid_urls_df.count())} url(s) as valid to visit')
 
         newly_discovered_urls = []
         for url in valid_urls:
@@ -543,6 +556,83 @@ class BaseCrawler(metaclass=Crawler):
             logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
             filtered_valid_urls = urls_to_keep
         self.urls_to_visit.update(filtered_valid_urls)
+
+        # valid_urls = set()
+        # invalid_urls = set()
+        # for url in raw_urls:
+        #     clean_url, url_object = self.url_structural_check(url)
+
+        #     if refresh:
+        #         # If we are for example paginating a page,
+        #         # then we only need to keep the new urls
+        #         # that have appeared and that we have
+        #         # not yet seen
+        #         if url in self.list_of_seen_urls:
+        #             invalid_urls.add(clean_url)
+        #             continue
+
+        #     if url_object.netloc != self._start_url_object.netloc:
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if url is None or url == '':
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if url_object.fragment:
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if url.endswith('#'):
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if url_object.path == '/' and self._start_url_object.path == '/':
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if self._meta.ignore_queries:
+        #         if url_object.query:
+        #             invalid_urls.add(clean_url)
+        #             continue
+
+        #     if self._meta.ignore_images:
+        #         url_as_path = pathlib.Path(clean_url)
+        #         if url_as_path.suffix != '':
+        #             suffix = url_as_path.suffix.removeprefix('.')
+        #             if suffix in constants.IMAGE_EXTENSIONS:
+        #                 invalid_urls.add(clean_url)
+        #                 continue
+
+        #     if clean_url in self.visited_urls:
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     if clean_url in self.visited_urls:
+        #         invalid_urls.add(clean_url)
+        #         continue
+
+        #     valid_urls.add(clean_url)
+
+        # self.list_of_seen_urls.update(valid_urls)
+        # self.list_of_seen_urls.update(invalid_urls)
+
+        # if valid_urls:
+        #     logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+
+        # newly_discovered_urls = []
+        # for url in valid_urls:
+        #     if url not in self.list_of_seen_urls:
+        #         newly_discovered_urls.append(url)
+
+        # if newly_discovered_urls:
+        #     logger.info(
+        #         f"Discovered {len(newly_discovered_urls)} "
+        #         "unseen url(s)"
+        #     )
+
+        # filtered_valid_urls = self.url_filters(valid_urls)
+        # self.urls_to_visit.update(filtered_valid_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
