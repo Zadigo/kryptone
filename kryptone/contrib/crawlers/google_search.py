@@ -7,7 +7,7 @@ from kryptone import logger
 from kryptone.contrib.models import GoogleSearch
 
 
-class GoogleSearchMixin(SiteCrawler):
+class GoogleSearchMixin:
     start_url = "https://www.google.com/search?q=site%3Alinkedin.com%2Fin+Undiz"
     # start_url = 'https://www.google.com/search'
     # query = 'site:linkedin.com/in Undiz'

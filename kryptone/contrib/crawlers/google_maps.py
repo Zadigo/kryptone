@@ -98,7 +98,7 @@ class GoogleMapsMixin:
             time.sleep(3)
 
 
-class GoogleMaps(GoogleMapsMixin, SiteCrawler):
+class GoogleMaps(GoogleMapsMixin):
     """Explores the business feed, gathers each business
     and returns the data"""
 

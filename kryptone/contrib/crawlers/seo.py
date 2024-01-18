@@ -7,7 +7,7 @@ from kryptone.mixins import SEOMixin
 from kryptone.utils import file_readers
 
 
-class SEOCrawler(SiteCrawler, SEOMixin):
+class SEOCrawler(SEOMixin):
     """A crawler specialized for running
     SEO tasks on a given website"""
 
