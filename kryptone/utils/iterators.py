@@ -4,7 +4,7 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property
 from string import Template
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import pytz
 
@@ -430,8 +430,8 @@ class URLGenerator:
         for i, param in enumerate(base_params, start=start):
             new_param = {}
             for key, value in param.items():
-                if value == 'number':
-                    new_param[key] = i
+                if value == 'number' or value == 'k':
+                    new_param[key.removeprefix('$')] = i
             new_params.append(new_param)
 
         self.urls = []
