@@ -95,7 +95,7 @@ class EcommerceCrawlerMixin:
         if 'date' not in data:
             data['date'] = datetime.datetime.now(tz=pytz.UTC)
 
-        self.check_products_json_file()
+        self._check_products_json_file()
 
         new_product = self.add_product(
             data,
