@@ -557,17 +557,18 @@ class BaseCrawler(metaclass=Crawler):
         # to visit which differs from the other
         # traditional filters "url_ignore_tests"
         # which ignores the urls
-        if self._meta.url_rule_tests:
-            urls_to_keep = set()
-            for url in filtered_valid_urls:
-                instance = URL(url)
-                for regex in self._meta.url_rule_tests:
-                    result = instance.test_url(regex)
-                    if result:
-                        urls_to_keep.add(url)
-                        continue
-            logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
-            filtered_valid_urls = urls_to_keep
+        # if self._meta.url_rule_tests:
+        #     urls_to_keep = set()
+        #     for url in filtered_valid_urls:
+        #         instance = URL(url)
+        #         for regex in self._meta.url_rule_tests:
+        #             result = instance.test_url(regex)
+        #             if result:
+        #                 urls_to_keep.add(url)
+        #                 continue
+        #     logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
+        #     filtered_valid_urls = urls_to_keep
+        filtered_valid_urls = self.url_rule_test_filter(filtered_valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
 
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
