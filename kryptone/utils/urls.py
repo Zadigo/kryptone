@@ -2,7 +2,7 @@ from collections import defaultdict
 import pathlib
 import re
 from functools import lru_cache
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 
@@ -63,6 +63,10 @@ class URL:
         ])
 
     @property
+    def has_queries(self):
+        return self.url_object.query != ''
+
+    @property
     def is_file(self):
         path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
         file_extensions = read_document(path, as_list=True)
@@ -74,7 +78,7 @@ class URL:
         if self.as_path.suffix in file_extensions:
             return True
         return False
-
+    
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
