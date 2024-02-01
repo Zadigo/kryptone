@@ -385,6 +385,29 @@ class BaseCrawler(metaclass=Crawler):
             return urls_kept
         return valid_urls
 
+    def url_rule_test_filter(self, valid_urls):
+        """
+        Apply this filter last just before
+        we add the urls to the "urls_to_visit"
+        container. This checks for urls that
+        match a pattern and should be kept
+        to visit which differs from the other
+        traditional filters "url_ignore_tests"
+        which ignores the urls
+        """
+        if self._meta.url_rule_tests:
+            urls_to_keep = set()
+            for url in valid_urls:
+                instance = URL(url)
+                for regex in self._meta.url_rule_tests:
+                    result = instance.test_url(regex)
+                    if result:
+                        urls_to_keep.add(url)
+                        continue
+            logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
+            return urls_to_keep
+        return valid_urls
+
     def add_urls(self, *urls_or_paths):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
