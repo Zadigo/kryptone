@@ -437,8 +437,11 @@ class BaseCrawler(metaclass=Crawler):
 
             counter = counter + 1
             valid_urls.add(clean_url)
-        filtered_valid_urls = self.url_filters(valid_urls)
-        self.urls_to_visit.update(filtered_valid_urls)
+
+        filtered_valid_urls1 = self.url_filters(valid_urls)
+        filtered_valid_urls2 = self.url_rule_test_filter(filtered_valid_urls1)
+   
+        self.urls_to_visit.update(filtered_valid_urls2)
         logger.info(f'{counter} url(s) added')
 
     def get_page_urls(self, current_url, refresh=False):
