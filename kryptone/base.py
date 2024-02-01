@@ -852,7 +852,10 @@ class SiteCrawler(BaseCrawler):
         else:
             self.statistics = previous_statistics
 
-        self.start(**kwargs)
+        if windows > 1:
+            self.boost_start(windows=windows, **kwargs)
+        else:
+            self.start(**kwargs)
 
     def start_from_sitemap_xml(self, url, **kwargs):
         """Start crawling from the XML sitemap
