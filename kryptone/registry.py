@@ -81,11 +81,11 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            # This will tell the driver to open
-            # one more window in more of the one
-            # that is opened
             settings['ACTIVE_SPIDER'] = spider_instance
 
+            # This will tell the driver to open
+            # one more window in additin to the 
+            # one that is opened
             if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
@@ -99,11 +99,12 @@ class SpiderConfig:
             logger.error(e)
             raise Exception(e)
 
-    def resume(self,  windows=1, **params):
+    def resume(self, windows=1, **params):
+        """Interface function used to call `SpiderCrawler.resume`"""
         spider_instance = self.get_spider_instance()
 
         try:
-            spider_instance.resume(**params)
+            spider_instance.resume(windows=windows, **params)
         except KeyboardInterrupt:
             spider_instance.create_dump()
             sys.exit(0)
