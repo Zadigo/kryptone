@@ -1058,7 +1058,7 @@ class SiteCrawler(BaseCrawler):
                 stop = settings.WAIT_TIME_RANGE[1]
                 wait_time = random.randrange(start, stop)
 
-            if os.getenv('KYRPTONE_TEST_RUN') is not None:
+            if os.getenv('KYRPTONE_TEST_RUN') == 'True':
                 break
 
             logger.info(f"Waiting {wait_time}s")
