@@ -571,33 +571,6 @@ class BaseCrawler(metaclass=Crawler):
         filtered_valid_urls = self.url_rule_test_filter(filtered_valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
 
-    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
-        """Scrolls the entire window by incremeting the current
-        scroll position by a given number of pixels"""
-        can_scroll = True
-        new_scroll_pixels = 1000
-
-        while can_scroll:
-            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
-
-            self.driver.execute_script(scroll_script)
-            # Scrolls until we get a result that determines that we
-            # have actually scrolled to the bottom of the page
-            has_reached_bottom = self.driver.execute_script(
-                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
-            )
-            if has_reached_bottom:
-                can_scroll = False
-
-            current_position = self.driver.execute_script(
-                """return window.scrollY"""
-            )
-            if stop_at is not None and current_position > stop_at:
-                can_scroll = False
-
-            new_scroll_pixels = new_scroll_pixels + increment
-            time.sleep(wait_time)
-
     def click_consent_button(self, element_id=None, element_class=None, before_click_wait_time=2, wait_time=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
@@ -622,34 +595,6 @@ class BaseCrawler(metaclass=Crawler):
             # error from being raised
             if wait_time is not None:
                 time.sleep(wait_time)
-
-    def scroll_page_section(self, xpath=None, css_selector=None):
-        """Scrolls a specific portion on the page"""
-        if css_selector:
-            selector = """const mainWrapper = document.querySelector('{condition}')"""
-            selector = selector.format(condition=css_selector)
-        else:
-            selector = self.evaluate_xpath(xpath)
-            # selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
-            # selector = selector.format(condition=xpath)
-
-        body = """
-        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
-
-        const elementHeight = elementToScroll.scrollHeight
-        let currentPosition = elementToScroll.scrollTop
-
-        // Indicates the scrolling speed
-        const scrollStep = Math.ceil(elementHeight / {scroll_step})
-
-        currentPosition += scrollStep
-        elementToScroll.scroll(0, currentPosition)
-
-        return [ currentPosition, elementHeight ]
-        """.format(scroll_step=self.default_scroll_step)
-
-        script = css_selector + '\n' + body
-        return script
 
     def calculate_performance(self):
         """Calculate the overall spider performance"""
@@ -804,9 +749,11 @@ class SiteCrawler(BaseCrawler):
         if start_urls:
             self.add_urls(*start_urls)
 
-    def resume(self, **kwargs):
-        """From a previous list of urls to visit and visited urls, 
-        resume a previous crawling session. In order :
+    def resume(self, windows=1, **kwargs):
+        """Resume a previous crawling sessiong by reloading
+        data from the urls to visit and visited urls json files
+        if present. The presence of previous data is checked 
+        in order by doing the following :
 
             * Redis is checked as the primary database for a cache
             * Memcache is checked in second place
@@ -828,7 +775,7 @@ class SiteCrawler(BaseCrawler):
 
         # Before reloading the urls, run the filters
         # in case previous urls to exclude were
-        # present
+        # present within the files
         valid_urls = self.url_filters(data['urls_to_visit'])
         self.urls_to_visit = set(valid_urls)
         self.visited_urls = set(data['visited_urls'])
