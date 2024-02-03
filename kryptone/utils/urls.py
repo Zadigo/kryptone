@@ -1,12 +1,12 @@
-from collections import defaultdict
 import pathlib
 import re
+from collections import defaultdict
 from functools import lru_cache
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 
-from kryptone import logger
+from kryptone import constants, logger
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
@@ -76,6 +76,16 @@ class URL:
             return False
 
         if self.as_path.suffix in file_extensions:
+            return True
+        return False
+
+    @property
+    def is_image(self):
+        if self.as_path.path == '':
+            return False
+        
+        suffix = self.as_path.suffix.removeprefix('.')
+        if suffix in constants.IMAGE_EXTENSIONS:
             return True
         return False
     
