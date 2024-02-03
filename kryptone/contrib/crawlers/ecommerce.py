@@ -15,14 +15,16 @@ from kryptone.utils.file_readers import (get_media_folder, read_json_document,
                                          write_json_document)
 from kryptone.utils.functions import create_filename
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.text import clean_dictionnary
+from kryptone.utils.text import clean_dictionnary, slugify
 
 TEMPORARY_PRODUCT_CACHE = set()
 
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated
-    to crawling ecommerce websites"""
+    to crawling ecommerce websites. The default model
+    is `Product` which you can customize with your custom
+    model"""
 
     scroll_step = 30
     products = []
@@ -31,6 +33,16 @@ class EcommerceCrawlerMixin:
     model = Product
     found_products_counter = 0
     product_pages = set()
+    current_product_file_path = None
+
+    def _check_products_json_file(self):
+        """Checks if the products json file exist and
+        creates an empty one if necessary"""
+        if self.current_product_file_path is None:
+            filename = f'products_{create_filename()}.json'
+            self.current_product_file_path = settings.MEDIA_FOLDER / filename
+            if not self.current_product_file_path.exists():
+                write_json_document(self.current_product_file_path, [])
 
     def calculate_performance(self):
         super().calculate_performance()
@@ -40,9 +52,9 @@ class EcommerceCrawlerMixin:
         })
 
     def add_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds a product to the internal product container
+        """Adds a product to the internal list product container
 
-        >>> instance.add_product([{...}], track_id=False)
+        >>> instance.add_product({...}, track_id=False)
         ... (True, Product)
         """
         if not data or data is None:
@@ -69,33 +81,21 @@ class EcommerceCrawlerMixin:
         return True, product
 
     def save_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds an saves a product to the backends
+        """Adds a single product data gathered from the website to the
+        underlying container and then creates a file called `products_xyz.json`
+        in the current project's media folder
 
         >>> instance.save_product([{...}], track_id=False)
         ... (True, Product)
         """
+        if data is None:
+            logger.warning('Received None when trying to save a product')
+            return (False, None)
+        
         if 'date' not in data:
             data['date'] = datetime.datetime.now(tz=pytz.UTC)
-        # Before writing new products, ensure that we have previous
-        # products from a previous scrap and if so, load the previous
-        # products. This would prevent overwriting the previous file
-        if not self.products:
-            products_file = pathlib.Path(
-                settings.PROJECT_PATH / 'products.json'
-            )
 
-            previous_products_data = []
-            if not products_file.exists():
-                write_json_document('products.json', [])
-            else:
-                previous_products_data = read_json_document('products.json')
-                self.products = previous_products_data
-
-            self.product_objects = list(
-                map(lambda x: self.model(**x),
-                    previous_products_data))
-            message = f"Loaded {len(self.products)} products from 'products.json'"
-            logger.info(message)
+        self._check_products_json_file()
 
         new_product = self.add_product(
             data,
@@ -103,18 +103,33 @@ class EcommerceCrawlerMixin:
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
         )
-        write_json_document('products.json', self.products)
+        write_json_document(self.current_product_file_path, self.products)
         return new_product
+    
+    def bulk_add_products(self, data, collection_id_regex=None):
+        """Adds multiple products to the internal list product container
 
-    def bulk_save_products(self, data, collection_id_regex=None):
-        """Adds multiple products at once"""
+        >>> instance.add_product([{...}], track_id=False)
+        ... (True, Product)
+        """
         products = []
         for item in data:
-            product = self.save_product(
-                item,
+            state, product = self.add_product(
+                item, 
                 collection_id_regex=collection_id_regex
             )
             products.append(product)
+        return products
+
+    def bulk_save_products(self, data=None, collection_id_regex=None):
+        """Adds multiple products at once to the underlying container
+        if data is provided otherwise will save the current stored products
+        to the `products_xyz.json` file"""
+        products = []
+        if data is not None:
+            self.bulk_add_products(data)
+        self._check_products_json_file()
+        write_json_document(self.current_product_file_path, self.products)
         return products
 
     def save_images(self, product, path, filename=None, download_first=False):
@@ -193,19 +208,19 @@ class EcommerceCrawlerMixin:
         asyncio.run(main())
 
     def as_dataframe(self, sort_by=None):
-        columns_to_keep = [
-            'name', 'description', 'price', 'url', 'material', 'old_price',
-            'breadcrumb', 'collection_id', 'number_of_colors',
-            'id_or_reference', 'composition', 'color'
-        ]
-        df = pandas.DataFrame(self.products, columns=columns_to_keep)
+        # columns_to_keep = [
+        #     'name', 'description', 'price', 'url', 'material', 'old_price',
+        #     'breadcrumb', 'collection_id', 'number_of_colors',
+        #     'id_or_reference', 'composition', 'color'
+        # ]
+        df = pandas.DataFrame(self.products)
         df = df.sort_values(sort_by or 'name')
         return df.drop_duplicates()
 
-    def capture_product_page(self, current_url, element_class=None, element_id=None, prefix=None, force=False):
-        """Use an element ID or the class on the current page
+    def capture_product_page(self, current_url, *, product=None, element_class=None, element_id=None, prefix=None, force=False):
+        """Use an element ID or element class of the current page
         to identify a product page. This will also create a
-        screenshot of the given page"""
+        screenshot of the page"""
         element = None
         if element_id is not None:
             element = self.driver.execute_script(
@@ -226,6 +241,8 @@ class EcommerceCrawlerMixin:
                 screen_shots_folder.mkdir()
 
             filename = create_filename(extension='png', suffix_with_date=True)
+            if product is not None:
+                filename = f'{slugify(product.name)}_{filename}'
             
             if prefix is not None:
                 filename = f'{prefix}_{filename}'

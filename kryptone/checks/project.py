@@ -50,15 +50,16 @@ def check_wait_time():
     if settings.WAIT_TIME < 0:
         errors.append(E006.format(name='WAIT_TIME'))
 
-    if len(settings.WAIT_TIME_RANGE) != 2:
-        errors.append(E007)
+    if settings.WAIT_TIME_RANGE:
+        if len(settings.WAIT_TIME_RANGE) != 2:
+            errors.append(E007)
 
-    for i, value in enumerate(settings.WAIT_TIME_RANGE):
-        if not isinstance(value, int):
-            errors.append(E004.format(time=value))
+        for i, value in enumerate(settings.WAIT_TIME_RANGE):
+            if not isinstance(value, int):
+                errors.append(E004.format(time=value))
 
-        if value < 0:
-            errors.append(f"WAIT_TIME_RANGE[{i}] cannot be a negative number")
+            if value < 0:
+                errors.append(f"WAIT_TIME_RANGE[{i}] cannot be a negative number")
 
     return errors
 

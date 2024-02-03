@@ -98,7 +98,7 @@ class GoogleMapsMixin:
             time.sleep(3)
 
 
-class GoogleMaps(GoogleMapsMixin, SiteCrawler):
+class GoogleMaps(GoogleMapsMixin):
     """Explores the business feed, gathers each business
     and returns the data"""
 
@@ -110,7 +110,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
             self.transform_to_json(self.final_result)
         )
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         try:
             # Google has a special consent form
             self.driver.execute_script(
@@ -129,7 +129,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
         except:
             logger.info('No consent screen')
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         # results_xpath = "//div[contains(@class, 'm6QErb WNBkOb')]/div[2]/div"
         results_xpath = "//div[@role='feed']"
         results_is_scrollable = True
@@ -426,7 +426,7 @@ class GoogleMaps(GoogleMapsMixin, SiteCrawler):
 class GoogleMapsPlace(GoogleMaps):
     """Gathers data for a Google Business place"""
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         current_time = time.time()
         business_information = GoogleBusiness()
 

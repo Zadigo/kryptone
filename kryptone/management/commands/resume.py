@@ -43,8 +43,12 @@ class Command(ProjectCommand):
         if namespace.windows < 0 or namespace.windows > 5:
             raise ValueError('Number of windows should be between 2 and 5')
 
-        spider_config.run(
+        spider_config.resume(
             windows=namespace.windows,
             **params
         )
-        spider_config.resume(**params)
+        # spider_config.run(
+        #     windows=namespace.windows,
+        #     **params
+        # )
+        # spider_config.resume(**params)

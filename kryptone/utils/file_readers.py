@@ -5,6 +5,7 @@ from functools import cached_property, lru_cache
 
 from kryptone import logger
 from kryptone.conf import settings
+from kryptone.exceptions import NoStartUrlsFile
 from kryptone.utils.encoders import DefaultJsonEncoder
 
 
@@ -152,11 +153,14 @@ class LoadStartUrls:
 
     @cached_property
     def content(self):
-        if self.is_json:
-            with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
-                data = json.load(f)
-                return list(set(item['url'] for item in data))
-        else:
-            with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
-                data = set(list(itertools.chain(*csv.reader(f))))
-                return data
+        try:
+            if self.is_json:
+                with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return list(set(item['url'] for item in data))
+            else:
+                with open(settings.PROJECT_PATH / self.filename, mode='r', encoding='utf-8') as f:
+                    data = set(list(itertools.chain(*csv.reader(f))))
+                    return data
+        except FileNotFoundError:
+            raise NoStartUrlsFile()
