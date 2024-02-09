@@ -279,12 +279,16 @@ class BaseCrawler(metaclass=Crawler):
             sorted_urls = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
-            file_readers.write_csv_document('seen_urls.csv', sorted_urls, adapt_data=True)
+            file_readers.write_csv_document(
+                'seen_urls.csv',
+                sorted_urls,
+                adapt_data=True
+            )
 
-        
         async def main():
-            await write_cache_file()
-            await write_seen_urls()
+            async with asyncio.TaskGroup() as t:
+                task1 = t.create_task(write_cache_file())
+                task2 = t.create_task(write_seen_urls())
 
         asyncio.run(main())
 
@@ -326,11 +330,9 @@ class BaseCrawler(metaclass=Crawler):
     def url_structural_check(self, url):
         """Checks the structure of an
         incoming url"""
-        url = str(url)
-        clean_url = unquote(url)
-        if url.startswith('/'):
-            clean_url = self.urljoin(clean_url)
-        return clean_url, urlparse(clean_url)
+        if str(url).startswith('/'):
+            clean_url = self.urljoin(str(clean_url))
+        return URL(url)
 
     def url_filters(self, valid_urls):
         """Excludes urls in the list of urls to visit based
@@ -378,8 +380,8 @@ class BaseCrawler(metaclass=Crawler):
             if url is None:
                 continue
 
-            clean_url, url_object = self.url_structural_check(url)
-            self.list_of_seen_urls.add(clean_url)
+            url_instance = self.url_structural_check(url)
+            self.list_of_seen_urls.add(url_instance.raw_url)
 
             if url in self.visited_urls:
                 invalid_urls.add(url)
@@ -389,12 +391,12 @@ class BaseCrawler(metaclass=Crawler):
                 invalid_urls.add(url)
                 continue
 
-            if url_object.netloc == '' and url_object.path == '':
+            if url_instance.url_object.netloc == '' and url_instance.url_object.path == '':
                 invalid_urls.add(url)
                 continue
 
             counter = counter + 1
-            valid_urls.add(clean_url)
+            valid_urls.add(url_instance.raw_url)
         filtered_valid_urls = self.url_filters(valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
         logger.info(f'{counter} url(s) added')
@@ -426,7 +428,7 @@ class BaseCrawler(metaclass=Crawler):
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
-            clean_url, url_object = self.url_structural_check(url)
+            url_instance = self.url_structural_check(url)
 
             if refresh:
                 # If we are for example paginating a page,
@@ -434,11 +436,11 @@ class BaseCrawler(metaclass=Crawler):
                 # that have appeared and that we have
                 # not yet seen
                 if url in self.list_of_seen_urls:
-                    invalid_urls.add(clean_url)
+                    invalid_urls.add(url_instance.raw_url)
                     continue
 
-            if url_object.netloc != self._start_url_object.netloc:
-                invalid_urls.add(clean_url)
+            if url_instance.url_object.netloc != self._start_url_object.netloc:
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
             if url is None or url == '':
@@ -600,7 +602,7 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         async def main():
-            global_performance  = await performance()
+            global_performance = await performance()
             urls_performance = await performance_urls()
 
             self.statistics.update({
@@ -661,6 +663,24 @@ class SiteCrawler(BaseCrawler):
         except:
             pass
         logger.info('Project stopped')
+
+    # def __getstate__(self):
+    #     serialized_meta = OrderedDict()
+    #     for key, value in self._meta.__dict__.keys():
+    #         if key.startswith('__'):
+    #             continue
+    #         serialized_meta[key] = value
+    #     spider_info = {
+    #         self.__class__.__name__: {
+    #             'path': self.__module__,
+    #             'meta': serialized_meta
+    #         },
+    #     }
+    #     return spider_info
+        
+
+    # def __setstate__(self, state):
+    #     return 
 
     @classmethod
     def create(cls, **params):
@@ -811,11 +831,13 @@ class SiteCrawler(BaseCrawler):
         """Enrich a JSON document that with additional
         data by """
         if not isinstance(self._meta.start_urls, LoadStartUrls):
-            raise ValueError("start_urls should be an instance of LoadStartUrls")
+            raise ValueError(
+                "start_urls should be an instance of LoadStartUrls")
 
         # Preload the content to fill
         # the cache
-        self.cached_json_items = pandas.read_json(settings.PROJECT_PATH / 'start_urls.json')
+        self.cached_json_items = pandas.read_json(
+            settings.PROJECT_PATH / 'start_urls.json')
         self._meta.crawl = False
         self.enrichment_mode = True
 
@@ -837,17 +859,17 @@ class SiteCrawler(BaseCrawler):
         # webhooks = Webhooks(settings.STORAGE_BACKENDS['webhooks'])
 
         while self.urls_to_visit:
-            current_url = self.urls_to_visit.pop()
+            current_url = URL(self.urls_to_visit.pop())
             logger.info(f"{len(self.urls_to_visit)} urls left to visit")
 
-            if current_url is None:
+            if current_url.is_empty:
                 continue
 
-            current_url_object = urlparse(current_url)
+            # current_url_object = urlparse(current_url)
             # If we are not on the same domain as the
             # starting url: *stop*. we are not interested
             # in exploring the whole internet
-            if current_url_object.netloc != self._start_url_object.netloc:
+            if current_url.url_object.netloc != self._start_url_object.netloc:
                 continue
 
             logger.info(f'Going to url: {current_url}')
@@ -856,13 +878,10 @@ class SiteCrawler(BaseCrawler):
             # that is an image if it happened to be in
             # the urls_to_visit
             if self._meta.ignore_images:
-                path = pathlib.Path(current_url_object.path)
-                if path.suffix != '':
-                    suffix = path.suffix.removeprefix('.')
-                    if suffix in constants.IMAGE_EXTENSIONS:
-                        continue
+                if current_url.is_image:
+                    continue
 
-            self.driver.get(current_url)
+            self.driver.get(str(current_url))
             self.visited_pages_count = self.visited_pages_count + 1
 
             try:
@@ -885,13 +904,14 @@ class SiteCrawler(BaseCrawler):
             #     images_list_filter=['jpg', 'jpeg', 'webp']
             # )
 
-            self.visited_urls.add(current_url)
-
-            url_instance = URL(current_url)
+            # TODO: Use the url instances directly
+            # in visited_urls and list_urls_seen
+            # self.visited_urls.add(current_url)
+            self.visited_urls.add(str(current_url))
 
             if self._meta.crawl:
                 # s = time.time()
-                self.get_page_urls(url_instance)
+                self.get_page_urls(current_url)
                 # e = round(time.time() - s, 2)
                 # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
@@ -901,11 +921,12 @@ class SiteCrawler(BaseCrawler):
             try:
                 if self.enrichment_mode:
                     current_json_object = self.cached_json_items[self.cached_json_items['url'] == current_url]
-                    run_action_params.update({'current_json_object': current_json_object})
+                    run_action_params.update(
+                        {'current_json_object': current_json_object})
 
                 # Run custom user actions once
                 # everything is completed
-                self.run_actions(url_instance, **run_action_params)
+                self.run_actions(current_url, **run_action_params)
             except TypeError as e:
                 logger.error(e)
                 raise TypeError(
@@ -928,14 +949,14 @@ class SiteCrawler(BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.get_page_urls(url_instance, refresh=True)
+                    self.get_page_urls(current_url, refresh=True)
                     self._backup_urls()
 
             # Run routing actions aka, base on given
             # url path, route to a function that
             # would execute said task
             if self._meta.router is not None:
-                self._meta.router.resolve(url_instance, self)
+                self._meta.router.resolve(current_url, self)
 
             if self._meta.crawl:
                 self.calculate_performance()
@@ -1087,7 +1108,7 @@ class SiteCrawler(BaseCrawler):
                 if self._meta.crawl:
                     self.calculate_performance()
                     file_readers.write_json_document(
-                        'performance.json', 
+                        'performance.json',
                         self.statistics
                     )
 
