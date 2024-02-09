@@ -1,3 +1,4 @@
+
 import kryptone
 from kryptone.checks.core import checks_registry
 from kryptone.management.base import ProjectCommand
@@ -6,7 +7,7 @@ from kryptone.registry import registry
 
 class Command(ProjectCommand):
     requires_system_checks = True
-    
+
     def add_arguments(self, parser):
         parser.add_argument(
             'name',
@@ -24,10 +25,11 @@ class Command(ProjectCommand):
             '-w',
             '--windows',
             type=int,
-            default=3,
+            default=0,
             help='Number of windows to launch for a spider'
         )
 
+    # TODO: Add enrichment to process
     def execute(self, namespace):
         kryptone.setup()
         checks_registry.run()
@@ -38,17 +40,13 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        params = {}
+        params = {'language': namespace.language}
+
         spider_config = registry.get_spider(namespace.name)
         if namespace.windows < 0 or namespace.windows > 5:
             raise ValueError('Number of windows should be between 2 and 5')
 
-        spider_config.resume(
+        spider_config.enrich(
             windows=namespace.windows,
             **params
         )
-        # spider_config.run(
-        #     windows=namespace.windows,
-        #     **params
-        # )
-        # spider_config.resume(**params)

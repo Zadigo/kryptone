@@ -12,7 +12,7 @@ class DefaultJsonEncoder(JSONEncoder):
 
     def default(self, obj):
         from kryptone.utils.urls import URL
-        
+
         # Date/Time string spcifications at ECMA 262
         # https://ecma-international.org/ecma-262/5.1/#sec-15.9.1.15
 

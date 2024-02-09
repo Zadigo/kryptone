@@ -23,3 +23,12 @@ class SpiderExistsError(Exception):
 class BadImplementationError(Exception):
     def __init__(self, message):
         super().__init__(message)
+
+
+class NoStartUrlsFile(Exception):
+    def __init__(self):
+        message = (
+            "The root of your project should "
+            "have a 'start_urls.csv' file"
+        )
+        super().__init__(message)

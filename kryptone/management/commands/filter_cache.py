@@ -1,8 +1,9 @@
+import pandas
+
 import kryptone
 from kryptone import logger
-from kryptone.management.base import ProjectCommand
 from kryptone.checks.core import checks_registry
-import pandas
+from kryptone.management.base import ProjectCommand
 from kryptone.utils.file_readers import read_json_document, write_json_document
 
 
