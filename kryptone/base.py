@@ -442,43 +442,40 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             if url is None or url == '':
-                invalid_urls.add(clean_url)
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
-            if url_object.fragment:
-                invalid_urls.add(clean_url)
+            if url_instance.has_fragment:
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
             if url.endswith('#'):
-                invalid_urls.add(clean_url)
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
-            if url_object.path == '/' and self._start_url_object.path == '/':
-                invalid_urls.add(clean_url)
+            if url_instance.url_object.path == '/' and self._start_url_object.path == '/':
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
             if self._meta.ignore_queries:
-                if url_object.query:
-                    invalid_urls.add(clean_url)
+                if url_instance.url_object.query:
+                    invalid_urls.add(url_instance.raw_url)
                     continue
 
             if self._meta.ignore_images:
-                url_as_path = pathlib.Path(clean_url)
-                if url_as_path.suffix != '':
-                    suffix = url_as_path.suffix.removeprefix('.')
-                    if suffix in constants.IMAGE_EXTENSIONS:
-                        invalid_urls.add(clean_url)
-                        continue
+                if url_instance.is_image:
+                    invalid_urls.add(url_instance.raw_url)
+                    continue
 
-            if clean_url in self.visited_urls:
-                invalid_urls.add(clean_url)
+            if url_instance.raw_url in self.visited_urls:
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
-            if clean_url in self.visited_urls:
-                invalid_urls.add(clean_url)
+            if url_instance.raw_url in self.list_of_seen_urls:
+                invalid_urls.add(url_instance.raw_url)
                 continue
 
-            valid_urls.add(clean_url)
+            valid_urls.add(url_instance.raw_url)
 
         self.list_of_seen_urls.update(valid_urls)
         self.list_of_seen_urls.update(invalid_urls)
