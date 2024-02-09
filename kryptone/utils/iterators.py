@@ -46,7 +46,7 @@ def group_by(predicate, items):
 def iterate_chunks(items, n):
     """Function that creates and iterates over
     chunks of data
-    
+
     >>> iterate_chunks([1, 2, 3], 2)
     ... [1, 2]
     ... [3]
@@ -121,7 +121,7 @@ class PageImagesIterator:
     images on the page except base64 types
 
     Subclass PageImagesIterator to collect specific
-    types of images.
+    types of images
     """
 
     images_list_filter = []
@@ -132,24 +132,23 @@ class PageImagesIterator:
         self._cached_images = []
         self.extensions = set()
 
-        extension_regex = re.compile(r'\.(\w+)$')
-
+        from kryptone.utils.urls import URL
         for image in image_elements:
             image_alt = image.get_attribute('alt')
             src = image.get_attribute('src')
 
-            if src is not None:
-                url_object = urlparse(src)
-                is_image = extension_regex.search(url_object.path)
-                if is_image:
-                    if is_image.group(1) not in self.images_list_filter:
-                        continue
-                    self.extensions.add(is_image.group(1))
+            instance = URL(src)
+            if instance.is_empty:
+                continue
 
-                # We are not interested in base64 images
+            if instance.is_image:
+                if instance.get_extension not in self.images_list_filter:
+                    continue
+                self.extensions.add(instance.get_extension)
+
                 if src.startswith('data:image'):
                     continue
-                self.urls.append([image_alt, src])
+                self.urls.append([image_alt, instance.raw_url])
 
     def __repr__(self):
         return f'<PageImages: {self.page_url}, {len(self.urls)} images>'
@@ -396,7 +395,7 @@ class PagePaginationGenerator:
     >>> PagePaginationGenerator('http://example.com', k=2)
     ... ['http://example.com?page=1', 'http://example.com?page=2']
     """
-    
+
     def __init__(self, url, query='page', k=10):
         self.urls = []
         self.final_urls = []
@@ -474,7 +473,6 @@ class URLGenerator:
 
     def __len__(self):
         return len(self.urls)
-
 
 
 # class W:
