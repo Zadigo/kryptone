@@ -72,6 +72,18 @@ class URL:
         return len(self.raw_url)
 
     @property
+    def is_social_link(self):
+        return any([
+            'facebook.com' in self.raw_url,
+            'twitter.com' in self.raw_url,
+            'tiktok.com' in self.raw_url,
+            'snapchat.com' in self.raw_url,
+            'youtube.com' in self.raw_url,
+            'pinterest.com' in self.raw_url,
+            'spotify.com' in self.raw_url
+        ])
+
+    @property
     def is_empty(self):
         return self.raw_url == ''
 
