@@ -1,7 +1,7 @@
 import pathlib
 import re
 from collections import defaultdict
-from functools import lru_cache
+from functools import cached_property
 from urllib.parse import urljoin, urlparse, urlunparse, unquote
 
 import requests
@@ -71,6 +71,11 @@ class URL:
     def __len__(self):
         return len(self.raw_url)
 
+    @cached_property
+    def _file_extensions(self):
+        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
+        return read_document(path, as_list=True)
+
     @property
     def is_social_link(self):
         return any([
@@ -120,19 +125,14 @@ class URL:
             'is_valid': self.is_valid
         }
 
-    def has_queries(self):
-        return self.url_object.query != ''
-
     @property
     def is_file(self):
-        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
-        file_extensions = read_document(path, as_list=True)
         extension = self.as_path.suffix
 
         if extension == '':
             return False
 
-        if self.as_path.suffix in file_extensions:
+        if self.as_path.suffix in self._file_extensions:
             return True
         return False
 
@@ -157,6 +157,9 @@ class URL:
     @classmethod
     def create(cls, url):
         return cls(url)
+
+    def has_queries(self):
+        return self.url_object.query != ''
 
     def is_same_domain(self, url):
         """Checks that an incoming url is the same
