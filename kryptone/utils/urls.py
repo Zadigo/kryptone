@@ -1,12 +1,12 @@
-from collections import defaultdict
 import pathlib
 import re
+from collections import defaultdict
 from functools import lru_cache
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import requests
 
-from kryptone import logger
+from kryptone import constants, logger
 from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
@@ -20,8 +20,12 @@ class URL:
     """
 
     def __init__(self, url_string):
-        self.raw_url = url_string
-        self.url_object = urlparse(self.raw_url)
+        if isinstance(url_string, URL):
+            self.raw_url = url_string.raw_url
+            self.url_object = url_string.url_object
+        else:
+            self.raw_url = unquote(url_string or '')
+            self.url_object = urlparse(self.raw_url)
 
     def __repr__(self):
         return f'<URL: {self.raw_url}>'
@@ -35,6 +39,29 @@ class URL:
     def __add__(self, obj):
         return URL(urljoin(self.raw_url, obj))
 
+    # def __and__(self, obj):
+    #     return all([
+    #         self.raw_url != '',
+    #         self.is_valid,
+    #         obj.raw_url != '',
+    #         obj.is_valid == True
+    #     ])
+
+    def __invert__(self):
+        return all([
+            not self.is_valid,
+            not self.raw_url == ''
+        ])
+
+    # def __or__(self, obj):
+    #     if not isinstance(obj, URL):
+    #         obj = URL(obj)
+    #     invalid_state = any([
+    #         self.raw_url == '',
+    #         self.is_valid == False
+    #     ])
+    #     return obj if invalid_state else self
+
     def __contains__(self, obj):
         return obj in self.raw_url
 
@@ -45,8 +72,20 @@ class URL:
         return len(self.raw_url)
 
     @property
+    def is_empty(self):
+        return self.raw_url == ''
+
+    @property
     def is_path(self):
         return self.raw_url.startswith('/')
+
+    @property
+    def is_image(self):
+        if self.as_path.suffix != '':
+            suffix = self.as_path.suffix.removeprefix('.')
+            if suffix in constants.IMAGE_EXTENSIONS:
+                return True
+        return False
 
     @property
     def is_valid(self):
@@ -61,6 +100,13 @@ class URL:
             self.url_object.fragment != '',
             self.raw_url.endswith('#')
         ])
+
+    @property
+    def as_dict(self):
+        return {
+            'url': self.raw_url,
+            'is_valid': self.is_valid
+        }
 
     @property
     def is_file(self):
@@ -96,10 +142,10 @@ class URL:
     @classmethod
     def create(cls, url):
         return cls(url)
-    
+
     def is_same_domain(self, url):
-        incoming_url_object = urlparse(url)
-        return incoming_url_object.netloc == self.url_object.netloc
+        instance = URL(url)
+        return instance.url_object.netloc == self.url_object.netloc
 
     def get_status(self):
         headers = {'User-Agent': RANDOM_USER_AGENT()}
@@ -224,7 +270,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         exclusion_truth_array = []
 
         url = self.convert_url(url)
-        
+
         # Include all the urls that match
         # the path to exclude as True and the
         # others as False
@@ -238,7 +284,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         if any(exclusion_truth_array):
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
@@ -266,7 +312,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         if result:
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
@@ -294,7 +340,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
 #             return False
 #         logger.warning(
 #             self.error_message.format(
-#                 url=url, 
+#                 url=url,
 #                 filter_name=self.name
 #             )
 #         )
