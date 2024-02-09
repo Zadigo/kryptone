@@ -119,6 +119,7 @@ class URL:
             'url': self.raw_url,
             'is_valid': self.is_valid
         }
+
     def has_queries(self):
         return self.url_object.query != ''
 
@@ -134,7 +135,7 @@ class URL:
         if self.as_path.suffix in file_extensions:
             return True
         return False
-    
+
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
@@ -250,7 +251,7 @@ class URL:
     def remove_fragment(self):
         """Reconstructs the url without the fragment
         if it is present but keeps the queries
-        
+
         >>> url = URL('http://example.com#')
         ... url.reconstruct()
         ... 'http://example.com'
