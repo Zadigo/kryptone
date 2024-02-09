@@ -1,13 +1,14 @@
 import asyncio
 import json
 
-from requests import Session
 import requests
+from requests import Session
 from requests.auth import HTTPBasicAuth
 from requests.models import Request
+
+from kryptone import logger
 from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.iterators import iterate_chunks
-from kryptone import logger
 
 
 class BaseWebhook:
