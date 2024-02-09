@@ -476,42 +476,6 @@ class BaseCrawler(metaclass=Crawler):
                 )
                 return
 
-        # # TODO: Try code with dataframe
-        # raw_urls = pandas.DataFrame({'urls': raw_urls})
-        # raw_urls['is_valid'] = False
-        # raw_urls['clean_urls'] = raw_urls['urls'].map(lambda x: self.url_structural_check(x).raw_url)
-
-        # def url_check(df):
-        #     for item in df.itertuples(name='Url'):
-        #         instance = URL(df.loc[item.Index, 'clean_url'])
-        #         if not instance.is_same_domain(self._start_url_object):
-        #             continue
-        #         if instance.is_empty:
-        #             continue
-        #         if instance.has_fragment:
-        #             continue
-        #         if instance.url_object.path == '/' and self._start_url_object.url_object.path == '/':
-        #             continue
-        #         if self._meta.ignore_queries:
-        #             if url_instance.has_queries():
-        #                 invalid_urls.add(url_instance.raw_url)
-        #                 continue
-        #         if self._meta.ignore_images:
-        #             if url_instance.is_image:
-        #                 invalid_urls.add(url_instance.raw_url)
-        #                 continue
-        #         df.loc[item.Index, 'is_valid'] = True
-        #     return df
-        
-        # raw_urls.pipe(url_check)
-        
-        # valid_urls = raw_urls[raw_urls['is_valid'] == True]
-        # invalid_urls = raw_urls[raw_urls['is_valid'] == False]
-
-        # valid_urls = valid_urls.sort_values('clean_urls')
-
-        # newly_discovered_urls = valid_urls['clean_urls'].isin(self.list_of_seen_urls).count()
-
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
