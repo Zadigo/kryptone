@@ -2,7 +2,7 @@ import pathlib
 import re
 from collections import defaultdict
 from functools import lru_cache
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse, unquote
 
 import requests
 
@@ -107,6 +107,8 @@ class URL:
             'url': self.raw_url,
             'is_valid': self.is_valid
         }
+    def has_queries(self):
+        return self.url_object.query != ''
 
     @property
     def is_file(self):
@@ -120,7 +122,7 @@ class URL:
         if self.as_path.suffix in file_extensions:
             return True
         return False
-
+    
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
@@ -225,14 +227,25 @@ class URL:
             return False
         return list(drop_while(clean_values, result))
 
-    # def paginate(self, k=10, regex_path=None, param=None):
-    #     """Increase the pagination number provided
-    #     on a given url"""
-    #     if regex_path is None and param is None:
-    #         # If we have nothing, classically, page
-    #         # is used to paginate in urls
-    #         param = 'page'
-    #     return 1
+    def remove_fragment(self):
+        """Reconstructs the url without the fragment
+        if it is present but keeps the queries
+        
+        >>> url = URL('http://example.com#')
+        ... url.reconstruct()
+        ... 'http://example.com'
+        """
+        clean_url = urlunparse((
+            self.url_object.scheme,
+            self.url_object.netloc,
+            self.url_object.path,
+            None,
+            None,
+            None
+        ))
+        if self.has_fragment:
+            return self.create(clean_url)
+        return self
 
 
 class BaseURLTestsMixin:

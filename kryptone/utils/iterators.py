@@ -1,20 +1,13 @@
+import datetime
 import itertools
 import re
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from functools import cached_property
-from urllib.parse import urlparse
-from collections import defaultdict
-import datetime
-import re
-from collections import OrderedDict
-from urllib.parse import urlparse
+from string import Template
+from urllib.parse import urlencode, urlparse
 
 import pytz
 
-from string import Template
-from collections import defaultdict
-import re
-from urllib.parse import urlparse
 
 def drop_null(items, remove_empty_strings=True):
     for item in items:
@@ -95,7 +88,7 @@ class CombinedIterators:
         for item in self.iterators:
             urls = list(item)
             for url in urls:
-                urls_list.append(url[1])
+                urls_list.append(url)
         return urls_list
 
     @cached_property
@@ -396,6 +389,53 @@ class URLIterator:
         return self._current_url
 
 
+class PagePaginationGenerator:
+    """
+    Generates a set of urls with a pagination query
+
+    >>> PagePaginationGenerator('http://example.com', k=2)
+    ... ['http://example.com?page=1', 'http://example.com?page=2']
+    """
+    
+    def __init__(self, url, query='page', k=10):
+        self.urls = []
+        self.final_urls = []
+
+        from kryptone.utils.urls import URL
+        if isinstance(url, str):
+            url = URL(url).remove_fragment()
+        url = str(url)
+
+        if isinstance(k, float):
+            k = int(k)
+
+        for i in range(k):
+            self.urls.append(url)
+
+        counter = 1
+        for url in self.urls:
+            final_query = urlencode({query: str(counter)}, encoding='utf-8')
+            self.final_urls.append(url + f'?{final_query}')
+            counter = counter + 1
+
+    def __repr__(self):
+        return f'<{self.__class__.__name__}: {len(self.final_urls)}>'
+
+    def __iter__(self):
+        for url in self.final_urls:
+            yield url
+
+    def __aiter__(self):
+        for url in self.final_urls:
+            yield url
+
+    def __len__(self):
+        return len(self.final_urls)
+
+    def __add__(self, obj):
+        return CombinedIterators(self, obj)
+
+
 class URLGenerator:
     """Generates a set of urls using a template
 
@@ -411,8 +451,8 @@ class URLGenerator:
         for i, param in enumerate(base_params, start=start):
             new_param = {}
             for key, value in param.items():
-                if value == 'number':
-                    new_param[key] = i
+                if value == 'number' or value == 'k':
+                    new_param[key.removeprefix('$')] = i
             new_params.append(new_param)
 
         self.urls = []

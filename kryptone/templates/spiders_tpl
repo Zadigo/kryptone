@@ -24,8 +24,8 @@ from kryptone.base import SiteCrawler
 class MyFirstCrawler(SiteCrawler):
     start_url = None
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         pass
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         pass

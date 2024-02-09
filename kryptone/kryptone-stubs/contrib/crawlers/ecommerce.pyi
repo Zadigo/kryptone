@@ -1,4 +1,7 @@
+import pathlib
 from typing import Any, List, Literal, Tuple
+
+import pandas
 
 from kryptone.contrib.models import Product
 from kryptone.utils.urls import URL
@@ -14,6 +17,9 @@ class EcommerceCrawlerMixin:
     model: Product = ...
     found_products_counter: int = ...
     product_pages: set = ...
+    current_product_file_path: pathlib.Path = ...
+
+    def _check_products_json_file(self) -> None: ...
 
     def calculate_performance(self) -> None: ...
 
@@ -31,12 +37,17 @@ class EcommerceCrawlerMixin:
         collection_id_regex: str = ...,
         avoid_duplicates: bool = ...,
         duplicate_key: str = ...
-    ) -> Tuple[bool, Product]: ...
-
+    ) -> Union[Tuple[bool, Product], Tuple[bool, None]]: ...
+    
+    def bulk_add_products(
+        self, 
+        data: list[dict[str, Any]], 
+        collection_id_regex: str=...
+    ) -> list[Product]:
+    
     def bulk_save_products(
         self,
-        data: dict[str, Any],
-        track_id: bool = ...,
+        data: list[dict[str, Any]],
         collection_id_regex: str = ...
     ) -> List[Product]: ...
 
@@ -48,9 +59,16 @@ class EcommerceCrawlerMixin:
         download_first: bool = ...
     ) -> None: ...
 
+    def as_dataframe(
+        self, 
+        sort_by: str = ...
+    ) -> pandas.DataFrame:
+
     def capture_product_page(
         self,
         current_url: URL,
+        *,
+        product: Product = ...,
         element_class: str = ...,
         element_id: str = ...,
         prefix: str = ...,

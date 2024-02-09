@@ -81,28 +81,30 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
-            # This will tell the driver to open
-            # one more window in more of the one
-            # that is opened
             settings['ACTIVE_SPIDER'] = spider_instance
 
+            # This will tell the driver to open
+            # one more window in additin to the 
+            # one that is opened
             if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
                 spider_instance.start(**params)
         except KeyboardInterrupt:
             spider_instance.create_dump()
+            logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
             spider_instance.create_dump()
             logger.error(e)
             raise Exception(e)
 
-    def resume(self,  windows=1, **params):
+    def resume(self, windows=1, **params):
+        """Interface function used to call `SpiderCrawler.resume`"""
         spider_instance = self.get_spider_instance()
 
         try:
-            spider_instance.resume(**params)
+            spider_instance.resume(windows=windows, **params)
         except KeyboardInterrupt:
             spider_instance.create_dump()
             sys.exit(0)
@@ -111,6 +113,7 @@ class SpiderConfig:
             logger.error(e)
             raise Exception(e)
 
+    # TODO: Add enrichment to spider process
     def enrich(self,  windows=1, **params):
         """Runs the spider by calling the spider class
         which in return calls "start_from_json" method on the
@@ -154,7 +157,9 @@ class MasterRegistry:
         if not self.has_spiders:
             raise ValueError(
                 "Spiders are not yet loaded or "
-                "there are no registered ones."
+                "there are no registered ones in your project. "
+                "Ensure that you spider classes inherit from 'SiteCrawler' "
+                "if you are using for example a mixin like 'EcommerceCrawlerMixin'"
             )
 
     def pre_configure_project(self, dotted_path, settings):
@@ -208,6 +213,7 @@ class MasterRegistry:
         try:
             spiders_module = import_module(f'{dotted_path}.{SPIDERS_MODULE}')
         except Exception as e:
+            logger.critical(e)
             raise ExceptionGroup(
                 f"An error occured when trying to load the project '{self.project_name}'",
                 [

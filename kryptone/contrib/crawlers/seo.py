@@ -7,7 +7,7 @@ from kryptone.mixins import SEOMixin
 from kryptone.utils import file_readers
 
 
-class SEOCrawler(SiteCrawler, SEOMixin):
+class SEOCrawler(SEOMixin):
     """A crawler specialized for running
     SEO tasks on a given website"""
 
@@ -33,7 +33,7 @@ class SEOCrawler(SiteCrawler, SEOMixin):
 
         self.start(**kwargs)
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         self.audit_page(current_url)
 
         async def write_audit_documents():
