@@ -1,11 +1,10 @@
 import asyncio
-import bisect
 import datetime
 import os
 import random
 import time
 from collections import OrderedDict, defaultdict, namedtuple
-from urllib.parse import unquote, urlencode, urlparse, urlunparse
+from urllib.parse import unquote, urlencode, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import pandas
@@ -22,15 +21,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import constants, exceptions, logger
+from kryptone import constants, exceptions, logger, receivers, signal_constants
 from kryptone.conf import settings
 from kryptone.db.tables import Database
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import LoadStartUrls
-from kryptone.utils.iterators import AsyncIterator, PagePaginationGenerator, URLGenerator
+from kryptone.utils.iterators import (AsyncIterator, PagePaginationGenerator,
+                                      URLGenerator)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.urls import URL, pathlib
+from kryptone.utils.urls import URL
 from kryptone.webhooks import Webhooks
 
 DEFAULT_META_OPTIONS = {
@@ -293,14 +292,20 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         async def write_seen_urls():
-            sorted_urls = []
-            for url in self.list_of_seen_urls:
-                bisect.insort(sorted_urls, url)
-            file_readers.write_csv_document(
+            df = pandas.DataFrame({'urls': list(self.list_of_seen_urls)})
+            df = df.sort_values('urls')
+            df.to_csv(
                 'seen_urls.csv',
-                sorted_urls,
-                adapt_data=True
+                index=False
             )
+            # sorted_urls = []
+            # for url in self.list_of_seen_urls:
+            #     bisect.insort(sorted_urls, url)
+            # file_readers.write_csv_document(
+            #     'seen_urls.csv',
+            #     sorted_urls,
+            #     adapt_data=True
+            # )
 
         async def main():
             async with asyncio.TaskGroup() as t:
@@ -471,6 +476,42 @@ class BaseCrawler(metaclass=Crawler):
                 )
                 return
 
+        # # TODO: Try code with dataframe
+        # raw_urls = pandas.DataFrame({'urls': raw_urls})
+        # raw_urls['is_valid'] = False
+        # raw_urls['clean_urls'] = raw_urls['urls'].map(lambda x: self.url_structural_check(x).raw_url)
+
+        # def url_check(df):
+        #     for item in df.itertuples(name='Url'):
+        #         instance = URL(df.loc[item.Index, 'clean_url'])
+        #         if not instance.is_same_domain(self._start_url_object):
+        #             continue
+        #         if instance.is_empty:
+        #             continue
+        #         if instance.has_fragment:
+        #             continue
+        #         if instance.url_object.path == '/' and self._start_url_object.url_object.path == '/':
+        #             continue
+        #         if self._meta.ignore_queries:
+        #             if url_instance.has_queries():
+        #                 invalid_urls.add(url_instance.raw_url)
+        #                 continue
+        #         if self._meta.ignore_images:
+        #             if url_instance.is_image:
+        #                 invalid_urls.add(url_instance.raw_url)
+        #                 continue
+        #         df.loc[item.Index, 'is_valid'] = True
+        #     return df
+        
+        # raw_urls.pipe(url_check)
+        
+        # valid_urls = raw_urls[raw_urls['is_valid'] == True]
+        # invalid_urls = raw_urls[raw_urls['is_valid'] == False]
+
+        # valid_urls = valid_urls.sort_values('clean_urls')
+
+        # newly_discovered_urls = valid_urls['clean_urls'].isin(self.list_of_seen_urls).count()
+
         valid_urls = set()
         invalid_urls = set()
         for url in raw_urls:
@@ -485,12 +526,10 @@ class BaseCrawler(metaclass=Crawler):
                     invalid_urls.add(url_instance.raw_url)
                     continue
 
-            # if url_instance.url_object.netloc != self._start_url_object.netloc:
             if not url_instance.is_same_domain(self._start_url_object):
                 invalid_urls.add(url_instance.raw_url)
                 continue
 
-            # if url is None or url == '':
             if url_instance.is_empty:
                 invalid_urls.add(url_instance.raw_url)
                 continue
@@ -504,7 +543,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             if self._meta.ignore_queries:
-                if url_instance.url_object.query:
+                if url_instance.has_queries():
                     invalid_urls.add(url_instance.raw_url)
                     continue
 
@@ -542,24 +581,6 @@ class BaseCrawler(metaclass=Crawler):
 
         filtered_valid_urls = self.url_filters(valid_urls)
 
-        # Apply this filter last just before
-        # we add the urls to the "urls_to_visit"
-        # container. This checks for urls that
-        # match a pattern and should be kept
-        # to visit which differs from the other
-        # traditional filters "url_ignore_tests"
-        # which ignores the urls
-        # if self._meta.url_rule_tests:
-        #     urls_to_keep = set()
-        #     for url in filtered_valid_urls:
-        #         instance = URL(url)
-        #         for regex in self._meta.url_rule_tests:
-        #             result = instance.test_url(regex)
-        #             if result:
-        #                 urls_to_keep.add(url)
-        #                 continue
-        #     logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
-        #     filtered_valid_urls = urls_to_keep
         filtered_valid_urls = self.url_rule_test_filter(filtered_valid_urls)
         self.urls_to_visit.update(filtered_valid_urls)
 
@@ -589,7 +610,8 @@ class BaseCrawler(metaclass=Crawler):
                 time.sleep(wait_time)
 
     def calculate_performance(self):
-        """Calculate the overall spider performance"""
+        """Calculate the overall spider performance
+        and scrapping url process"""
         # Calculate global performance
         async def performance():
             self._end_date = get_current_date(timezone=self.timezone)
@@ -676,6 +698,11 @@ class SiteCrawler(BaseCrawler):
              'visited_pages_count']
         )
         self.statistics = {}
+
+        signal_constants.navigation.connect(
+            receivers.collect_images_receiver,
+            self
+        )
 
         # self.cached_json_items = None
         # self.enrichment_mode = False
@@ -836,24 +863,6 @@ class SiteCrawler(BaseCrawler):
             start_urls.append(sub_children[0].text)
         return start_urls
 
-    def start_from_html_sitemap(self, url, **kwargs):
-        """Start crawling from the sitemap HTML page
-        section of a given website
-
-        >>> instance = BaseCrawler()
-        ... instance.start_from_html_sitemap("http://example.com/sitemap.html")
-        """
-        if not 'sitemap' in url:
-            raise ValueError('Url should be the sitemap page')
-
-        body = self.driver.find_element(By.TAG_NAME, 'body')
-        link_elements = body.find_elements(By.TAG_NAME, 'a')
-
-        urls = []
-        for element in link_elements:
-            urls.append(element.get_attribute('href'))
-        self.start(start_urls=urls, **kwargs)
-
     # def start_from_json(self, windows=0, **kwargs):
     #     """Enrich a JSON document containing a set of
     #     products with additionnal data"""
@@ -940,12 +949,10 @@ class SiteCrawler(BaseCrawler):
             self.post_navigation_actions(current_url)
 
             # Post navigation signal
-            # TEST: This has to be tested
-            # navigation.send(
-            #     self,
-            #     current_url=current_url,
-            #     images_list_filter=['jpg', 'jpeg', 'webp']
-            # )
+            signal_constants.navigation.send(
+                self,
+                current_url=current_url
+            )
 
             # TODO: Use the url instances directly
             # in visited_urls and list_urls_seen
@@ -975,7 +982,7 @@ class SiteCrawler(BaseCrawler):
                 # Run custom user actions once
                 # everything is completed
                 self.current_page_actions(
-                    current_url, 
+                    current_url,
                     **current_page_actions_params
                 )
             except TypeError as e:
