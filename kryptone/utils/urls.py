@@ -158,8 +158,16 @@ class URL:
         return cls(url)
 
     def is_same_domain(self, url):
-        instance = URL(url)
-        return instance.url_object.netloc == self.url_object.netloc
+        """Checks that an incoming url is the same
+        domain as the current one
+        
+        >>> url = URL('http://example.com')
+        ... url.is_same_domain('http://example.com')
+        ... True
+        """
+        if isinstance(url, str):
+            url = URL(url)
+        return url.url_object.netloc == self.url_object.netloc
 
     def get_status(self):
         headers = {'User-Agent': RANDOM_USER_AGENT()}
