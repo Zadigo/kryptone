@@ -5,7 +5,7 @@ import os
 import random
 import time
 from collections import OrderedDict, defaultdict, namedtuple
-from urllib.parse import unquote, urlparse, urlunparse
+from urllib.parse import unquote, urlencode, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import pandas
@@ -677,10 +677,9 @@ class SiteCrawler(BaseCrawler):
     #         },
     #     }
     #     return spider_info
-        
 
     # def __setstate__(self, state):
-    #     return 
+    #     return
 
     @classmethod
     def create(cls, **params):
@@ -1157,6 +1156,12 @@ class JSONCrawler:
     def data(self):
         return self.iterator(self.received_data, by=self.chunks)
 
+    async def get_paginated_url(self, name='page'):
+        if self.paginate_data:
+            query = urlencode({name: self.internal_pagination})
+            return self.base_url + f'?{query}'
+        return self.base_url
+
     async def create_dump(self):
         pass
 
@@ -1253,7 +1258,7 @@ class JSONCrawler:
 
                                 if self.paginate_data:
                                     self.max_pages = data[self.max_pages_key]
-                                    self.current_page = data[self.current_page]
+                                    self.current_page = data[self.current_page_key]
 
                                 await queue.put(data)
 
