@@ -58,6 +58,10 @@ class TestUrl(unittest.TestCase):
     def test_is_valid(self):
         self.assertTrue(self.instance.is_valid)
 
+    def test_is_image(self):
+        url = 'https://static.bershka.net/4/photos2/2024/V/0/1/p/8936/256/800//01/ab1c523937698d85bb1dfe3953bbd6f7-8936256800_2_3_0.jpg'
+        self.assertTrue(URL(url).is_image)
+
     def test_has_fragment(self):
         self.assertFalse(self.instance.has_fragment)
         url = 'https://www.lefties.com/ma/woman/clothing/knit-c1030267524.html#'
@@ -91,8 +95,25 @@ class TestUrl(unittest.TestCase):
             tokens, ['fr-ma', 'coool-fitted-kisa-kollu-tisort-2836888']
         )
 
-    def test_pagination(self):
-        url = 'http://example/[1]'
+    def test_contains(self):
+        urls = [
+            URL('http://example.com'),
+            URL('http://example.com/1')
+        ]
+        self.assertIn(URL('http://example.com'), urls)
+        self.assertIn('http://example.com', urls)
+        # TODO: When trying to check the presence of
+        # string in the set, it uses the __hash__
+        # which are not the same
+
+    def test_inversion(self):
+        url = URL('http://example.com')
+        self.assertFalse(~url)
+
+    # def test_and(self):
+    #     url = URL('http://example.com')
+    #     url2 = URL('http://example.com/2')
+    #     print(url & url2)
 
 
 class TestUrlIgnoreURL(unittest.TestCase):
@@ -121,13 +142,13 @@ class TestUrlIgnoreURL(unittest.TestCase):
 
         self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
         self.assertListEqual(
-            results['https://www.defacto.com/fr-ma/woman'], 
+            results['https://www.defacto.com/fr-ma/woman'],
             [False, False]
         )
 
         self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
         self.assertListEqual(
-            results['https://www.defacto.com/fr-ma/baby'], 
+            results['https://www.defacto.com/fr-ma/baby'],
             [True, True]
         )
 
@@ -155,7 +176,7 @@ class TestUrlIgnoreURL(unittest.TestCase):
             all(results['https://www.defacto.com/fr-ma/statik/new-member'])
         )
         self.assertTrue(
-            results['https://www.defacto.com/fr-ma/baby'], 
+            results['https://www.defacto.com/fr-ma/baby'],
             [True, False]
         )
 

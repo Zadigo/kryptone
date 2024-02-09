@@ -1,8 +1,8 @@
 import pathlib
 import re
 from collections import defaultdict
-from functools import lru_cache
-from urllib.parse import urljoin, urlparse, urlunparse
+from functools import cached_property
+from urllib.parse import urljoin, urlparse, urlunparse, unquote
 
 import requests
 
@@ -20,8 +20,12 @@ class URL:
     """
 
     def __init__(self, url_string):
-        self.raw_url = url_string
-        self.url_object = urlparse(self.raw_url)
+        if isinstance(url_string, URL):
+            self.raw_url = url_string.raw_url
+            self.url_object = url_string.url_object
+        else:
+            self.raw_url = unquote(url_string or '')
+            self.url_object = urlparse(self.raw_url)
 
     def __repr__(self):
         return f'<URL: {self.raw_url}>'
@@ -35,6 +39,29 @@ class URL:
     def __add__(self, obj):
         return URL(urljoin(self.raw_url, obj))
 
+    # def __and__(self, obj):
+    #     return all([
+    #         self.raw_url != '',
+    #         self.is_valid,
+    #         obj.raw_url != '',
+    #         obj.is_valid == True
+    #     ])
+
+    def __invert__(self):
+        return all([
+            not self.is_valid,
+            not self.raw_url == ''
+        ])
+
+    # def __or__(self, obj):
+    #     if not isinstance(obj, URL):
+    #         obj = URL(obj)
+    #     invalid_state = any([
+    #         self.raw_url == '',
+    #         self.is_valid == False
+    #     ])
+    #     return obj if invalid_state else self
+
     def __contains__(self, obj):
         return obj in self.raw_url
 
@@ -44,9 +71,38 @@ class URL:
     def __len__(self):
         return len(self.raw_url)
 
+    @cached_property
+    def _file_extensions(self):
+        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
+        return read_document(path, as_list=True)
+
+    @property
+    def is_social_link(self):
+        return any([
+            'facebook.com' in self.raw_url,
+            'twitter.com' in self.raw_url,
+            'tiktok.com' in self.raw_url,
+            'snapchat.com' in self.raw_url,
+            'youtube.com' in self.raw_url,
+            'pinterest.com' in self.raw_url,
+            'spotify.com' in self.raw_url
+        ])
+
+    @property
+    def is_empty(self):
+        return self.raw_url == ''
+
     @property
     def is_path(self):
         return self.raw_url.startswith('/')
+
+    @property
+    def is_image(self):
+        if self.as_path.suffix != '':
+            suffix = self.as_path.suffix.removeprefix('.')
+            if suffix in constants.IMAGE_EXTENSIONS:
+                return True
+        return False
 
     @property
     def is_valid(self):
@@ -63,32 +119,23 @@ class URL:
         ])
 
     @property
-    def has_queries(self):
-        return self.url_object.query != ''
+    def as_dict(self):
+        return {
+            'url': self.raw_url,
+            'is_valid': self.is_valid
+        }
 
     @property
     def is_file(self):
-        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
-        file_extensions = read_document(path, as_list=True)
         extension = self.as_path.suffix
 
         if extension == '':
             return False
 
-        if self.as_path.suffix in file_extensions:
+        if self.as_path.suffix in self._file_extensions:
             return True
         return False
 
-    @property
-    def is_image(self):
-        if self.as_path.path == '':
-            return False
-        
-        suffix = self.as_path.suffix.removeprefix('.')
-        if suffix in constants.IMAGE_EXTENSIONS:
-            return True
-        return False
-    
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
@@ -110,10 +157,21 @@ class URL:
     @classmethod
     def create(cls, url):
         return cls(url)
-    
+
+    def has_queries(self):
+        return self.url_object.query != ''
+
     def is_same_domain(self, url):
-        incoming_url_object = urlparse(url)
-        return incoming_url_object.netloc == self.url_object.netloc
+        """Checks that an incoming url is the same
+        domain as the current one
+
+        >>> url = URL('http://example.com')
+        ... url.is_same_domain('http://example.com')
+        ... True
+        """
+        if isinstance(url, str):
+            url = URL(url)
+        return url.url_object.netloc == self.url_object.netloc
 
     def get_status(self):
         headers = {'User-Agent': RANDOM_USER_AGENT()}
@@ -196,7 +254,7 @@ class URL:
     def remove_fragment(self):
         """Reconstructs the url without the fragment
         if it is present but keeps the queries
-        
+
         >>> url = URL('http://example.com#')
         ... url.reconstruct()
         ... 'http://example.com'
@@ -249,7 +307,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         exclusion_truth_array = []
 
         url = self.convert_url(url)
-        
+
         # Include all the urls that match
         # the path to exclude as True and the
         # others as False
@@ -263,7 +321,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         if any(exclusion_truth_array):
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
@@ -291,7 +349,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         if result:
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
@@ -319,7 +377,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
 #             return False
 #         logger.warning(
 #             self.error_message.format(
-#                 url=url, 
+#                 url=url,
 #                 filter_name=self.name
 #             )
 #         )
