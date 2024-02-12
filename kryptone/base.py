@@ -136,14 +136,14 @@ class CrawlerOptions:
     def prepare(self):
         # The user can either use a list of generators or directly
         # use a generator (URLGenerator, PagePaginationGenerator)
-        # directly in "start_urls"
+        # directly in "start_urls"Loa
         if isinstance(self.start_urls, (URLGenerator, PagePaginationGenerator)):
             self.start_urls = list(self.start_urls)
 
         if isinstance(self.start_urls, list):
             start_urls = []
             for item in self.start_urls:
-                if isinstance(item, (URLGenerator, PagePaginationGenerator)):
+                if isinstance(item, (URLGenerator, file_readers.LoadStartUrls, PagePaginationGenerator)):
                     start_urls.extend(list(item))
                     continue
                 
@@ -672,6 +672,7 @@ class SiteCrawler(BaseCrawler):
         self._start_date = get_current_date(timezone=self.timezone)
         self._start_time = time.time()
         self._end_time = None
+        self.current_iteration = 0
 
         self.performance_audit = namedtuple(
             'Performance',
@@ -743,6 +744,9 @@ class SiteCrawler(BaseCrawler):
                 # urls to visit - as entrypoint
                 self.add_urls(self.start_url)
 
+        # FIXME: This might be redundant
+        # because why add the urls again
+        # when they are already added ?
         if start_urls:
             self.add_urls(*start_urls)
 
@@ -1006,6 +1010,7 @@ class SiteCrawler(BaseCrawler):
                 break
 
             logger.info(f"Waiting {wait_time}s")
+            self.current_iteration = self.current_iteration + 1
             time.sleep(wait_time)
             self.before_next_page_actions(url_instance)
 
@@ -1118,7 +1123,8 @@ class SiteCrawler(BaseCrawler):
                 except TypeError as e:
                     logger.info(e)
                     raise TypeError(
-                        "'self.current_page_actions' should be able to accept arguments"
+                        "'self.current_page_actions' "
+                        "should be able to accept arguments"
                     )
                 except Exception as e:
                     logger.error(e)
@@ -1152,6 +1158,7 @@ class SiteCrawler(BaseCrawler):
                         'performance.json',
                         self.statistics
                     )
+                self.current_iteration = self.current_iteration + 1
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
