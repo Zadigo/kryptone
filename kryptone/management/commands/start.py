@@ -58,8 +58,8 @@ class Command(ProjectCommand):
         }
 
         spider_config = registry.get_spider(namespace.name)
-        if namespace.windows < 0 or namespace.windows > 5:
-            raise ValueError('Number of windows should be between 2 and 5')
+        if namespace.windows < 0 or namespace.windows > 8:
+            raise ValueError('Number of windows should be between 1 and 8')
 
         spider_config.run(
             windows=namespace.windows,
