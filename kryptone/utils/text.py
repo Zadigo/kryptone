@@ -47,6 +47,7 @@ def clean_text(text, encoding='utf-8'):
         return text
 
     text = text.replace('\n', ' ')
+    text = text.replace('\t', ' ')
     text = unicodedata.normalize('NFKD', text)
     text = text.encode(encoding).decode()
     return normalize_spaces(text)
