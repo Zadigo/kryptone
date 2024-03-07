@@ -14,7 +14,7 @@ class Lower(Functions):
     """Returns each values of the given
     column in lowercase
     
-    >>> table.annotate(url_lower=Lower('url'))
+    >>> table.annotate(lowered_url=Lower('url'))
     """
 
     def function_sql(self):
