@@ -1287,7 +1287,8 @@ class JSONCrawler:
                                     data = data_or_dataframe
 
                                 logger.info(
-                                    f"Received {len(self.current_raw_data)} elements"
+                                    f"Received {
+                                        len(self.current_raw_data)} elements"
                                 )
 
                                 if self.paginate_data:
