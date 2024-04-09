@@ -464,6 +464,7 @@ class BaseCrawler(metaclass=Crawler):
         raw_urls = raw_urls.drop_duplicates(subset=['urls'])
 
         raw_urls['is_valid'] = False
+
         def initial_url_filter(df):
             for item in df.itertuples(name='Url'):
                 instance = URL(item.urls)
@@ -903,6 +904,7 @@ class SiteCrawler(BaseCrawler):
                 )
             except:
                 logger.error('Body element of page was not detected')
+                continue
 
             self.post_navigation_actions(current_url)
 
