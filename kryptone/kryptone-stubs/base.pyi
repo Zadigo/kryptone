@@ -1,7 +1,7 @@
 import datetime
 import time
 from typing import (Any, Coroutine, DefaultDict, Iterator, List, Literal,
-                    NamedTuple, Tuple, Union)
+                    NamedTuple, Tuple, TypedDict, Union)
 from urllib.robotparser import RobotFileParser
 
 import pandas
@@ -13,7 +13,8 @@ from kryptone.utils.file_readers import LoadStartUrls
 from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest
 
-WEBDRIVER_ENVIRONMENT_PATH: str = 'KRYPTONE_WEBDRIVER'
+
+WEBDRIVER_ENVIRONMENT_PATH: str
 
 
 def get_selenium_browser_instance(
@@ -115,13 +116,22 @@ class BaseCrawler(metaclass=Crawler):
     ) -> None: ...
 
     def calculate_performance(self) -> Tuple[PerformanceAudit, URLsAudit]: ...
-    def post_navigation_actions(self, current_url: URL, **kwargs) -> None: ...
-    def before_next_page_actions(self, current_url: URL, **kwargs) -> None: ...
+    
+    def post_navigation_actions(
+        self, 
+        current_url: URL, 
+        **kwargs
+    ) -> None: ...
+    
+    def before_next_page_actions(
+        self, 
+        current_url: URL, 
+        **kwargs
+    ) -> None: ...
 
     def current_page_actions(
         self,
         current_url: URL,
-        current_json_object: pandas.DataFrame = ...,
         **kwargs
     ) -> None: ...
     def create_dump(self) -> None: ...

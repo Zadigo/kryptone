@@ -1,7 +1,18 @@
-from kryptone.base import SiteCrawler
-from kryptone.mixins import EmailMixin
+from typing import override
+from kryptone.mixins import SEOMixin
 from kryptone.utils.urls import URL
 
 
-class SEOCrawler(SiteCrawler, EmailMixin):
-    def current_page_actions(self, current_url: URL, **kwargs) -> None: ...
+class SEOCrawlerMixin(SEOMixin):
+    @override
+    def resume(
+        self,
+        **kwargs
+    ) -> None: ...
+
+    @override
+    def current_page_actions(
+        self,
+        current_url: URL,
+        **kwargs
+    ) -> None: ...
