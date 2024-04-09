@@ -4,7 +4,7 @@ from kryptone.mixins import EmailMixin
 from kryptone.utils import file_readers
 
 
-class LeadsCrawler(EmailMixin):
+class SearchLeadsMixin(EmailMixin):
     """A crawler specialize in finding emails on a website"""
 
     def current_page_actions(self, current_url, **kwargs):

@@ -40,7 +40,7 @@ class TextMixin:
     @staticmethod
     def tokenize(text):
         return text.split(' ')
-    
+
     def stop_words(self, language='en'):
         global_path = settings.GLOBAL_KRYPTONE_PATH
         if language == 'en':
@@ -198,7 +198,7 @@ class SEOMixin(TextMixin):
         with open(path, encoding='utf-8') as f:
             content = f.read()
         return content
-    
+
     def create_word_cloud(self, frequency):
         from wordcloud import WordCloud
 
@@ -365,7 +365,7 @@ class SEOMixin(TextMixin):
                 audit['status_code'] = 0
             else:
                 audit['status_code'] = response.status_code
-        
+
         async def main():
             await sender()
 
@@ -470,7 +470,7 @@ class EmailMixin(TextMixin):
 class ScrollMixin:
     """A mixin that implements special scrolling
     functionnalities to the spider"""
-    
+
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
         scroll position by a given number of pixels"""
@@ -525,6 +525,7 @@ class ScrollMixin:
 
         script = css_selector + '\n' + body
         return script
+
 
 # class TestClass(TextMixin):
 #     def __init__(self):

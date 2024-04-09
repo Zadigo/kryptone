@@ -1,13 +1,11 @@
 import asyncio
-from collections import defaultdict
 
 from kryptone import logger
-from kryptone.base import SiteCrawler
 from kryptone.mixins import SEOMixin
 from kryptone.utils import file_readers
 
 
-class SEOCrawler(SEOMixin):
+class SEOCrawlerMixin(SEOMixin):
     """A crawler specialized for running
     SEO tasks on a given website"""
 
