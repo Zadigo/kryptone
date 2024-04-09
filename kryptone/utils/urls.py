@@ -1,9 +1,10 @@
 import pathlib
 import re
+import secrets
 from collections import defaultdict
 from functools import cached_property
-from urllib.parse import urljoin, urlparse, urlunparse, unquote
-import secrets
+from urllib.parse import unquote, urljoin, urlparse, urlunparse
+
 import requests
 
 from kryptone import constants, logger
@@ -365,30 +366,3 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
             )
             return True
         return False
-
-
-# class URLPassesRegexTest(BaseURLTestsMixin):
-#     """Only include and keep urls that successfully pass
-#     the provided regex test
-#     """
-
-#     def __init__(self, name, regex):
-#         self.name = name
-#         self.regex = re.compile(regex)
-
-#     def __repr__(self):
-#         return f'<{self.__class__.__name__} [{self.regex}]>'
-
-#     def __call__(self, url):
-#         result = self.regex.search(url)
-#         if result:
-#             # Indicate to not ignore
-#             # the url
-#             return False
-#         logger.warning(
-#             self.error_message.format(
-#                 url=url,
-#                 filter_name=self.name
-#             )
-#         )
-#         return True

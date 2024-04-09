@@ -83,8 +83,7 @@ class Router:
 
     Let's say we have `http://example.com/product` and
     `http://example.com/products` and that we need to apply two
-    different logics to these urls. That's where the Router comes
-    in handy
+    different logics to these urls. We can do the following:
 
     >>> class MySpider:
     ...     start_url = 'http://example.com'
@@ -92,7 +91,7 @@ class Router:
     ...     class Meta:
     ...        router = Router([
     ...            route('logic_for_first_url', regex='\/products', name='products'),
-    ...            route('logic_for_first_url', path='/product', name='product')
+    ...            route('logic_for_second_url', path='/product', name='product')
     ...        ])
     ...     
     ...     def logic_for_first_url(self, current_url, route=None, **kwargs):
