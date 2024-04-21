@@ -727,6 +727,9 @@ class SiteCrawler(BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
+            if isinstance(start_urls, file_readers.LoadStartUrls):
+                start_urls = list(start_urls)
+
             self.list_of_seen_urls.update(start_urls)
             self.start_url = start_urls.pop()
         self._start_url_object = urlparse(self.start_url)
