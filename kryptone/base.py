@@ -699,8 +699,8 @@ class SiteCrawler(BaseCrawler):
         super().__init__(browser_name=browser_name)
 
         self._start_date = get_current_date(timezone=self.timezone)
-        self._start_time = time.time()
-        self._end_time = None
+        self._start_time = self._start_date.time()
+        self._end_date = None
         self.current_iteration = 0
         self.performance_audit = PerformanceAudit()
 
