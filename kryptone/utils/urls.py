@@ -1,6 +1,6 @@
-from collections import defaultdict
 import pathlib
 import re
+from collections import defaultdict
 from functools import lru_cache
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -11,6 +11,17 @@ from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+
+
+@lru_cache(maxsize=100)
+def load_image_extensions():
+    try:
+        from PIL import Image
+    except ImportError:
+        return []
+    else:
+        Image.init()
+        return [ext.lower() for ext in Image.EXTENSION]
 
 
 class URL:
@@ -30,12 +41,18 @@ class URL:
         return self.raw_url
 
     def __eq__(self, obj):
+        if not isinstance(obj, URL):
+            return NotImplemented
         return self.raw_url == obj
 
     def __add__(self, obj):
+        if not isinstance(obj, str):
+            return NotImplemented
         return URL(urljoin(self.raw_url, obj))
 
     def __contains__(self, obj):
+        if isinstance(obj, URL):
+            return obj.raw_url in self.raw_url
         return obj in self.raw_url
 
     def __hash__(self):
@@ -65,6 +82,10 @@ class URL:
     @property
     def has_queries(self):
         return self.url_object.query != ''
+    
+    @property
+    def is_image(self):
+        return self.as_path.suffix in load_image_extensions()
 
     @property
     def is_file(self):
@@ -78,7 +99,7 @@ class URL:
         if self.as_path.suffix in file_extensions:
             return True
         return False
-    
+
     @property
     def as_path(self):
         return pathlib.Path(self.raw_url)
@@ -100,7 +121,7 @@ class URL:
     @classmethod
     def create(cls, url):
         return cls(url)
-    
+
     def is_same_domain(self, url):
         incoming_url_object = urlparse(url)
         return incoming_url_object.netloc == self.url_object.netloc
@@ -186,7 +207,7 @@ class URL:
     def remove_fragment(self):
         """Reconstructs the url without the fragment
         if it is present but keeps the queries
-        
+
         >>> url = URL('http://example.com#')
         ... url.reconstruct()
         ... 'http://example.com'
@@ -210,7 +231,7 @@ class BaseURLTestsMixin:
     error_message = "{url} was blacklisted by filter '{filter_name}'"
 
     def __call__(self, url):
-        pass
+        return NotImplemented
 
     def convert_url(self, url):
         if isinstance(url, URL):
@@ -239,7 +260,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         exclusion_truth_array = []
 
         url = self.convert_url(url)
-        
+
         # Include all the urls that match
         # the path to exclude as True and the
         # others as False
@@ -253,7 +274,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         if any(exclusion_truth_array):
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
@@ -281,36 +302,9 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         if result:
             logger.warning(
                 self.error_message.format(
-                    url=url, 
+                    url=url,
                     filter_name=self.name
                 )
             )
             return True
         return False
-
-
-# class URLPassesRegexTest(BaseURLTestsMixin):
-#     """Only include and keep urls that successfully pass
-#     the provided regex test
-#     """
-
-#     def __init__(self, name, regex):
-#         self.name = name
-#         self.regex = re.compile(regex)
-
-#     def __repr__(self):
-#         return f'<{self.__class__.__name__} [{self.regex}]>'
-
-#     def __call__(self, url):
-#         result = self.regex.search(url)
-#         if result:
-#             # Indicate to not ignore
-#             # the url
-#             return False
-#         logger.warning(
-#             self.error_message.format(
-#                 url=url, 
-#                 filter_name=self.name
-#             )
-#         )
-#         return True
