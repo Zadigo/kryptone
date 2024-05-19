@@ -3,6 +3,7 @@ from functools import cached_property
 from typing import Any, Literal
 from urllib.parse import ParseResult
 
+
 class BaseModel:
     def __getitem__(self, key) -> Any: ...
 
@@ -51,12 +52,18 @@ class Product(BaseModel):
     is_404: bool = False
 
     def __hash__(self) -> int: ...
-    
+
     @cached_property
     def get_images_url_objects(self) -> list[ParseResult]: ...
-    
+
     @cached_property
     def number_of_images(self) -> int: ...
-    
+
     def set_collection_id(self, regex: str) -> None: ...
     def complex_name(self) -> str: ...
+
+
+@dataclasses.dataclass
+class GoogleSearch:
+    title: str
+    url: str
