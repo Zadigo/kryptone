@@ -1,15 +1,17 @@
 import asyncio
 import bisect
+import dataclasses
 import datetime
 import os
 import random
 import time
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import OrderedDict, defaultdict
 from urllib.parse import unquote, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import pandas
 import requests
+from lorelie.database.base import Database
 from lxml import etree
 from requests import Session
 from requests.models import Request
@@ -24,11 +26,10 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
-from kryptone.db.tables import Database
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.file_readers import LoadStartUrls
-from kryptone.utils.iterators import AsyncIterator, PagePaginationGenerator, URLGenerator
+from kryptone.utils.iterators import (AsyncIterator, PagePaginationGenerator,
+                                      URLGenerator)
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
 from kryptone.webhooks import Webhooks
@@ -146,7 +147,7 @@ class CrawlerOptions:
                 if isinstance(item, (URLGenerator, file_readers.LoadStartUrls, PagePaginationGenerator)):
                     start_urls.extend(list(item))
                     continue
-                
+
                 if isinstance(item, str):
                     start_urls.extend([item])
                     continue
@@ -296,8 +297,12 @@ class BaseCrawler(metaclass=Crawler):
             sorted_urls = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
+
             file_readers.write_csv_document(
-                'seen_urls.csv', sorted_urls, adapt_data=True)
+                'seen_urls.csv',
+                sorted_urls,
+                adapt_data=True
+            )
 
         async def main():
             aws = [write_cache_file(), write_seen_urls()]
@@ -441,7 +446,7 @@ class BaseCrawler(metaclass=Crawler):
 
         filtered_valid_urls1 = self.url_filters(valid_urls)
         filtered_valid_urls2 = self.url_rule_test_filter(filtered_valid_urls1)
-   
+
         self.urls_to_visit.update(filtered_valid_urls2)
         logger.info(f'{counter} url(s) added')
 
@@ -635,13 +640,13 @@ class BaseCrawler(metaclass=Crawler):
         """Actions to run on the page immediately after
         the crawler has visited a page e.g. clicking
         on cookie button banner"""
-        pass
+        return NotImplemented
 
     def before_next_page_actions(self, current_url, **kwargs):
         """Actions to run once the page was visited and that
         all user actions were performed. This method runs just 
         after the `wait_time` has expired"""
-        pass
+        return NotImplemented
 
     def current_page_actions(self, current_url, **kwargs):
         """Custom actions to execute on the current page. 
@@ -650,7 +655,7 @@ class BaseCrawler(metaclass=Crawler):
         ...     def current_page_actions(self, current_url, **kwargs):
         ...         text = self.driver.find_element('h1').text
         """
-        pass
+        return NotImplemented
 
     def create_dump(self):
         """Dumps the collected results to a file when the driver
@@ -658,6 +663,9 @@ class BaseCrawler(metaclass=Crawler):
         can be customized with a custome action that you would want
         to run
         """
+        return NotImplemented
+
+
 @dataclasses.dataclass
 class PerformanceAudit:
     days: int = 0
@@ -740,8 +748,8 @@ class SiteCrawler(BaseCrawler):
         # same time we have no start_urls, raise an error
         if self.start_url is None and not start_urls:
             raise exceptions.BadImplementationError(
-                "No start url. Provide either a "
-                "start url or start urls in the Meta"
+                "No start url was used. Provide either a "
+                "start url or start urls to crawl in the Meta"
             )
 
         if self.start_url is None and start_urls:
@@ -928,8 +936,6 @@ class SiteCrawler(BaseCrawler):
 
             logger.info(f'Going to url: {current_url}')
 
-            url_instance = URL(current_url)
-
             # By security measure, do not go to an url
             # that is an image if it happened to be in
             # the urls_to_visit
@@ -961,7 +967,7 @@ class SiteCrawler(BaseCrawler):
             self.post_navigation_actions(url_instance)
 
             # Post navigation signal
-            # TEST: This has to be tested
+            # TODO: This has to be tested
             # navigation.send(
             #     self,
             #     current_url=current_url,
@@ -971,10 +977,7 @@ class SiteCrawler(BaseCrawler):
             self.visited_urls.add(current_url)
 
             if self._meta.crawl:
-                # s = time.time()
                 self.get_page_urls(url_instance)
-                # e = round(time.time() - s, 2)
-                # print(f'Completed urls scrap in {e}s')
                 self._backup_urls()
 
             current_page_actions_params = {}
@@ -1198,6 +1201,7 @@ class SiteCrawler(BaseCrawler):
             current_urls.clear()
             url_instances.clear()
 
+            self._end_date = get_current_date(timezone=self.timezone)
             logger.info(f"Waiting {wait_time}s")
             time.sleep(wait_time)
 
@@ -1323,7 +1327,8 @@ class JSONCrawler:
                                     data = data_or_dataframe
 
                                 logger.info(
-                                    f"Received {len(self.current_raw_data)} elements"
+                                    f"Received {
+                                        len(self.current_raw_data)} elements"
                                 )
 
                                 if self.paginate_data:
