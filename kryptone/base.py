@@ -658,6 +658,38 @@ class BaseCrawler(metaclass=Crawler):
         can be customized with a custome action that you would want
         to run
         """
+@dataclasses.dataclass
+class PerformanceAudit:
+    days: int = 0
+    duration: float = 0
+    count_urls_to_visit: int = 0
+    count_visited_urls: int = 0
+    completion_percentage: float = 0
+    visited_pages_count: int = 0
+
+    @property
+    def total_urls(self):
+        return sum([
+            self.count_urls_to_visit,
+            self.count_visited_urls
+        ])
+
+    def calculate_completion_percentage(self):
+        try:
+            self.completion_percentage = (
+                self.count_urls_to_visit /
+                self.visited_pages_count
+            )
+        except ZeroDivisionError:
+            self.completion_percentage = 0
+
+    def json(self):
+        statistics = OrderedDict()
+        fields = dataclasses.fields(self)
+        for field in fields:
+            statistics[field.name] = getattr(self, field.name)
+        statistics['total_urls'] = self.total_urls
+        return statistics
 
 
 class SiteCrawler(BaseCrawler):
