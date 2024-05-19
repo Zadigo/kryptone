@@ -1,3 +1,7 @@
+import dataclasses
+import pandas
+from urllib.parse import unquote, urlparse
+import pathlib
 from functools import cached_property
 from typing import Any, List
 from urllib.parse import ParseResult

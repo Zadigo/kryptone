@@ -1,7 +1,6 @@
-from typing import Any, Generator, List, Callable, Literal, Union
-from functools import cached_property
 import pathlib
-
+from functools import cached_property
+from typing import Any, Callable, Generator, List, Literal, Union
 
 def tokenize(func: Callable) -> Callable[[str], List[str]]: ...
 
@@ -55,8 +54,8 @@ class LoadJS:
 
 
 class LoadStartUrls:
-    CACHE: list = ...
-    filename: str = Literal['start_urls']
+    CACHE: list[str] = ...
+    filename: str = ...
     is_json: bool = ...
 
     def __init__(self, filename: str = ..., is_json: bool = ...) -> None: ...
