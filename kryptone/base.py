@@ -702,18 +702,7 @@ class SiteCrawler(BaseCrawler):
         self._start_time = time.time()
         self._end_time = None
         self.current_iteration = 0
-
-        self.performance_audit = namedtuple(
-            'Performance',
-            ['days', 'duration']
-        )
-        self.urls_audit = namedtuple(
-            'URLsAudit',
-            ['count_urls_to_visit', 'count_visited_urls',
-             'completion_percentage', 'total_urls',
-             'visited_pages_count']
-        )
-        self.statistics = {}
+        self.performance_audit = PerformanceAudit()
 
         # self.cached_json_items = None
         # self.enrichment_mode = False
