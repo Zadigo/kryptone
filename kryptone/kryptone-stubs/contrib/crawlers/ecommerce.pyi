@@ -1,5 +1,5 @@
 import pathlib
-from typing import Any, List, Literal, Tuple
+from typing import Any, List, Literal, Tuple, Union
 
 import pandas
 
@@ -10,7 +10,7 @@ TEMPORARY_PRODUCT_CACHE: set[str] = ...
 
 
 class EcommerceCrawlerMixin:
-    scroll_step: int = Literal[30]
+    scroll_step: Literal[30] = 30
     products: List = ...
     product_objects: List = ...
     seen_products: List = ...
@@ -37,14 +37,14 @@ class EcommerceCrawlerMixin:
         collection_id_regex: str = ...,
         avoid_duplicates: bool = ...,
         duplicate_key: str = ...
-    ) -> Union[Tuple[bool, Product], Tuple[bool, None]]: ...
-    
+    ) -> Union[Tuple[Union[bool, Product]], Tuple[bool, None]]: ...
+
     def bulk_add_products(
-        self, 
-        data: list[dict[str, Any]], 
-        collection_id_regex: str=...
-    ) -> list[Product]:
-    
+        self,
+        data: list[dict[str, Any]],
+        collection_id_regex: str = ...
+    ) -> list[Product]: ...
+
     def bulk_save_products(
         self,
         data: list[dict[str, Any]],
@@ -60,9 +60,9 @@ class EcommerceCrawlerMixin:
     ) -> None: ...
 
     def as_dataframe(
-        self, 
+        self,
         sort_by: str = ...
-    ) -> pandas.DataFrame:
+    ) -> pandas.DataFrame: ...
 
     def capture_product_page(
         self,
