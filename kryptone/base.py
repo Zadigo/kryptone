@@ -300,8 +300,9 @@ class BaseCrawler(metaclass=Crawler):
                 'seen_urls.csv', sorted_urls, adapt_data=True)
 
         async def main():
-            await write_cache_file()
-            await write_seen_urls()
+            aws = [write_cache_file(), write_seen_urls()]
+            for aw in asyncio.as_completed(aws):
+                await aw
 
         asyncio.run(main())
 
