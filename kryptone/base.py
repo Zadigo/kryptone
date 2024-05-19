@@ -599,41 +599,37 @@ class BaseCrawler(metaclass=Crawler):
 
     def calculate_performance(self):
         """Calculate the overall spider performance"""
-        # Calculate global performance
-        async def performance():
+        if self._end_date is None:
             self._end_date = get_current_date(timezone=self.timezone)
-            days = (self._start_date - self._end_date).days
-            completed_time = round(time.time() - self._start_time, 1)
-            days = 0 if days < 0 else days
-            return self.performance_audit(days, completed_time)
 
-        # Calculate performance related to urls
-        async def performance_urls():
+        async def calculate_global_performance():
+            days = (self._start_date - self._end_date).days
+            completed_time = (self._start_date - self._end_date).seconds
+            days = 0 if days < 0 else days
+            self.performance_audit.days = days
+            self.performance_audit.duration = completed_time
+
+        async def calculate_urls_performance():
             total_urls = sum([len(self.visited_urls), len(self.urls_to_visit)])
             result = len(self.visited_urls) / total_urls
             percentage = round(result * 100, 3)
             logger.info(f'{percentage}% of total urls visited')
 
-            return self.urls_audit(
-                count_urls_to_visit=len(self.urls_to_visit),
-                count_visited_urls=len(self.visited_urls),
-                total_urls=total_urls,
-                completion_percentage=percentage,
-                visited_pages_count=self.visited_pages_count
+            self.performance_audit.count_urls_to_visit = len(
+                self.urls_to_visit
             )
+            self.performance_audit.count_visited_urls = len(self.visited_urls)
 
         async def main():
-            global_performance = await performance()
-            urls_performance = await performance_urls()
+            t1 = asyncio.create_task(calculate_global_performance())
+            t2 = asyncio.create_task(calculate_urls_performance())
 
-            self.statistics.update({
-                'days': global_performance.days,
-                'duration': global_performance.duration,
-                'count_urls_to_visit': urls_performance.count_urls_to_visit,
-                'count_visited_urls': urls_performance.count_visited_urls
-            })
-            return global_performance, urls_performance
-        return asyncio.run(main())
+            await t1
+            await t2
+
+            self.performance_audit.calculate_completion_percentage()
+            
+        asyncio.run(main())
 
     def post_navigation_actions(self, current_url, **kwargs):
         """Actions to run on the page immediately after
