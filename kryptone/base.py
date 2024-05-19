@@ -918,7 +918,8 @@ class SiteCrawler(BaseCrawler):
             if current_url is None:
                 continue
 
-            current_url_object = urlparse(current_url)
+            url_instance = URL(current_url)
+            current_url_object = url_instance.url_object
             # If we are not on the same domain as the
             # starting url: *stop*. we are not interested
             # in exploring the whole internet
