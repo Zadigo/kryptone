@@ -1025,7 +1025,7 @@ class SiteCrawler(BaseCrawler):
                 self.calculate_performance()
                 file_readers.write_json_document(
                     'performance.json',
-                    self.statistics
+                    self.performance_audit.json()
                 )
 
             if settings.WAIT_TIME_RANGE:
@@ -1183,7 +1183,7 @@ class SiteCrawler(BaseCrawler):
                     self.calculate_performance()
                     file_readers.write_json_document(
                         'performance.json',
-                        self.statistics
+                        self.performance_audit.json()
                     )
                 self.current_iteration = self.current_iteration + 1
 
