@@ -955,7 +955,8 @@ class SiteCrawler(BaseCrawler):
                     EC.presence_of_element_located((By.TAG_NAME, 'body'))
                 )
             except:
-                logger.error('Body element of page was not detected')
+                logger.critical('Body element of page was not located')
+                continue
 
             self.post_navigation_actions(url_instance)
 
