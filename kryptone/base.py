@@ -934,11 +934,15 @@ class SiteCrawler(BaseCrawler):
             # that is an image if it happened to be in
             # the urls_to_visit
             if self._meta.ignore_images:
-                path = pathlib.Path(current_url_object.path)
-                if path.suffix != '':
-                    suffix = path.suffix.removeprefix('.')
-                    if suffix in constants.IMAGE_EXTENSIONS:
-                        continue
+                if url_instance.is_image:
+                    continue
+
+                # DELETE
+                # path = pathlib.Path(current_url_object.path)
+                # if path.suffix != '':
+                #     suffix = path.suffix.removeprefix('.')
+                #     if suffix in constants.IMAGE_EXTENSIONS:
+                #         continue
 
             self.driver.get(current_url)
             self.visited_pages_count = self.visited_pages_count + 1
