@@ -4,11 +4,6 @@ import pathlib
 PROJECT_PATH = pathlib.Path(__file__).parent.absolute()
 
 
-# Register spiders to crawl
-# pages on a website
-SPIDERS = ['Jennyfer']
-
-
 # Indicates the Selenium
 # browser to use
 WEBDRIVER = 'Edge'

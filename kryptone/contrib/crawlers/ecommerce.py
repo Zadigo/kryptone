@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import mimetypes
-import pathlib
 from urllib.parse import urlparse
 
 import pandas
@@ -11,14 +10,15 @@ import requests
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
-from kryptone.utils.file_readers import (get_media_folder, read_json_document,
-                                         write_json_document)
+from kryptone.utils.file_readers import write_json_document
 from kryptone.utils.functions import create_filename
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import clean_dictionnary, slugify
 
 TEMPORARY_PRODUCT_CACHE = set()
 
+
+# TODO: Rename this mixin to EcommerceMixin
 
 class EcommerceCrawlerMixin:
     """Adds specific functionnalities dedicated

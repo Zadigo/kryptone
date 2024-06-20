@@ -360,14 +360,14 @@ class BaseCrawler(metaclass=Crawler):
         """Excludes urls in the list of urls to visit based
         on the return value of the function in `url_filters`.
         All conditions should be true for the url to be
-        considered to be visited.
+        considered to be visited
         """
         if self._meta.url_ignore_tests:
             results = defaultdict(list)
-            for url in valid_urls:
-                truth_array = results[url]
+            for item in valid_urls.itertuples(name='Url'):
+                truth_array = results[item.urls]
                 for instance in self._meta.url_ignore_tests:
-                    truth_array.append(instance(url))
+                    truth_array.append(instance(item.urls))
 
             urls_kept = set()
             urls_removed = set()
@@ -376,18 +376,12 @@ class BaseCrawler(metaclass=Crawler):
             for url, truth_array in results.items():
                 final_urls_filtering_audit[url] = any(truth_array)
 
-                # Expect all the test results to
-                # be true. Otherwise the url is invalid
                 if any(truth_array):
                     urls_removed.add(url)
                     continue
                 urls_kept.add(url)
 
-            logger.info(
-                f"Filters completed. {len(urls_removed)} "
-                "url(s) removed"
-            )
-            return urls_kept
+            valid_urls = valid_urls[valid_urls.urls.isin(urls_kept)]
         return valid_urls
 
     def url_rule_test_filter(self, valid_urls):
@@ -395,56 +389,56 @@ class BaseCrawler(metaclass=Crawler):
         Apply this filter last just before
         we add the urls to the "urls_to_visit"
         container. This checks for urls that
-        match a pattern and should be kept
+        match a pattern and should *only* be kept
         to visit which differs from the other
         traditional filters "url_ignore_tests"
         which ignores the urls
         """
         if self._meta.url_rule_tests:
             urls_to_keep = set()
-            for url in valid_urls:
-                instance = URL(url)
+            for item in valid_urls.itertuples(name='Url'):
+                instance = URL(item.urls)
                 for regex in self._meta.url_rule_tests:
                     result = instance.test_url(regex)
                     if result:
-                        urls_to_keep.add(url)
+                        urls_to_keep.add(item.urls)
                         continue
-            logger.info(f'Url rule tests kept {len(urls_to_keep)} urls')
-            return urls_to_keep
+
+            valid_urls = valid_urls[valid_urls.urls.isin(urls_to_keep)]
+            logger.info(
+                "'url_rule_test_filter' kept "
+                f"{valid_urls.urls.count()} valid url(s)"
+            )
         return valid_urls
 
     def add_urls(self, *urls_or_paths):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
-        nested in other elements than links and that
+        nested in other elements than links and
         cannot actually be retrieved by the spider"""
-        counter = 0
-        valid_urls = set()
-        invalid_urls = set()
-        for url in urls_or_paths:
-            if url is None:
+        df = pandas.DataFrame({'urls': list(urls_or_paths)})
+
+        df['is_valid'] = False
+        for item in df.itertuples(name='Url'):
+            instance = URL(item.urls)
+            self.list_of_seen_urls.add(instance.raw_url)
+
+            if instance.raw_url in self.visited_urls:
                 continue
 
-            url_instance = self.url_structural_check(url)
-            self.list_of_seen_urls.add(url_instance.raw_url)
-
-            if url in self.visited_urls:
-                invalid_urls.add(url)
+            if instance.raw_url in self.visited_urls:
                 continue
 
-            if url in self.urls_to_visit:
-                invalid_urls.add(url)
+            if instance.is_empty:
                 continue
 
-            if url_instance.url_object.netloc == '' and url_instance.url_object.path == '':
-                invalid_urls.add(url)
-                continue
+            df.loc[item.Index, 'is_valid'] = True
 
-            counter = counter + 1
-            valid_urls.add(url_instance.raw_url)
-        filtered_valid_urls = self.url_filters(valid_urls)
-        self.urls_to_visit.update(filtered_valid_urls)
-        logger.info(f'{counter} url(s) added')
+        valid_urls = df[df['is_valid'] == True]
+        valid_urls = self.url_filters(valid_urls)
+
+        self.urls_to_visit.update(valid_urls.urls.to_list())
+        logger.info(f'{valid_urls.urls.count()} url(s) added')
 
     def get_page_urls(self, current_url, refresh=False):
         """Gets all the urls present on the
@@ -455,98 +449,98 @@ class BaseCrawler(metaclass=Crawler):
         By default, all the urls that were found during a crawling
         session are save in `list_of_seen_urls` and only valid urls
         to visit are included in `urls_to_visit`"""
-        raw_urls = set(self.get_page_link_elements)
-        logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
+        raw_urls = pandas.DataFrame(
+            {'initial_urls': self.get_page_link_elements}
+        )
 
-        # Specifically indicate to the crawler to
-        # not try and collect urls on pages that
-        # match the specified regex values
-        if self._meta.url_gather_ignore_tests:
-            matched_pattern = None
-            for regex in self._meta.url_gather_ignore_tests:
-                if current_url.test_url(regex):
-                    matched_pattern = regex
-                    break
+        logger.info(
+            f"Found {raw_urls.initial_urls.count()} "
+            "url(s) in total on this page"
+        )
 
-            if matched_pattern is not None:
-                self.list_of_seen_urls.update(raw_urls)
-                logger.warning(
-                    f"Url collection ignored on current url "
-                    f"by '{matched_pattern}'"
-                )
-                return
+        raw_urls['urls'] = raw_urls['initial_urls'].map(
+            lambda x: self.url_structural_check(x).raw_url
+        )
+        raw_urls = raw_urls.drop_duplicates(subset=['urls'])
 
-        valid_urls = set()
-        invalid_urls = set()
-        for url in raw_urls:
-            url_instance = self.url_structural_check(url)
+        raw_urls['is_valid'] = False
 
-            if refresh:
-                # If we are for example paginating a page,
-                # then we only need to keep the new urls
-                # that have appeared and that we have
-                # not yet seen
-                if url in self.list_of_seen_urls:
-                    invalid_urls.add(url_instance.raw_url)
+        def initial_url_filter(df):
+            for item in df.itertuples(name='Url'):
+                instance = URL(item.urls)
+                if not instance.is_same_domain(self._start_url_object):
                     continue
 
-            if not url_instance.is_same_domain(self._start_url_object):
-                invalid_urls.add(url_instance.raw_url)
-                continue
-
-            if url_instance.is_empty:
-                invalid_urls.add(url_instance.raw_url)
-                continue
-
-            if url_instance.has_fragment:
-                invalid_urls.add(url_instance.raw_url)
-                continue
-
-            if url_instance.url_object.path == '/' and self._start_url_object.url_object.path == '/':
-                invalid_urls.add(url_instance.raw_url)
-                continue
-
-            if self._meta.ignore_queries:
-                if url_instance.has_queries():
-                    invalid_urls.add(url_instance.raw_url)
+                if instance.is_empty:
                     continue
 
-            if self._meta.ignore_images:
-                if url_instance.is_image:
-                    invalid_urls.add(url_instance.raw_url)
+                if instance.has_fragment:
                     continue
 
-            if url_instance.raw_url in self.visited_urls:
-                invalid_urls.add(url_instance.raw_url)
-                continue
+                if instance.url_object.path == '/' and self._start_url_object.url_object.path == '/':
+                    continue
 
-            if url_instance.raw_url in self.list_of_seen_urls:
-                invalid_urls.add(url_instance.raw_url)
-                continue
+                if self._meta.ignore_queries:
+                    if instance.has_queries():
+                        continue
 
-            valid_urls.add(url_instance.raw_url)
+                if self._meta.ignore_images:
+                    if instance.is_image:
+                        continue
 
-        self.list_of_seen_urls.update(valid_urls)
-        self.list_of_seen_urls.update(invalid_urls)
+                df.loc[item.Index, 'is_valid'] = True
 
-        if valid_urls:
-            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+        raw_urls.pipe(initial_url_filter)
 
-        newly_discovered_urls = []
-        for url in valid_urls:
-            if url not in self.list_of_seen_urls:
-                newly_discovered_urls.append(url)
+        visited_urls = pandas.DataFrame({'urls': list(self.visited_urls)})
+        raw_urls['already_visited'] = raw_urls['urls'].isin(visited_urls.urls)
 
-        if newly_discovered_urls:
-            logger.info(
-                f"Discovered {len(newly_discovered_urls)} "
-                "unseen url(s)"
-            )
+        list_of_seen_urls = pandas.DataFrame(
+            {'urls': list(self.list_of_seen_urls)})
+        raw_urls['already_seen'] = raw_urls['urls'].isin(
+            list_of_seen_urls.urls)
 
-        filtered_valid_urls = self.url_filters(valid_urls)
+        # This is our intermediate dataframe that
+        # we will be using to apply the remaining
+        # custom user filters
+        valid_urls = raw_urls[
+            (raw_urls['is_valid'] == True) &
+            (raw_urls['already_visited'] == False) &
+            (raw_urls['already_seen'] == False)
+        ]
 
-        filtered_valid_urls = self.url_rule_test_filter(filtered_valid_urls)
-        self.urls_to_visit.update(filtered_valid_urls)
+        newly_discovered_urls = valid_urls[~valid_urls['already_seen']]
+        logger.info(
+            f"Discovered {newly_discovered_urls.urls.count()} new url(s)")
+
+        valid_urls = valid_urls[['urls', 'is_valid']]
+        valid_urls = self.url_filters(valid_urls)
+        valid_urls = self.url_rule_test_filter(valid_urls)
+
+        self.urls_to_visit.update(valid_urls.urls.to_list())
+        self.list_of_seen_urls.update(raw_urls.urls.to_list())
+
+        # # Specifically indicate to the crawler to
+        # # not try and collect urls on pages that
+        # # match the specified regex values
+        # if self._meta.url_gather_ignore_tests:
+        #     def url_gather_ignore_test(value):
+        #         instance = URL(value)
+
+        #         matched_pattern = None
+        #         for regex in self._meta.url_gather_ignore_tests:
+        #             if instance.test_url(regex):
+        #                 matched_pattern = regex
+        #                 break
+
+        #         if matched_pattern is not None:
+        #             self.list_of_seen_urls.update(raw_urls)
+        #             logger.warning(
+        #                 f"Url collection ignored on current url "
+        #                 f"by '{matched_pattern}'"
+        #             )
+        #             return True
+        #         return False
 
     def click_consent_button(self, element_id=None, element_class=None, before_click_wait_time=2, wait_time=None):
         """Click the consent to cookies button which often
@@ -776,8 +770,9 @@ class SiteCrawler(BaseCrawler):
         # Before reloading the urls, run the filters
         # in case previous urls to exclude were
         # present within the files
-        valid_urls = self.url_filters(data['urls_to_visit'])
-        self.urls_to_visit = set(valid_urls)
+        urls_to_visit = pandas.DataFrame({'urls': data['urls_to_visit']})
+        self.url_filters(urls_to_visit)
+        self.urls_to_visit = set(urls_to_visit.urls.to_list())
         self.visited_urls = set(data['visited_urls'])
 
         try:
@@ -909,6 +904,7 @@ class SiteCrawler(BaseCrawler):
                 )
             except:
                 logger.error('Body element of page was not detected')
+                continue
 
             self.post_navigation_actions(current_url)
 
@@ -1291,7 +1287,8 @@ class JSONCrawler:
                                     data = data_or_dataframe
 
                                 logger.info(
-                                    f"Received {len(self.current_raw_data)} elements"
+                                    f"Received {
+                                        len(self.current_raw_data)} elements"
                                 )
 
                                 if self.paginate_data:

@@ -9,6 +9,7 @@ from kryptone.utils.file_readers import read_json_document
 from kryptone.utils.urls import URLIgnoreTest
 from kryptone.utils.functions import create_filename
 
+
 class Command(ProjectCommand):
     requires_system_checks = True
 

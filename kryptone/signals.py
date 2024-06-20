@@ -206,6 +206,7 @@ def function_to_receiver(signal, **kwargs):
     ... @function_to_receiver(custom_signal)
     ... def some_receiver(**kwargs):
     ...     # Do something here
+    ...     pass
     """
     def decorator(func):
         if isinstance(signal, (list, tuple)):

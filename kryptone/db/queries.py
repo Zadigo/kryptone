@@ -50,12 +50,17 @@ class Query:
 
     def run(self, commit=False):
         """Runs an sql statement and stores the
-        return data on the `result_cache`"""
+        return data in the `result_cache`"""
         self.prepare_sql()
-        result = self._backend.connection.execute(self._sql)
-        if commit:
-            self._backend.connection.commit()
-        self.result_cache = list(result)
+
+        try:
+            result = self._backend.connection.execute(self._sql)
+        except Exception as e:
+            print(e)
+        else:
+            if commit:
+                self._backend.connection.commit()
+            self.result_cache = list(result)
 
     @classmethod
     def run_script(cls, backend, sql_tokens):

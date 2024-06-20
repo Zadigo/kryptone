@@ -1,11 +1,8 @@
-import inspect
 import threading
-import time
-from typing import Any, Callable, Type, Union
-import weakref
 from functools import lru_cache
+from typing import Any, Callable
 
-NO_RECEIVERS = object()
+NO_RECEIVERS: object
 
 
 @lru_cache(maxsize=512)
@@ -53,8 +50,17 @@ class Signal:
         uid: int = ...
     ) -> bool: ...
 
-    def send(self, sender: Callable[..., Any], **named) -> list: ...
-    def send_to_all(self, sender: Callable[..., Any], **named) -> list[tuple]: ...
+    def send(
+        self,
+        sender: Callable[..., Any], 
+        **named
+    ) -> list: ...
+    
+    def send_to_all(
+        self, 
+        sender: Callable[..., Any], 
+        **named
+    ) -> list[tuple]: ...
 
 
 def function_to_receiver(

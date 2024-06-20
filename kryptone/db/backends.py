@@ -11,7 +11,7 @@ class BaseRow:
     to be interfaced
 
     >>> row = table.get(name='Kendall')
-    ... <BaseRow [{'rowid': 1}]>
+    ... "<BaseRow [{'rowid': 1}]>"
     ... row['rowid']
     ... 1
     """
@@ -70,7 +70,8 @@ class BaseRow:
 def row_factory(backend):
     """Base function to generate row that implement
     additional functionnalities on the results
-    of the database"""
+    of the database. This function overrides the default
+    class used for the data in the database."""
     def inner_factory(cursor, row):
         fields = [column[0] for column in cursor.description]
         data = {key: value for key, value in zip(fields, row)}

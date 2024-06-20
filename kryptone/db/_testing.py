@@ -1,23 +1,40 @@
 import datetime
+import pathlib
 from collections import namedtuple
-
+from kryptone.conf import settings
 from kryptone.db import tables
 from kryptone.db.fields import BooleanField, CharField, Field, JSONField
 from kryptone.db.functions import ExtractYear, Lower, Max
 from kryptone.db.migrations import Migrations
-from kryptone.db.tables import Table
+from kryptone.db.tables import Database, Table
 
-fields = [
-    CharField('url', max_length=500, unique=True),
-    BooleanField('visited', default=False),
-    Field('created_on')
-]
-table = Table('something_urls', database_name='scraping', fields=fields)
-table.prepare()
+# fields = [
+#     CharField('url', max_length=500, unique=True),
+#     BooleanField('visited', default=False),
+#     Field('created_on')
+# ]
+# table = Table('something_urls', database_name='scraping', fields=fields)
+# table.prepare()
 
+setattr(settings, 'PROJECT_PATH', pathlib.Path('.'))
 
-
-
+table1 = Table('url', fields=[
+    CharField('url')
+])
+table2 = Table('business', fields=[
+    CharField('name')
+])
+database = Database('my_database', table1, table2)
+database.make_migrations()
+database.migrate()
+# print('New object', database.objects.create('url', url='http://google.com'))
+# print('All', database.objects.all('url'))
+# print('First', database.objects.first('url'))
+# print('Last', database.objects.last('url'))
+# print('Filter', database.objects.filter('url', id__eq=3))
+# print('Get', database.objects.get('url', id__eq=1))
+# print('Get', database.objects.annotate('url', lowered_url=Lower('url')))
+print(dict(database.objects.first('url')))
 
 # def make_migrations(*tables):
 #     """Writes the physical changes to the
@@ -49,7 +66,6 @@ table.prepare()
 # migrate()
 
 
-
 # TODO: Implement cases
 # 1. case when '1' then '2' else '3' end
 # 2 case when '1' then '3' when '2' then '4'  else '5' end
@@ -68,8 +84,8 @@ table.prepare()
 
 # table.create(url='http://google.com', visited=True)
 
-obj = namedtuple('Object', ['url'])
-table.bulk_create([obj('http://example.com')])
+# obj = namedtuple('Object', ['url'])
+# table.bulk_create([obj('http://example.com')])
 # import datetime
 # table.create(url='http://example.com/1', visited=False, created_on=str(datetime.datetime.now()))
 

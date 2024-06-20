@@ -355,6 +355,184 @@ class Table(AbstractTable):
         self.is_prepared = True
 
 
+class DatabaseManager:
+    """A manager is a class that implements query
+    functionnalities for inserting, updating, deleting
+    or retrieving data from the underlying database tables"""
+
+    def __init__(self):
+        self.table_map = {}
+
+    def __get__(self, instance, cls=None):
+        if not self.table_map:
+            self.table_map = instance.table_map
+        return self
+
+    def first(self, table):
+        """Returns the first row from
+        a database table"""
+        result = self.all(table)
+        return result[0]
+
+    def last(self, table):
+        """Returns the last row from
+        a database table"""
+        result = self.all(table)
+        return result[-1]
+
+    def all(self, table):
+        selected_table = self.table_map[table]
+        all_sql = selected_table.backend.SELECT.format_map({
+            'fields': selected_table.backend.comma_join(['rowid', '*']),
+            'table': selected_table.name
+        })
+        sql = [all_sql]
+        query = selected_table.query_class(
+            selected_table.backend,
+            sql,
+            table=selected_table
+        )
+        query._table = selected_table
+        query.run()
+        return query.result_cache
+
+    def create(self, table, **kwargs):
+        """Creates a new row in the table of 
+        the current database
+
+        >>> database.objects.create('table_name', name='Kendall')
+        """
+        selected_table = self.table_map[table]
+        fields, values = selected_table.backend.dict_to_sql(
+            kwargs, quote_values=False)
+        values = selected_table.validate_values(fields, values)
+
+        joined_fields = selected_table.backend.comma_join(fields)
+        joined_values = selected_table.backend.comma_join(values)
+        sql = selected_table.backend.INSERT.format(
+            table=selected_table.name,
+            fields=joined_fields,
+            values=joined_values
+        )
+        query = selected_table.query_class(
+            selected_table.backend,
+            [sql],
+            table=selected_table
+        )
+        query.run(commit=True)
+        return self.last(selected_table.name)
+
+    def filter(self, table, **kwargs):
+        """Filter the data in the database based on
+        a set of criteria
+
+        >>> database.objects.filter(name='Kendall')
+        ... database.objects.filter(name__eq='Kendall')
+        ... database.objects.filter(age__gt=15)
+        ... database.objects.filter(name__in=['Kendall'])
+        """
+        selected_table = self.table_map[table]
+        tokens = selected_table.backend.decompose_filters(**kwargs)
+        filters = selected_table.backend.build_filters(tokens)
+
+        if len(filters) > 1:
+            filters = [' and '.join(filters)]
+
+        select_sql = selected_table.backend.SELECT.format_map({
+            'fields': selected_table.backend.comma_join(['rowid', '*']),
+            'table': selected_table.name,
+        })
+        where_clause = selected_table.backend.WHERE_CLAUSE.format_map({
+            'params': selected_table.backend.comma_join(filters)
+        })
+        sql = [select_sql, where_clause]
+        query = selected_table.query_class(
+            selected_table.backend, 
+            sql, 
+            table=selected_table
+        )
+        query.run()
+        return query.result_cache
+    
+    def get(self, table, **kwargs):
+        """Returns a specific row from the database
+        based on a set of criteria
+
+        >>> instance.objects.get('table_name', id__eq=1)
+        ... instance.objects.get('table_name', id=1)
+        """
+        selected_table = self.table_map[table]
+        base_return_fields = ['rowid', '*']
+        filters = selected_table.backend.build_filters(
+            selected_table.backend.decompose_filters(**kwargs)
+        )
+
+        # Functions SQL: select rowid, *, lower(url) from table
+        select_sql = selected_table.backend.SELECT.format_map({
+            'fields': selected_table.backend.comma_join(base_return_fields),
+            'table': selected_table.name
+        })
+        sql = [select_sql]
+
+        # Filters SQL: select rowid, * from table where url='http://'
+        joined_statements = ' and '.join(filters)
+        where_clause = selected_table.backend.WHERE_CLAUSE.format_map({
+            'params': joined_statements
+        })
+        sql.extend([where_clause])
+
+        query = selected_table.query_class(
+            selected_table.backend, 
+            sql, 
+            table=selected_table
+        )
+        query.run()
+
+        if not query.result_cache:
+            return None
+
+        if len(query.result_cache) > 1:
+            raise ValueError('Returned more than 1 value')
+
+        return query.result_cache[0]
+
+    def annotate(self, table, **kwargs):
+        """Annotations implements the usage of
+        functions in the query
+
+        For example, if we want the iteration of each
+        value in the database to be returned in lowercase
+        or in uppercase
+
+        >>> instance.objects.annotate(lowered_name=Lower('name'))
+        ... instance.objects.annotate(uppered_name=Upper('name'))
+
+        If we want to return only the year section of a date
+
+        >>> self.annotate(year=ExtractYear('created_on'))
+        """
+        selected_table = self.table_map[table]
+        base_return_fields = ['rowid', '*']
+        fields = selected_table.backend.build_annotation(**kwargs)
+        base_return_fields.extend(fields)
+        selected_table.field_names = selected_table.field_names + list(kwargs.keys())
+
+        sql = selected_table.backend.SELECT.format_map({
+            'fields': selected_table.backend.comma_join(base_return_fields),
+            'table': selected_table.name
+        })
+
+        # TODO: Create a query and only run it when
+        # we need with QuerySet for the other functions
+        query = Query(
+            selected_table.backend, 
+            [sql], 
+            table=selected_table
+        )
+        # query.run()
+        # return query.result_cache
+        return QuerySet(query)
+
 class Database:
     """This class links and unifies independent
     tables together and allows the management of
@@ -379,14 +557,17 @@ class Database:
 
     migrations = None
     migrations_class = Migrations
+    objects = DatabaseManager()
 
     def __init__(self, name, *tables):
         self.database_name = name
         self.migrations = self.migrations_class(database_name=name)
+
         self.table_map = {}
         for table in tables:
             if not isinstance(table, Table):
                 raise ValueError('Value should be an instance of Table')
+
             if table.backend is None:
                 table.backend = table.backend_class(
                     database_name=self.database_name,

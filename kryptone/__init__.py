@@ -1,6 +1,4 @@
 import logging
-from kryptone.signals import Signal
-
 
 class Logger:
     instance = None

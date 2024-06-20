@@ -1,8 +1,9 @@
 import pathlib
 import re
+import secrets
 from collections import defaultdict
 from functools import cached_property
-from urllib.parse import urljoin, urlparse, urlunparse, unquote
+from urllib.parse import unquote, urljoin, urlparse, urlunparse
 
 import requests
 
@@ -90,7 +91,10 @@ class URL:
 
     @property
     def is_empty(self):
-        return self.raw_url == ''
+        return any([
+            self.raw_url == '',
+            self.url_object.netloc == '' and self.url_object.path == ''
+        ])
 
     @property
     def is_path(self):
@@ -164,7 +168,7 @@ class URL:
     def is_same_domain(self, url):
         """Checks that an incoming url is the same
         domain as the current one
-        
+
         >>> url = URL('http://example.com')
         ... url.is_same_domain('http://example.com')
         ... True
@@ -277,8 +281,15 @@ class BaseURLTestsMixin:
     blacklist_distribution = defaultdict(list)
     error_message = "{url} was blacklisted by filter '{filter_name}'"
 
+    def __init__(self, name):
+        name = str(name).lower().replace(' ', '_')
+        self.name = f'ignore_{name}_{secrets.token_hex(nbytes=5)}'
+
     def __call__(self, url):
         pass
+
+    def __hash__(self):
+        return hash((self.name))
 
     def convert_url(self, url):
         if isinstance(url, URL):
@@ -295,7 +306,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
     """
 
     def __init__(self, name, *, paths=[]):
-        self.name = name
+        super().__init__(name)
         if not isinstance(paths, (list, tuple)):
             raise ValueError("'paths' should be a list or a tuple")
         self.paths = set(paths)
@@ -338,7 +349,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
     """
 
     def __init__(self, name, regex):
-        self.name = name
+        super().__init__(name)
         self.regex = re.compile(regex)
 
     def __repr__(self):
@@ -355,30 +366,3 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
             )
             return True
         return False
-
-
-# class URLPassesRegexTest(BaseURLTestsMixin):
-#     """Only include and keep urls that successfully pass
-#     the provided regex test
-#     """
-
-#     def __init__(self, name, regex):
-#         self.name = name
-#         self.regex = re.compile(regex)
-
-#     def __repr__(self):
-#         return f'<{self.__class__.__name__} [{self.regex}]>'
-
-#     def __call__(self, url):
-#         result = self.regex.search(url)
-#         if result:
-#             # Indicate to not ignore
-#             # the url
-#             return False
-#         logger.warning(
-#             self.error_message.format(
-#                 url=url,
-#                 filter_name=self.name
-#             )
-#         )
-#         return True
