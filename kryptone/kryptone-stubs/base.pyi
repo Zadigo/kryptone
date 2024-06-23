@@ -2,19 +2,19 @@ import dataclasses
 import datetime
 import time
 from typing import (Any, Coroutine, DefaultDict, Iterator, List, Literal,
-                    NamedTuple, OrderedDict, Tuple, Union, override)
+                    OrderedDict, Union, override)
 from urllib.parse import ParseResult
 from urllib.robotparser import RobotFileParser
 
 import pandas
-from lorelie.database.base import Database
 from selenium.webdriver import Chrome, Edge
 from selenium.webdriver.remote.webelement import WebElement
 
 from kryptone.routing import Router
-from kryptone.utils.file_readers import LoadStartUrls
 from kryptone.utils.iterators import AsyncIterator
-from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest
+from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
+                                 URLIgnoreTest, URLPaginationGenerator,
+                                 URLQueryGenerator)
 
 
 def get_selenium_browser_instance(
@@ -25,16 +25,20 @@ def get_selenium_browser_instance(
 ) -> Union[Edge, Chrome]: ...
 
 
-# class PerformanceAudit(NamedTuple):
-#     days: int
-#     duration: int
+@dataclasses.dataclass
+class PerformanceAudit:
+    days: int = 0
+    duration: float = 0
+    count_urls_to_visit: int = 0
+    count_visited_urls: int = 0
+    completion_percentage: float = 0
+    visited_pages_count: int = 0
 
+    @property
+    def total_urls(self) -> int: ...
 
-# class URLsAudit(NamedTuple):
-#     count_urls_to_visit: int
-#     count_visited_urls: int
-#     completion_percentage: float
-#     total_urls: int
+    def calculate_completion_percentage(self) -> float: ...
+    def json(self) -> dict: ...
 
 
 class CrawlerOptions:
@@ -48,13 +52,17 @@ class CrawlerOptions:
     default_scroll_step: Literal[80] = ...
     router: Router = ...
     crawl: bool = ...
-    start_urls: Union[LoadStartUrls, list[str]]
+    start_urls: Union[
+        LoadStartUrls,
+        URLPaginationGenerator,
+        URLQueryGenerator,
+        list[str]
+    ]
     restrict_search_to: list[str] = ...
     ignore_queries: bool = ...
     ignore_images: bool = ...
     url_gather_ignore_tests: list[str] = ...
     url_rule_tests: list[str] = ...
-    database: Database = ...
 
     def __repr__(self) -> str: ...
 
@@ -119,7 +127,7 @@ class BaseCrawler(metaclass=Crawler):
         wait_time: int = ...
     ) -> None: ...
 
-    def calculate_performance(self) -> Tuple[PerformanceAudit, URLsAudit]: ...
+    def calculate_performance(self) -> None: ...
     def post_navigation_actions(self, current_url: URL, **kwargs) -> None: ...
     def before_next_page_actions(self, current_url: URL, **kwargs) -> None: ...
 
@@ -150,14 +158,12 @@ class PerformanceAudit:
 
 class SiteCrawler(BaseCrawler):
     _start_date: datetime.datetime = ...
-    _start_time: time.time
-    _end_time: time.time
+    _start_time: time.time = ...
+    _end_date: datetime.datetime = ...
     _meta: CrawlerOptions = ...
     start_url: str = ...
+    current_iteration: Literal[0] = ...
     performance_audit: PerformanceAudit = ...
-
-    # cached_json_items: pandas.DataFrame = ...
-    # enrichment_mode: bool = ...
 
     @override
     def __init__(self, browser_name: str = ...) -> None: ...
