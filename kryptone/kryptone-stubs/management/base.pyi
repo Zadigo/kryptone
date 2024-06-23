@@ -2,7 +2,6 @@ import argparse
 from argparse import ArgumentParser, Namespace
 from collections import OrderedDict
 
-
 class BaseCommand:
     help_text: str = ...
     command_registry: OrderedDict = ...

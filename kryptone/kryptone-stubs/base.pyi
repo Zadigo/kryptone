@@ -16,7 +16,6 @@ from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
                                  URLIgnoreTest, URLPaginationGenerator,
                                  URLQueryGenerator)
 
-
 def get_selenium_browser_instance(
     browser_name: str = ...,
     headless: bool = ...,
