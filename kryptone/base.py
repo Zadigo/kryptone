@@ -2,6 +2,7 @@ import asyncio
 import bisect
 import dataclasses
 import datetime
+import inspect
 import os
 import random
 import time
@@ -11,7 +12,6 @@ from urllib.robotparser import RobotFileParser
 
 import pandas
 import requests
-from lorelie.database.base import Database
 from lxml import etree
 from requests import Session
 from requests.models import Request
@@ -28,8 +28,7 @@ from kryptone import constants, exceptions, logger
 from kryptone.conf import settings
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
-from kryptone.utils.iterators import (AsyncIterator, PagePaginationGenerator,
-                                      URLGenerator)
+from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL, pathlib
 from kryptone.webhooks import Webhooks
@@ -116,7 +115,6 @@ class CrawlerOptions:
         self.ignore_images = False
         self.url_gather_ignore_tests = []
         self.url_rule_tests = []
-        self.database = None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -137,14 +135,14 @@ class CrawlerOptions:
     def prepare(self):
         # The user can either use a list of generators or directly
         # use a generator (URLGenerator, PagePaginationGenerator)
-        # directly in "start_urls"Loa
-        if isinstance(self.start_urls, (URLGenerator, PagePaginationGenerator)):
+        # or other types of generators launch the spider
+        if hasattr(self.start_urls, 'resolve_generator'):
             self.start_urls = list(self.start_urls)
 
         if isinstance(self.start_urls, list):
             start_urls = []
             for item in self.start_urls:
-                if isinstance(item, (URLGenerator, file_readers.LoadStartUrls, PagePaginationGenerator)):
+                if hasattr(item, 'resolve_generator'):
                     start_urls.extend(list(item))
                     continue
 
@@ -153,13 +151,6 @@ class CrawlerOptions:
                     continue
 
             self.start_urls = start_urls
-
-        if self.database is not None:
-            if not isinstance(self.database, Database):
-                raise ValueError(
-                    f"{type(self.database)} should be "
-                    "an instance of Database"
-                )
 
 
 class Crawler(type):
@@ -580,9 +571,6 @@ class BaseCrawler(metaclass=Crawler):
     def click_consent_button(self, element_id=None, element_class=None, before_click_wait_time=2, wait_time=None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
-        if before_click_wait_time:
-            time.sleep(before_click_wait_time)
-
         try:
             element = None
             if element_id is not None:
@@ -640,7 +628,7 @@ class BaseCrawler(metaclass=Crawler):
             await t2
 
             self.performance_audit.calculate_completion_percentage()
-            
+
         asyncio.run(main())
 
     def post_navigation_actions(self, current_url, **kwargs):

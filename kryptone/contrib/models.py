@@ -30,6 +30,9 @@ class BaseModel:
     def url_stem(self):
         return pathlib.Path(str(self.url)).stem
 
+    def set_collection_id(self, regex):
+        return NotImplemented
+
     def as_json(self):
         """Return the object as dictionnary"""
         item = {}
