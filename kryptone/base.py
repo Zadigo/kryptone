@@ -1242,7 +1242,7 @@ class JSONCrawler:
     def data(self):
         return self.iterator(self.received_data, by=self.chunks)
 
-    async def create_dump(self):
+    async def after_fail(self):
         pass
 
     async def clean(self, data):
