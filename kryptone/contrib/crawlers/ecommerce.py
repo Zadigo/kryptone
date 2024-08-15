@@ -1,23 +1,27 @@
 import asyncio
 import datetime
 import mimetypes
-import pathlib
+from dataclasses import field
 from urllib.parse import urlparse
 
 import pandas
 import pytz
 import requests
-
 from kryptone import logger
+from kryptone.base import PerformanceAudit
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
-from kryptone.utils.file_readers import (get_media_folder, read_json_document,
-                                         write_json_document)
+from kryptone.utils.file_readers import write_json_document
 from kryptone.utils.functions import create_filename
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import clean_dictionnary, slugify
 
 TEMPORARY_PRODUCT_CACHE = set()
+
+
+class EcommercePerformanceAudit(PerformanceAudit):
+    products_gathered: int = 0
+    products_urls: list = field(default_factory=list)
 
 
 class EcommerceCrawlerMixin:
@@ -35,6 +39,10 @@ class EcommerceCrawlerMixin:
     product_pages = set()
     current_product_file_path = None
 
+    def __init__(self, **kwargs):
+        super().__init__(self, **kwargs)
+        self.performance_audit = EcommercePerformanceAudit()
+
     def _check_products_json_file(self):
         """Checks if the products json file exist and
         creates an empty one if necessary"""
@@ -46,10 +54,8 @@ class EcommerceCrawlerMixin:
 
     def calculate_performance(self):
         super().calculate_performance()
-        self.statistics.update({
-            'products_gathered': self.found_products_counter,
-            'products_urls': list(TEMPORARY_PRODUCT_CACHE)
-        })
+        self.performance_audit.products_gathered = self.found_products_counter
+        self.performance_audit.products_urls = list(TEMPORARY_PRODUCT_CACHE)
 
     def add_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
         """Adds a product to the internal list product container
@@ -59,7 +65,7 @@ class EcommerceCrawlerMixin:
         """
         if not data or data is None:
             logger.warning(f'Product not added to product list with {data}')
-            return False
+            return False, None
 
         data = clean_dictionnary(data)
         product = self.model(**data)
@@ -97,14 +103,14 @@ class EcommerceCrawlerMixin:
 
         self._check_products_json_file()
 
-        new_product = self.add_product(
+        result = self.add_product(
             data,
             collection_id_regex=collection_id_regex,
             avoid_duplicates=avoid_duplicates,
             duplicate_key=duplicate_key
         )
         write_json_document(self.current_product_file_path, self.products)
-        return new_product
+        return result
     
     def bulk_add_products(self, data, collection_id_regex=None):
         """Adds multiple products to the internal list product container

@@ -1,7 +1,6 @@
 from logging import Logger as base_logger
 from typing import Literal
 
-
 class Logger:
     instance: base_logger = ...
 

@@ -2,7 +2,6 @@ import os
 from collections import OrderedDict
 from importlib import import_module
 from os.path import basename
-from typing import Callable
 
 # NOTE: In order for certain commands to work when
 # testing ex. startproject myproject, in order for
@@ -34,7 +33,7 @@ def collect_commands():
     return complete_paths
 
 
-def load_command_class(name: str) -> Callable:
+def load_command_class(name):
     """
     Loads each commands in the `management/commands` directory
     and then returns the Command class instance of a specific
@@ -70,10 +69,12 @@ class Utility:
                     f'kryptone.management.commands.{true_name}')
             except Exception as e:
                 raise ImportError(
-                    (f"Could not import module at {path}. {e.args[0]}"))
+                    "Could not import module "
+                    f"at {path}. {e.args[0]}"
+                )
             self.commands_registry[true_name] = module_obj.Command()
 
-    def _parse_incoming_commands(self, args: list):
+    def _parse_incoming_commands(self, args):
         if len(args) <= 1:
             message = (
                 'You called manage.py or python -m kryptone '
@@ -83,7 +84,7 @@ class Utility:
         name = args[0]
         remaining_tokens = args[1:]
         return name, remaining_tokens
-    
+
     def _find_similar_command(self, name):
         command_names = self.commands_registry.keys()
         commands = list(filter(lambda x: name in x, command_names))

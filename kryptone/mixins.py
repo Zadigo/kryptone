@@ -1,8 +1,10 @@
 import asyncio
 import json
 import re
+import time
 from collections import Counter, defaultdict, deque
 from functools import cached_property
+from string import Template
 
 import requests
 from bs4 import BeautifulSoup
@@ -40,7 +42,7 @@ class TextMixin:
     @staticmethod
     def tokenize(text):
         return text.split(' ')
-    
+
     def stop_words(self, language='en'):
         global_path = settings.GLOBAL_KRYPTONE_PATH
         if language == 'en':
@@ -198,7 +200,7 @@ class SEOMixin(TextMixin):
         with open(path, encoding='utf-8') as f:
             content = f.read()
         return content
-    
+
     def create_word_cloud(self, frequency):
         from wordcloud import WordCloud
 
@@ -365,7 +367,7 @@ class SEOMixin(TextMixin):
                 audit['status_code'] = 0
             else:
                 audit['status_code'] = response.status_code
-        
+
         async def main():
             await sender()
 
@@ -470,7 +472,7 @@ class EmailMixin(TextMixin):
 class ScrollMixin:
     """A mixin that implements special scrolling
     functionnalities to the spider"""
-    
+
     def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
         """Scrolls the entire window by incremeting the current
         scroll position by a given number of pixels"""
@@ -504,9 +506,10 @@ class ScrollMixin:
             selector = """const mainWrapper = document.querySelector('{condition}')"""
             selector = selector.format(condition=css_selector)
         else:
-            selector = self.evaluate_xpath(xpath)
+            # selector = self.evaluate_xpath(xpath)
             # selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
             # selector = selector.format(condition=xpath)
+            pass
 
         body = """
         const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
@@ -525,6 +528,16 @@ class ScrollMixin:
 
         script = css_selector + '\n' + body
         return script
+
+    def scroll_into_view(self, css_selector):
+        """Scrolls directly into an element of the page"""
+        script = """
+        const el = document.querySelector('$css_selector')
+        el.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
+        """
+        template = Template(script)
+        script = template.substitute(**{'css_selector': css_selector})
+        self.driver.execute_script(script)
 
 # class TestClass(TextMixin):
 #     def __init__(self):

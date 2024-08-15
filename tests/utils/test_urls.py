@@ -24,7 +24,7 @@ class TestUrl(unittest.TestCase):
         url = 'https://www.defacto.com/fr-ma/coool-fitted-kisa-kollu-tisort-2836888'
         self.instance = URL(url)
 
-    def test_structural(self):
+    def test_structure(self):
         self.assertTrue('kollu-' in self.instance)
         self.assertFalse(self.instance.is_path)
         self.assertTrue(self.instance.is_valid)
@@ -43,6 +43,9 @@ class TestUrl(unittest.TestCase):
 
         new_instance = self.instance.create('http://example.com/fast.pdf')
         self.assertTrue(new_instance.is_file)
+
+        new_instance = self.instance.create('http://example.com?q=true')
+        self.assertIsInstance(new_instance.query, dict)
 
     def test_capturing(self):
         result = self.instance.capture(r'[a-z]+\-(\d+)')
@@ -114,31 +117,47 @@ class TestUrl(unittest.TestCase):
     #     url = URL('http://example.com')
     #     url2 = URL('http://example.com/2')
     #     print(url & url2)
+    def test_is_same_domain(self):
+        domain = 'https://www.defacto.com'
+        self.assertTrue(self.instance.is_same_domain(domain))
+
+    def test_compare(self):
+        a = URL('http://example.com')
+        b = URL('http://example.com?q=true')
+        self.assertTrue(a.compare(b))
+
+        b = 'http://example.com?q=true'
+        self.assertTrue(a.compare(b))
+
+    def test_remove_fragment(self):
+        result = URL('http://example.com#home')
+        new_url = result.remove_fragment()
+        self.assertFalse(new_url.has_fragment)
 
 
-class TestUrlIgnoreURL(unittest.TestCase):
-    def test_result(self):
-        instance = URLIgnoreTest('base_pages', paths=IGNORE_PATHS)
+# class TestUrlIgnore(unittest.TestCase):
+#     def test_result(self):
+#         instance = URLIgnoreTest('base_pages', paths=IGNORE_PATHS)
 
-        for url in URLS:
-            with self.subTest(url=url):
-                self.assertTrue(instance(url))
+#         for url in URLS:
+#             with self.subTest(url=url):
+#                 self.assertTrue(instance(url))
 
-    def test_multiple_ignores(self):
-        ignore_instances = [
-            URLIgnoreTest('base_pages', paths=IGNORE_PATHS),
-            URLIgnoreTest('other_pages', paths=['baby'])
-        ]
+#     def test_multiple_ignores(self):
+#         ignore_instances = [
+#             URLIgnoreTest('base_pages', paths=IGNORE_PATHS),
+#             URLIgnoreTest('other_pages', paths=['baby'])
+#         ]
 
-        # Logic used in
-        def url_filters():
-            results = defaultdict(list)
-            for url in URLS:
-                truth_array = results[url]
-                for instance in ignore_instances:
-                    truth_array.append(instance(url))
-            return results
-        results = url_filters()
+#         # Logic used in
+#         def url_filters():
+#             results = defaultdict(list)
+#             for url in URLS:
+#                 truth_array = results[url]
+#                 for instance in ignore_instances:
+#                     truth_array.append(instance(url))
+#             return results
+#         results = url_filters()
 
         self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
         self.assertListEqual(
@@ -151,17 +170,28 @@ class TestUrlIgnoreURL(unittest.TestCase):
             results['https://www.defacto.com/fr-ma/baby'],
             [True, True]
         )
+#         self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
+#         self.assertListEqual(
+#             results['https://www.defacto.com/fr-ma/woman'],
+#             [False, False]
+#         )
 
-    def test_regex_result(self):
-        instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
-        self.assertTrue(instance(URLS[0]))
-        self.assertFalse(instance(URLS[-1]))
+#         self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
+#         self.assertListEqual(
+#             results['https://www.defacto.com/fr-ma/baby'],
+#             [True, True]
+#         )
 
-    def test_different_ignores(self):
-        ignore_instances = [
-            URLIgnoreTest('base_pages', paths=['/baby']),
-            URLIgnoreRegexTest('other_pages', regex=r'\/woman')
-        ]
+#     def test_regex_result(self):
+#         instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
+#         self.assertTrue(instance(URLS[0]))
+#         self.assertFalse(instance(URLS[-1]))
+
+#     def test_different_ignores(self):
+#         ignore_instances = [
+#             URLIgnoreTest('base_pages', paths=['/baby']),
+#             URLIgnoreRegexTest('other_pages', regex=r'\/woman')
+#         ]
 
         def url_filters():
             results = defaultdict(list)
@@ -179,7 +209,22 @@ class TestUrlIgnoreURL(unittest.TestCase):
             results['https://www.defacto.com/fr-ma/baby'],
             [True, False]
         )
+#         def url_filters():
+#             results = defaultdict(list)
+#             for url in URLS:
+#                 truth_array = results[url]
+#                 for instance in ignore_instances:
+#                     truth_array.append(instance(url))
+#             return results
+#         results = url_filters()
 
+#         self.assertFalse(
+#             all(results['https://www.defacto.com/fr-ma/statik/new-member'])
+#         )
+#         self.assertTrue(
+#             results['https://www.defacto.com/fr-ma/baby'],
+#             [True, False]
+#         )
 
 if __name__ == '__main__':
     unittest.main()

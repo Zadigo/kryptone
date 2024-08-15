@@ -93,14 +93,14 @@ class SEOMixin(TextMixin):
     def create_word_cloud(self, frequency: dict[str, int]) -> None: ...
 
     def create_graph(
-        self, 
+        self,
         current_url: URL,
-        x_values: list[str], 
+        x_values: list[str],
         y_values: list[int]
     ) -> None: ...
-    
+
     def calculate_word_frequency(
-        self, 
+        self,
         tokens: list[str]
     ) -> tuple[FreqDist, list[str, int]]: ...
 
@@ -110,10 +110,13 @@ class SEOMixin(TextMixin):
     def audit_images(self, audit: dict) -> None: ...
     def audit_structured_data(self, audit: dict) -> None: ...
     def audit_page_speed(self, audit: dict) -> None: ...
-    def audit_page_status_code(self, current_url: URL, audit: dict) -> None: ...
+
+    def audit_page_status_code(
+        self, current_url: URL, audit: dict) -> None: ...
+
     def audit_page(
-        self, 
-        current_url: URL, 
+        self,
+        current_url: URL,
         generate_graph: bool = ...
     ) -> dict: ...
 
@@ -133,3 +136,23 @@ class EmailMixin(TextMixin):
         self,
         elements: List[WebElement]
     ) -> set[str]: ...
+
+
+class ScrollMixin:
+    def scroll_window(
+        self,
+        wait_time: int = Literal[5],
+        increment: int = Literal[1000],
+        stop_at: int = None
+    ) -> None: ...
+
+    def scroll_page_section(
+        self,
+        xpath: str = None,
+        css_selector: str = None
+    ) -> str: ...
+
+    def scroll_into_view(
+        self,
+        css_selector: str
+    ) -> None: ...

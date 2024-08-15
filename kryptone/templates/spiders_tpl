@@ -29,3 +29,6 @@ class MyFirstCrawler(SiteCrawler):
 
     def current_page_actions(self, current_url, **kwargs):
         pass
+
+    def after_fail(self):
+        pass

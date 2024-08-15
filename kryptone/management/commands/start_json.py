@@ -2,14 +2,14 @@ import multiprocessing
 import asyncio
 import kryptone
 from kryptone.checks.core import checks_registry
-from kryptone.core.process import BaseProcess
+# from kryptone.core.process import BaseProcess
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
 
 
 class Command(ProjectCommand):
     requires_system_checks = True
-    
+
     def add_arguments(self, parser):
         parser.add_argument(
             'name',

@@ -1,5 +1,4 @@
-import os
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from collections import OrderedDict
 
 
@@ -9,13 +8,13 @@ class BaseCommand:
     class to subclass this in order to be registered
     """
 
-    help = ''
+    help_text = ''
     command_registry = OrderedDict()
     requires_system_checks = False
 
     def create_parser(self, **kwargs):
         parser = ArgumentParser(
-            description=self.help or None,
+            description=self.help_text or None,
             **kwargs
         )
         # These are the base arguments that are implemented
@@ -28,22 +27,22 @@ class BaseCommand:
         self.add_arguments(parser)
         return parser
 
-    def add_arguments(self, parser: ArgumentParser):
+    def add_arguments(self, parser):
         """
         Adds additional arguments in addition with
         the ones that were already implemented above. Each
         subclass can implement additional arguments
         """
-        pass
+        return NotImplemented
 
-    def execute(self, namespace: Namespace = None):
+    def execute(self, namespace = None):
         """
         Represents the main logic behind an argument passed
         using the command line. Each Command should override
         this definition to implement their custom logic so that
         when this is called, the logic is run
         """
-        pass
+        return NotImplemented
 
 
 class ProjectCommand(BaseCommand):

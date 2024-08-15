@@ -6,6 +6,8 @@ from kryptone.base import SiteCrawler
 from kryptone.mixins import SEOMixin
 from kryptone.utils import file_readers
 
+# TODO: Reunite these two classes
+
 
 class SEOCrawler(SEOMixin):
     """A crawler specialized for running
@@ -22,7 +24,7 @@ class SEOCrawler(SEOMixin):
         self.visited_urls = set(data['visited_urls'])
 
         previous_seen_urls = file_readers.read_csv_document(
-            'seen_urls.csv', 
+            'seen_urls.csv',
             flatten=True
         )
         self.list_of_seen_urls = set(previous_seen_urls)
@@ -37,7 +39,8 @@ class SEOCrawler(SEOMixin):
         self.audit_page(current_url)
 
         async def write_audit_documents():
-            file_readers.write_json_document('word_frequency.json', self.word_frequency_by_page)
+            file_readers.write_json_document(
+                'word_frequency.json', self.word_frequency_by_page)
             file_readers.write_json_document('audit.json', self.page_audits)
 
         async def write_vocabulary():
@@ -69,7 +72,6 @@ class SEOCrawler(SEOMixin):
                 'stemmed_words.json',
                 list(self.stemmed_tokens)
             )
-
 
         async def main():
             task1 = asyncio.create_task(write_audit_documents())

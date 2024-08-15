@@ -45,47 +45,16 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        # params = {
-        #     'start_urls': namespace.start_urls,
-        #     'language': namespace.language
-        # }
-        # spider_config = registry.get_spider(namespace.name)
-        # spider_config.run(**params)
-
         params = {
             'start_urls': namespace.start_urls,
             'language': namespace.language
         }
 
         spider_config = registry.get_spider(namespace.name)
-        if namespace.windows < 0 or namespace.windows > 5:
-            raise ValueError('Number of windows should be between 2 and 5')
+        if namespace.windows < 0 or namespace.windows > 16:
+            raise ValueError('Number of windows should be between 1 and 8')
 
         spider_config.run(
             windows=namespace.windows,
             **params
         )
-
-        # TODO: Try and execute multiple instances of selenium at once
-        # if namespace.instances < 0 or namespace.instances > 3:
-        #     raise ValueError('Number of instances should be between 1 and 3')
-
-        # params = {
-        #     'start_urls': namespace.start_urls,
-        #     'language': namespace.language
-        # }
-        # spider_config = registry.get_spider(namespace.name)
-
-        # if namespace.instances > 1:
-        #     async def main():
-        #         tasks, instances = await spider_config.multi_run(
-        #             number_of_instances=namespace.instances,
-        #         )
-
-        #         for coroutine in asyncio.as_completed(tasks):
-        #             await coroutine
-        #         # await asyncio.gather(*tasks)
-
-        #     asyncio.run(main())
-        # else:
-        #     spider_config.run(**params)
