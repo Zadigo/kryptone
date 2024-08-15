@@ -753,7 +753,13 @@ class SiteCrawler(BaseCrawler):
             )
 
         if self.start_url is None and start_urls:
-            if isinstance(start_urls, file_readers.LoadStartUrls):
+            # if isinstance(start_urls, file_readers.LoadStartUrls):
+            #     start_urls = list(start_urls)
+
+            # TODO: Expand the "resolve_generator" to all the
+            # url generators to resolve the output urls
+            if (hasattr(start_urls, 'resolve_generator') or
+                    inspect.isgenerator(start_urls)):
                 start_urls = list(start_urls)
 
             self.list_of_seen_urls.update(start_urls)
