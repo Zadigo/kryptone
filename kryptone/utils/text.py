@@ -47,6 +47,7 @@ def clean_text(text, encoding='utf-8'):
         return text
 
     text = text.replace('\n', ' ')
+    text = text.replace('\t', ' ')
     text = unicodedata.normalize('NFKD', text)
     text = text.encode(encoding).decode()
     return normalize_spaces(text)
@@ -110,6 +111,15 @@ def clean_dictionnary(item, accents=False, punctation=False):
     >>> items = clean_dictionnary({'name': ' Kendall'})
     ... {'name': 'Kendall}
     """
+    if item is None:
+        return {}
+    
+    if isinstance(item, list):
+        return [clean_dictionnary(data) for data in item]
+    
+    if not isinstance(item, dict):
+        raise ValueError('Object to clean should a dictionnary')
+
     new_item = {}
     for key, value in item.items():
         if isinstance(value, str):
@@ -141,4 +151,5 @@ def slugify(text):
     """
     if not isinstance(text, str):
         raise ValueError(f'Value should be a text. Got: {type(text)}')
-    return text.replace(' ', '-').lower()
+    text = text.replace(' ', '-').lower()
+    return remove_accents(text)

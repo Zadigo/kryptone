@@ -81,32 +81,53 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
+            settings['ACTIVE_SPIDER'] = spider_instance
+
             # This will tell the driver to open
-            # one more window in more of the one
-            # that is opened
+            # one more window in additin to the 
+            # one that is opened
             if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
                 spider_instance.start(**params)
-            settings['ACTIVE_SPIDER'] = spider_instance
         except KeyboardInterrupt:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
+            logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
 
-    def resume(self, **kwargs):
+    def resume(self, windows=1, **params):
+        """Interface function used to call `SpiderCrawler.resume`"""
         spider_instance = self.get_spider_instance()
 
         try:
-            spider_instance.resume(**kwargs)
+            spider_instance.resume(windows=windows, **params)
         except KeyboardInterrupt:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             sys.exit(0)
         except Exception as e:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
+            logger.error(e)
+            raise Exception(e)
+
+    # TODO: Add enrichment to spider process
+    def enrich(self,  windows=1, **params):
+        """Runs the spider by calling the spider class
+        which in return calls "start_from_json" method on the
+        spider via the __init__ method"""
+        spider_instance = self.get_spider_instance()
+
+        try:
+            settings['ACTIVE_SPIDER'] = spider_instance
+            spider_instance.start_from_json(windows=windows, **params)
+        except KeyboardInterrupt:
+            spider_instance.after_fail()
+            sys.exit(0)
+        except Exception as e:
+            spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
 
@@ -136,7 +157,9 @@ class MasterRegistry:
         if not self.has_spiders:
             raise ValueError(
                 "Spiders are not yet loaded or "
-                "there are no registered ones."
+                "there are no registered ones in your project. "
+                "Ensure that you spider classes inherit from 'SiteCrawler' "
+                "if you are using for example a mixin like 'EcommerceCrawlerMixin'"
             )
 
     def pre_configure_project(self, dotted_path, settings):
@@ -171,7 +194,11 @@ class MasterRegistry:
             # his responsibility to provide a module where
             # the spiders are located. This is done in order
             # to not completly block the project from functionning
-            raise ValueError('Requires project')
+            raise ValueError(
+                "The registry requires a project in order "
+                "to be populated correctly. Create a project "
+                "using 'startproject'"
+            )
 
         try:
             project_module = import_module(dotted_path)
@@ -190,6 +217,7 @@ class MasterRegistry:
         try:
             spiders_module = import_module(f'{dotted_path}.{SPIDERS_MODULE}')
         except Exception as e:
+            logger.critical(e)
             raise ExceptionGroup(
                 f"An error occured when trying to load the project '{self.project_name}'",
                 [

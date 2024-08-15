@@ -1,9 +1,10 @@
 import kryptone
 from kryptone import logger
-from kryptone.management.base import ProjectCommand
 from kryptone.checks.core import checks_registry
-from kryptone.conf import settings
-from kryptone.utils.file_readers import write_json_document, write_csv_document, write_text_document
+from kryptone.management.base import ProjectCommand
+from kryptone.utils.file_readers import (write_csv_document,
+                                         write_json_document,
+                                         write_text_document)
 
 
 class Command(ProjectCommand):

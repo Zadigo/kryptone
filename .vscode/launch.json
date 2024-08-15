@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Kryptone: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -19,7 +19,7 @@
         },
         {
             "name": "Kryptone: Test Project",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tests/testproject/manage.py",
             "args": ["start"],
@@ -33,7 +33,7 @@
         },
         {
             "name": "Kryptone: Local Project",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "../myscrap/manage.py",
             "args": [
@@ -51,7 +51,7 @@
         },
         {
             "name": "Kryptone: Blackbox",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tests/blackbox.py",
             "console": "integratedTerminal",

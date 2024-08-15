@@ -35,32 +35,16 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
 
     class Meta:
         crawl = True
-        # router = Router([
-        #     route(
-        #         'handle_products',
-        #         regex=r'\/vetements\/',
-        #         name='products_page'
-        #     ),
-        #     route(
-        #         'handle_product',
-        #         regex=r'\/[a-z\d-]+\-\d+\.html$',
-        #         name='product_page'
-        #     )
-        # ])
-        url_passes_tests = [
-            URLIgnoreTest(
-                'base_pages',
-                paths=IGNORE_URLS
-            )
+        url_ignore_tests = [
+            URLIgnoreTest('base_pages', paths=IGNORE_URLS)
         ]
 
-    def create_dump(self):
-        print('Dumping data')
+    def after_fail(self):
+        pass
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         time.sleep(2)
         self.click_consent_button(element_id='onetrust-accept-btn-handler')
-
         # try:
         #     download_app_button = self.driver.find_element(
         #         By.CSS_SELECTOR,
@@ -70,7 +54,7 @@ class Jennyfer(EcommerceCrawlerMixin, SiteCrawler):
         # except:
         #     pass
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         print('Global actions')
 
     def handle_product(self, current_url, route=None, **kwargs):

@@ -1,13 +1,11 @@
-from kryptone import logger
-from kryptone.base import SiteCrawler
 from kryptone.mixins import EmailMixin
 from kryptone.utils import file_readers
 
 
-class LeadsCrawler(SiteCrawler, EmailMixin):
+class LeadsCrawler(EmailMixin):
     """A crawler specialize in finding emails on a website"""
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         self.emails(
             self.get_page_text,
             elements=self.get_page_link_elements

@@ -1,9 +1,11 @@
-import kryptone
 import re
-from kryptone import logger
-from kryptone.management.base import ProjectCommand
-from kryptone.checks.core import checks_registry
+
 import pandas
+
+import kryptone
+from kryptone import logger
+from kryptone.checks.core import checks_registry
+from kryptone.management.base import ProjectCommand
 from kryptone.utils.file_readers import read_json_document, write_json_document
 
 
@@ -31,7 +33,7 @@ class Command(ProjectCommand):
             if result:
                 return True
             return False
-        
+
         df['has_match'] = df['urls'].map(match_regex)
 
         valid_urls = df[df['has_match'] == True]

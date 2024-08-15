@@ -1,13 +1,12 @@
-from typing import final
-from urllib.parse import quote, urlencode
-from kryptone.base import SiteCrawler
-import time
 import random
+import time
+from urllib.parse import quote, urlencode
+
 from kryptone import logger
 from kryptone.contrib.models import GoogleSearch
 
 
-class GoogleSearchMixin(SiteCrawler):
+class GoogleSearchMixin:
     start_url = "https://www.google.com/search?q=site%3Alinkedin.com%2Fin+Undiz"
     # start_url = 'https://www.google.com/search'
     # query = 'site:linkedin.com/in Undiz'
@@ -21,7 +20,7 @@ class GoogleSearchMixin(SiteCrawler):
         encoded_query = urlencode({'q': query})
         return f'{self.start_url}?{encoded_query}'
 
-    def post_visit_actions(self, **kwargs):
+    def post_navigation_actions(self, current_url, **kwargs):
         element = self.evaluate_xpath(
             '//button/div[contains(text(), "Tout accepter")]/..')
         try:
@@ -29,7 +28,7 @@ class GoogleSearchMixin(SiteCrawler):
         except:
             pass
 
-    def run_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url, **kwargs):
         has_next = True
         while has_next:
             state, next_element = self.driver.execute_script(

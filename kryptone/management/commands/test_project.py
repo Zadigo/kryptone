@@ -1,8 +1,10 @@
+import time
+
 import kryptone
+from kryptone.checks.core import checks_registry
 from kryptone.management.base import ProjectCommand
 from kryptone.registry import registry
-import time
-from kryptone.checks.core import checks_registry
+
 
 class Command(ProjectCommand):
     requires_system_checks = True

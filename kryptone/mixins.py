@@ -1,8 +1,10 @@
 import asyncio
 import json
 import re
+import time
 from collections import Counter, defaultdict, deque
 from functools import cached_property
+from string import Template
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,7 +16,7 @@ from kryptone.utils.file_readers import read_document
 from kryptone.utils.functions import create_filename
 from kryptone.utils.iterators import keep_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.utils.text import (remove_punctuation, slugify)
+from kryptone.utils.text import clean_text, remove_punctuation, slugify
 
 EMAIL_REGEX = r'\S+\@\S+'
 
@@ -40,7 +42,7 @@ class TextMixin:
     @staticmethod
     def tokenize(text):
         return text.split(' ')
-    
+
     def stop_words(self, language='en'):
         global_path = settings.GLOBAL_KRYPTONE_PATH
         if language == 'en':
@@ -198,7 +200,7 @@ class SEOMixin(TextMixin):
         with open(path, encoding='utf-8') as f:
             content = f.read()
         return content
-    
+
     def create_word_cloud(self, frequency):
         from wordcloud import WordCloud
 
@@ -269,7 +271,7 @@ class SEOMixin(TextMixin):
         audit['has_h1'] = False
         if result is not None:
             audit['has_h1'] = True
-            audit['h1'] = result
+            audit['h1'] = clean_text(result)
         else:
             filename = create_filename(suffix='h1')
 
@@ -357,9 +359,15 @@ class SEOMixin(TextMixin):
     def audit_page_status_code(self, current_url, audit):
         async def sender():
             headers = {'User-Agent': RANDOM_USER_AGENT()}
-            response = requests.get(str(current_url), headers=headers)
-            audit['status_code'] = response.status_code
-        
+            try:
+                response = requests.get(str(current_url), headers=headers)
+            except:
+                # If we get an error when trying to send
+                # the request, just put status code 0
+                audit['status_code'] = 0
+            else:
+                audit['status_code'] = response.status_code
+
         async def main():
             await sender()
 
@@ -460,6 +468,76 @@ class EmailMixin(TextMixin):
         emails_from_urls = map(self.parse_url, elements)
         return set(emails_from_urls)
 
+
+class ScrollMixin:
+    """A mixin that implements special scrolling
+    functionnalities to the spider"""
+
+    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
+        """Scrolls the entire window by incremeting the current
+        scroll position by a given number of pixels"""
+        can_scroll = True
+        new_scroll_pixels = 1000
+
+        while can_scroll:
+            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
+
+            self.driver.execute_script(scroll_script)
+            # Scrolls until we get a result that determines that we
+            # have actually scrolled to the bottom of the page
+            has_reached_bottom = self.driver.execute_script(
+                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
+            )
+            if has_reached_bottom:
+                can_scroll = False
+
+            current_position = self.driver.execute_script(
+                """return window.scrollY"""
+            )
+            if stop_at is not None and current_position > stop_at:
+                can_scroll = False
+
+            new_scroll_pixels = new_scroll_pixels + increment
+            time.sleep(wait_time)
+
+    def scroll_page_section(self, xpath=None, css_selector=None):
+        """Scrolls a specific portion on the page"""
+        if css_selector:
+            selector = """const mainWrapper = document.querySelector('{condition}')"""
+            selector = selector.format(condition=css_selector)
+        else:
+            # selector = self.evaluate_xpath(xpath)
+            # selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
+            # selector = selector.format(condition=xpath)
+            pass
+
+        body = """
+        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
+
+        const elementHeight = elementToScroll.scrollHeight
+        let currentPosition = elementToScroll.scrollTop
+
+        // Indicates the scrolling speed
+        const scrollStep = Math.ceil(elementHeight / {scroll_step})
+
+        currentPosition += scrollStep
+        elementToScroll.scroll(0, currentPosition)
+
+        return [ currentPosition, elementHeight ]
+        """.format(scroll_step=self.default_scroll_step)
+
+        script = css_selector + '\n' + body
+        return script
+
+    def scroll_into_view(self, css_selector):
+        """Scrolls directly into an element of the page"""
+        script = """
+        const el = document.querySelector('$css_selector')
+        el.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
+        """
+        template = Template(script)
+        script = template.substitute(**{'css_selector': css_selector})
+        self.driver.execute_script(script)
 
 # class TestClass(TextMixin):
 #     def __init__(self):

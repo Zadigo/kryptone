@@ -1,5 +1,10 @@
 import logging
+
 from kryptone.signals import Signal
+
+__all__ = [
+    'Signal'
+]
 
 
 class Logger:
@@ -28,7 +33,7 @@ class Logger:
     def create(cls, name):
         instance = cls(name=name)
         return instance
-    
+
     def warning(self, message, *args, **kwargs):
         self.instance.warning(message, *args, **kwargs)
 

@@ -62,7 +62,7 @@ def get_page_urls():
     return run_filters(urls)
 
 
-def post_visit_actions(**kwargs):
+def post_navigation_actions(**kwargs):
     pass
 
 
@@ -142,7 +142,7 @@ def start(start_urls=[], url_cache=None, **kwargs):
 
         # Always wait for the body section of
         # the page to be located  or visible
-        post_visit_actions(current_url=current_url)
+        post_navigation_actions(current_url=current_url)
 
         # Post navigation signal
         # TEST: This has to be tested
