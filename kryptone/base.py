@@ -589,7 +589,14 @@ class BaseCrawler(metaclass=Crawler):
                 element = self.driver.find_element(By.ID, element_id)
 
             if element_class is not None:
-                element = self.driver.find_element(By.CLASS_NAME, element_id)
+                element = self.driver.find_element(
+                    By.CLASS_NAME,
+                    element_class
+                )
+
+            if element is not None and before_click_wait_time:
+                time.sleep(before_click_wait_time)
+
             element.click()
         except:
             logger.info('Consent button not found')
