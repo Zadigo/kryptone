@@ -91,11 +91,11 @@ class SpiderConfig:
             else:
                 spider_instance.start(**params)
         except KeyboardInterrupt:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
 
@@ -106,10 +106,10 @@ class SpiderConfig:
         try:
             spider_instance.resume(windows=windows, **params)
         except KeyboardInterrupt:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             sys.exit(0)
         except Exception as e:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
 
@@ -124,10 +124,10 @@ class SpiderConfig:
             settings['ACTIVE_SPIDER'] = spider_instance
             spider_instance.start_from_json(windows=windows, **params)
         except KeyboardInterrupt:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             sys.exit(0)
         except Exception as e:
-            spider_instance.create_dump()
+            spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
 
@@ -194,7 +194,11 @@ class MasterRegistry:
             # his responsibility to provide a module where
             # the spiders are located. This is done in order
             # to not completly block the project from functionning
-            raise ValueError('Requires project')
+            raise ValueError(
+                "The registry requires a project in order "
+                "to be populated correctly. Create a project "
+                "using 'startproject'"
+            )
 
         try:
             project_module = import_module(dotted_path)
