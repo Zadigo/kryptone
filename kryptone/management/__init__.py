@@ -74,7 +74,7 @@ class Utility:
                 )
             self.commands_registry[true_name] = module_obj.Command()
 
-    def _parse_incoming_commands(self, args: list):
+    def _parse_incoming_commands(self, args):
         if len(args) <= 1:
             message = (
                 'You called manage.py or python -m kryptone '
