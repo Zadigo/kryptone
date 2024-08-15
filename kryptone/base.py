@@ -657,7 +657,7 @@ class BaseCrawler(metaclass=Crawler):
         """
         return NotImplemented
 
-    def create_dump(self):
+    def after_fail(self):
         """Dumps the collected results to a file when the driver
         meets and exception during the crawling process. This method
         can be customized with a custome action that you would want
