@@ -86,35 +86,18 @@ class URL:
     def __eq__(self, obj):
         if not isinstance(obj, URL):
             return NotImplemented
-        return self.raw_url == obj
+        return self.url_object == obj.url_object
 
     def __add__(self, obj):
         if not isinstance(obj, str):
             return NotImplemented
         return URL(urljoin(self.raw_url, obj))
 
-    # def __and__(self, obj):
-    #     return all([
-    #         self.raw_url != '',
-    #         self.is_valid,
-    #         obj.raw_url != '',
-    #         obj.is_valid == True
-    #     ])
-
     def __invert__(self):
         return all([
             not self.is_valid,
             not self.raw_url == ''
         ])
-
-    # def __or__(self, obj):
-    #     if not isinstance(obj, URL):
-    #         obj = URL(obj)
-    #     invalid_state = any([
-    #         self.raw_url == '',
-    #         self.is_valid == False
-    #     ])
-    #     return obj if invalid_state else self
 
     def __contains__(self, obj):
         if isinstance(obj, URL):
@@ -227,18 +210,8 @@ class URL:
         return cls(url)
 
     @staticmethod
-    def _structural_check(url, domain=None):
+    def structural_check(url, domain=None):
         clean_url = unquote(url)
-        # if clean_url.startswith('/') and domain is not None:
-        #     domain = URL(domain)
-        #     clean_url = urlunparse(
-        #         domain.url_object.scheme,
-        #         domain.url_object.netloc,
-        #         url,
-        #         None,
-        #         None,
-        #         None
-        #     )
         return clean_url, urlparse(clean_url)
 
     def rebuild_query(self, **query):

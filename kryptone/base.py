@@ -429,7 +429,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             counter = counter + 1
-            valid_urls.add(clean_url)
+            valid_urls.add(url)
 
         filtered_valid_urls1 = self.url_filters(valid_urls)
         filtered_valid_urls2 = self.url_rule_test_filter(filtered_valid_urls1)
@@ -1082,6 +1082,7 @@ class SiteCrawler(BaseCrawler):
                     current_url = URL(current_urls[i])
                 except IndexError:
                     continue
+
                 self.driver.switch_to.window(handle)
 
                 # If we are not on the same domain as the
@@ -1129,8 +1130,8 @@ class SiteCrawler(BaseCrawler):
                     self.get_page_urls(url_instance)
                     self._backup_urls()
                 else:
-                    self.visited_urls.add(current_url)
-                    self.list_of_seen_urls.add(current_url)
+                    self.visited_urls.add(str(current_url))
+                    self.list_of_seen_urls.add(str(current_url))
                     self._backup_urls()
 
                 try:
