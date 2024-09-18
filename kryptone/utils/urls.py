@@ -88,6 +88,26 @@ class URL:
             return NotImplemented
         return self.url_object == obj.url_object
 
+    def __lt__(self, obj):
+        if not isinstance(obj, URL):
+            return NotImplemented
+        return self.raw_url < obj.raw_url
+
+    def __gt__(self, obj):
+        if not isinstance(obj, URL):
+            return NotImplemented
+        return self.raw_url > obj.raw_url
+
+    def __lte__(self, obj):
+        if not isinstance(obj, URL):
+            return NotImplemented
+        return self.raw_url <= obj.raw_url
+
+    def __gte__(self, obj):
+        if not isinstance(obj, URL):
+            return NotImplemented
+        return self.raw_url >= obj.raw_url
+
     def __add__(self, obj):
         if not isinstance(obj, str):
             return NotImplemented

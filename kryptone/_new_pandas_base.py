@@ -1,19 +1,29 @@
 import dataclasses
 import datetime
+import inspect
+import os
 import pathlib
+import random
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field, is_dataclass
-from urllib.parse import unquote, urlparse, urlunparse
+from functools import cached_property
+from typing import List, Union
+from urllib.parse import unquote, urljoin, urlparse, urlunparse
+from uuid import uuid4
 
 import pandas
+import pytz
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.proxy import Proxy, ProxyType
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import logger
+from kryptone import exceptions, logger
 from kryptone.conf import settings
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL
@@ -96,6 +106,9 @@ class Performance:
     def add_iteration_count(self):
         self.iteration_count = self.iteration_count + 1
 
+    def json(self) -> List[
+        OrderedDict[str, Union[int, float, datetime.datetime]]]: ...
+
 
 class CrawlerOptions:
     def __init__(self, spider, name):
@@ -170,6 +183,11 @@ class Crawler(type):
 
 
 class BaseCrawler(metaclass=Crawler):
+    DATA_CONTAINER = []
+    model = None
+    timezone = 'UTC'
+    start_url = None
+
     container = None
     saved_data = None
 
@@ -178,7 +196,7 @@ class BaseCrawler(metaclass=Crawler):
         self.after_seconds = after_seconds
         self.driver = None
         self.debug = debug
-        self.start_url_object = None
+        self.spider_uuid = uuid4()
 
         if not self.debug:
             self.driver = get_selenium_browser_instance(
@@ -203,44 +221,17 @@ class BaseCrawler(metaclass=Crawler):
                 data[field.name]
             self.saved_data = pandas.DataFrame(data)
 
-        self.performance = Performance()
-
     def __repr__(self):
         name = self.__class__.__new__()
         return f'<{name}:>'
 
-    @property
-    def visited_urls(self):
-        return self.urls_to_visit.query('visited == True')
+    def __hash__(self):
+        return hash((self.spider_uuid))
 
     @property
-    def count_of_visited_urls(self):
-        return self.visited_urls.urls.count()
-
-    @property
-    def count_of_urls_to_visit(self):
-        return len(self.urls_to_visit_list)
-
-    @property
-    def get_current_date(self):
-        return datetime.datetime.now()
-
-    @property
-    def get_origin(self):
-        return urlunparse((
-            self.start_url_object.scheme,
-            self.start_url_object.netloc,
-            None,
-            None,
-            None,
-            None
-        ))
-
-    @property
-    def get_page_link_elements(self):
-        """Property that returns all the links on a
-        given page or on the specific section e.g.
-        body, section..."""
+    def collect_page_urls(self):
+        """Returns all the links present on the
+        currently visited page"""
         found_urls = []
         if self._meta.restrict_search_to:
             for selector in self._meta.restrict_search_to:
@@ -263,32 +254,58 @@ class BaseCrawler(metaclass=Crawler):
                 return urls.map(x => x.href)
                 """
             )
-        return self.check_urls(found_urls)
+        return found_urls
 
-    @staticmethod
-    def urljoin(self, path):
-        """Returns the domain of the current
-        website"""
-        path = str(path).strip()
-        result = urlunparse((
-            self.start_url_object.scheme,
-            self.start_url_object.netloc,
-            path,
+    @property
+    def visited_urls(self):
+        return self.urls_to_visit.query('visited == True')
+
+    @property
+    def count_of_visited_urls(self):
+        return self.visited_urls.urls.count()
+
+    @property
+    def count_of_urls_to_visit(self):
+        return len(self.urls_to_visit_list)
+
+    @property
+    def get_page_title(self):
+        element = self.driver.find_element(By.TAG_NAME, 'title')
+        return element.text
+
+    @property
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
+
+    @property
+    def get_origin(self):
+        return urlunparse((
+            self.start_url.scheme,
+            self.start_url.netloc,
+            None,
             None,
             None,
             None
         ))
-        return unquote(result)
 
-    def url_structural_check(self, url):
-        """Checks that the url is a path
-        or with http/https"""
-        if str(url).startswith('/'):
-            return URL(self.urljoin(str(url)))
-        return URL(url)
+    @cached_property
+    def calculate_completion_percentage(self):
+        return len(self.visited_urls) / len(self.urls_to_visit)
+
+    def urljoin(self, path):
+        """Returns the domain of the current
+        website"""
+        path = str(path).strip()
+        result = urljoin(self.get_origin, path)
+        return URL(unquote(result))
+
+    def run_url_filters(self, valid_urls):
+        return valid_urls
 
     def create_dataframe_from_urls(self, urls=[]):
-        local_df = pandas.DataFrame({'urls': urls})
+        url_objs = self.transform_string_urls(urls)
+        local_df = pandas.DataFrame({'urls': url_objs})
         local_df['visited'] = False
         local_df['date'] = None
         local_df['error'] = None
@@ -327,52 +344,64 @@ class BaseCrawler(metaclass=Crawler):
                 "be a dataframe object"
             )
 
-        local_df = local_df[~local_df.duplicated()]
+        if self.performance_audit.iteration_count > 0:
+            logger.info(
+                f"Found {len(list_or_dataframe)} "
+                "url(s) in total on this page"
+            )
 
-        local_df['ignore'] = False
+        # 1. Check that the urls that we are trying to add
+        # do not already exist in the database of seen urls
+        seen_urls_list = self.seen_urls.urls.tolist()
+        unseen_urls_tests = local_df.isin({'urls': seen_urls_list})
+        unseen_urls = local_df[unseen_urls_tests.urls == False]
 
-        def url_gather_ignore_tests(df):
-            return df
+        no_duplicates = unseen_urls[~unseen_urls.duplicated()]
+        no_duplicates['ignore'] = False
 
-        def url_basic_check_test(df):
-            if self._meta.url_gather_ignore_tests:
-                for item in df.itertuples():
-                    url_instance = URL(item.urls)
+        if self._meta.url_gather_ignore_tests:
+            pass
 
-                    if item.ignore:
-                        continue
+        def url_basic_check_test(value):
+            url_instance = URL(value)
 
-                    if not url_instance.is_same_domain(self.start_url_object):
-                        df.loc[item.Index, 'ignore'] = True
-                        continue
+            if not url_instance.is_same_domain(self.start_url):
+                return True
 
-                    if url_instance.is_empty:
-                        df.loc[item.Index, 'ignore'] = True
-                        continue
+            if url_instance.is_empty:
+                return True
 
-                    if url_instance.has_fragment:
-                        df.loc[item.Index, 'ignore'] = True
-                        continue
+            if url_instance.has_fragment:
+                return True
 
-                    if (url_instance.url_object.path == '/' and
-                            self.start_url_object.url_object.path == '/'):
-                        df.loc[item.Index, 'ignore'] = True
-                        continue
+            if (url_instance.url_object.path == '/' and
+                    self.start_url.url_object.path == '/'):
+                return True
 
-                    if self._meta.ignore_queries:
-                        if url_instance.has_queries():
-                            df.loc[item.Index, 'ignore'] = True
-                            continue
+            if self._meta.ignore_queries:
+                if url_instance.has_queries():
+                    return True
 
-                    if self._meta.ignore_images:
-                        if url_instance.is_image:
-                            df.loc[item.Index, 'ignore'] = True
-                            continue
-            return df
+            if self._meta.ignore_images:
+                if url_instance.is_image:
+                    return True
+            return False
 
-        local_df.pipe(url_basic_check_test)
+        no_duplicates['ignore'] = no_duplicates.urls.map(url_basic_check_test)
+        valid_urls = no_duplicates[~no_duplicates.ignore]
 
-        return local_df
+        # Regardless of whether the url is valid
+        # or not, it should be registered as a
+        # seen url
+        self.seen_urls = pandas.concat(
+            [
+                self.seen_urls,
+                local_df[['urls']]
+            ]
+        )
+        self.seen_urls.sort_values('urls')
+
+        return valid_urls.get(['urls', 'visited', 'date', 'error'])
 
     def merge_urls(self, dataframe):
         """Function that merges the urls from a dataframe
@@ -407,68 +436,144 @@ class BaseCrawler(metaclass=Crawler):
         urls do not get added to the main container of urls
         to navigate
 
-        * Check that the url was not already seen and therefore
-          invalid be navigated to"""
-        if isinstance(list_or_dataframe, (list, set)):
-            list_or_dataframe = self.create_dataframe_from_urls(
-                urls=list_or_dataframe
-            )
+        * Check that the url was either already seen and therefore
+          invalid be navigated to or does not contain a normal format
 
-        # 1. Check that the urls that we are trying to add
-        # do not already exist in the database of seen urls
-        unseen_urls_df = list_or_dataframe.isin(
-            {'urls': self.seen_urls.urls.tolist()})
-        unseen_urls = list_or_dataframe[unseen_urls_df.urls == False]
+        * Run user custom url filters that invalidate or validate certain
+          types of urls to exclude"""
+        # 1. Check the urls before adding them to the list of
+        # urls to visit + list of seen urls
+        checked_urls = self.check_urls(list_or_dataframe)
 
-        self.seen_urls = pandas.concat(
-            [
-                self.seen_urls,
-                unseen_urls[['urls']]
-            ]
-        )
-        self.seen_urls.sort_values('urls')
+        # 2. Run the custom user filters
+        filtered_urls = self.run_url_filters(checked_urls)
 
-        if unseen_urls.urls.count() > 0:
-            final_df = self.check_urls(unseen_urls)
-            logger.info(f'Added {final_df.urls.count()} more urls to visit')
+        if filtered_urls.urls.count() > 0:
+            logger.info(
+                f'Added {filtered_urls.urls.count()} more url(s) to visit')
+            self.merge_urls(filtered_urls)
 
-            self.merge_urls(final_df)
-
-    def before_page_actions(self, url, *args, **kwargs):
-        return NotImplemented
+    def calculate_performance(self):
+        pass
 
     def current_page_actions(self, url, *args, **kwargs):
         return NotImplemented
 
-    def on_error(self, url, message, *args, **kwargs):
-        self.urls_to_visit.loc[
-            self.urls_to_visit.urls == url,
-            'error'
-        ] = message
+    def post_navigation_actions(self, current_url, **kwargs):
+        """Actions to run on the page immediately after
+        the crawler has visited a page e.g. clicking
+        on cookie button banner"""
+        return NotImplemented
+
+    def before_next_page_actions(self, current_url, next_url, **kwargs):
+        """Actions to run once the page was visited and that
+        all user actions were performed. This method runs just 
+        after the `wait_time` has expired"""
         self.urls_to_visit.to_csv('visited_urls.csv', index_label='id')
 
-    def before_next_page_actions(self, url, *args, **kwargs):
+    def after_fail(self, current_url, message):
+        self.urls_to_visit.loc[
+            self.urls_to_visit.urls == current_url,
+            'error'
+        ] = message
         self.urls_to_visit.to_csv('visited_urls.csv', index_label='id')
 
     def after_data_save(self, dataframe):
         return NotImplemented
 
-    def before_start(self):
-        logger.info(f'{self.__class__.__name__} ready to crawl website')
+    def before_start(self, start_urls, *args, **kwargs):
+        return NotImplemented
 
+
+class OnPageActionsMixin:
+    def click_consent_button(self, element_id=None, element_class=None, before_click_wait_time=2, wait_time=None):
+        """Click the consent to cookies button which often
+        tends to appear on websites"""
+        try:
+            element = None
+            if element_id is not None:
+                element = self.driver.find_element(By.ID, element_id)
+
+            if element_class is not None:
+                element = self.driver.find_element(
+                    By.CLASS_NAME,
+                    element_class
+                )
+
+            if element is not None and before_click_wait_time:
+                time.sleep(before_click_wait_time)
+
+            element.click()
+        except:
+            logger.info('Consent button not found')
+        finally:
+            # Some websites might create an issue when
+            # trying to gather the urls of page just
+            # after clicking the consent button. Using
+            # the wait time can prevent the stale element
+            # error from being raised
+            if wait_time is not None:
+                time.sleep(wait_time)
+
+
+class SiteCrawler(OnPageActionsMixin, BaseCrawler):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.performance_audit = Performance()
+
+    def __del__(self):
+        try:
+            self.driver.quit()
+        except:
+            pass
+        logger.info('Project stopped')
+
+    @staticmethod
+    def transform_string_urls(urls):
+        for url in urls:
+            yield URL(url)
+
+    @staticmethod
+    def reverse_transform_url_objects(urls):
+        for url in urls:
+            yield str(url)
+
+    def before_start(self, start_urls, *args, **kwargs):
         if self._meta.debug_mode:
-            logger.info('Starting Kryptone in debug mode...')
+            logger.debug('Starting Kryptone in debug mode...')
         else:
             logger.info('Starting Kryptone...')
 
-    def start(self, start_urls=[], filename=None, sort_data_by=None):
-        self.before_start()
+        # self.driver.maximize_window()
+        logger.info(f'{self.__class__.__name__} ready to crawl website')
 
+        start_urls = start_urls or self._meta.start_urls
+        if (hasattr(start_urls, 'resolve_generator') or
+                inspect.isgenerator(start_urls)):
+            start_urls = list(start_urls)
+        start_urls = list(self.transform_string_urls(start_urls))
+
+        # If we have absolutely no start_url and at the
+        # same time we have no start_urls, raise an error
+        if self.start_url is None and not start_urls:
+            raise exceptions.BadImplementationError(
+                "No start url was used. Provide either a "
+                "start url or start urls to crawl in the Meta"
+            )
+
+        if self.start_url is None and start_urls:
+            self.start_url = start_urls[-1]
+            self.list_of_seen_urls.update(start_urls)
+        else:
+            self.start_url = URL(self.start_url)
+            start_urls.append(self.start_url)
+        self.add_urls(start_urls)
+
+    def start(self, start_urls=[], filename=None, sort_data_by=None):
         if filename is not None:
             self.load_file(filename)
 
-        if start_urls:
-            self.add_urls(start_urls)
+        self.before_start(start_urls)
 
         if self.after_seconds is not None:
             time.sleep(self.after_seconds)
@@ -479,12 +584,9 @@ class BaseCrawler(metaclass=Crawler):
                 if self.get_current_date < next_execution_date:
                     continue
 
-            current_url = URL(self.urls_to_visit_list.pop())
-            if self.start_url_object is None:
-                self.start_url_object = current_url
-
+            current_url = self.urls_to_visit_list.pop()
             item = self.urls_to_visit.loc[self.urls_to_visit.urls == current_url]
-            self.before_page_actions(current_url)
+            # self.before_page_actions(current_url)
 
             try:
                 if self.debug:
@@ -492,79 +594,73 @@ class BaseCrawler(metaclass=Crawler):
                 else:
                     self.driver.get(str(current_url))
             except Exception as e:
-                self.performance.add_error_count()
-                self.on_error(current_url, e.args)
+                self.performance_audit.add_error_count()
+                self.after_fail(current_url, e.args)
                 continue
+
+            try:
+                # Always wait for the body section of
+                # the page to be located  or visible
+                wait = WebDriverWait(self.driver, 5)
+
+                condition = EC.presence_of_element_located(
+                    (By.TAG_NAME, 'body')
+                )
+                wait.until(condition)
+            except:
+                logger.critical('Body element of page was not located')
+                continue
+            else:
+                self.post_navigation_actions(current_url)
 
             if not self._meta.debug_mode:
                 if self._meta.crawl:
-                    new_urls_df = self.check_urls(self.get_page_link_elements)
-                    self.add_urls(new_urls_df)
+                    self.add_urls(self.collect_page_urls)
+                    # new_urls_df = self.check_urls(self.collect_page_urls)
+                    # self.add_urls(new_urls_df)
 
             logger.info(f'Going to url: {current_url}')
 
             self.urls_to_visit.loc[item.index, 'visited'] = True
             self.urls_to_visit.loc[
-                item.index, 'date'] = self.get_current_date
+                item.index,
+                'date'
+            ] = self.get_current_date
 
-            data = self.current_page_actions(current_url)
-            if data is not None:
-                if isinstance(data, list):
-                    local_df = pandas.DataFrame(data)
-                    self.saved_data = pandas.concat(
-                        [
-                            local_df,
-                            self.saved_data
-                        ]
-                    )
+            self.before_next_page_actions(
+                current_url, self.urls_to_visit_list[-1])
 
-                    if sort_data_by is not None:
-                        self.saved_data.sort_values(sort_data_by)
-
-                    self.after_data_save(self.saved_data)
-
-            self.before_next_page_actions(current_url)
+            wait_time = settings.WAIT_TIME
+            if settings.WAIT_TIME_RANGE:
+                wait_time = random.randrange(
+                    settings.WAIT_TIME_RANGE[0],
+                    settings.WAIT_TIME_RANGE[1],
+                )
 
             next_execution_date = (
                 self.get_current_date +
-                datetime.timedelta(seconds=5)
+                datetime.timedelta(seconds=wait_time)
             )
 
-            self.performance.add_iteration_count()
+            self.performance_audit.add_iteration_count()
 
             if len(self.urls_to_visit_list) == 0:
-                self.performance.end_date = self.get_current_date
-                self.performance.calculate_duration()
+                self.performance_audit.end_date = self.get_current_date
+                self.performance_audit.calculate_duration()
 
+            logger.info(f"Next execution time: {next_execution_date}")
 
-class SiteCrawler(BaseCrawler):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+            if os.getenv('KYRPTONE_TEST_RUN') is not None:
+                break
 
+    def resume(self, windows=1, **kwargs):
+        pass
 
-# crawler = SiteCrawler(
-#     browser_name='Edge',
-#     debug=True
-# )
-# crawler.start(
-#     filename='start_urls.csv',
-#     urls_to_visit=[
-#         'http://example.com/1',
-#         'http://example.com/2'
-#     ]
-# )
+    def start_from_sitemap_xml(self, url, windows=1, **kwargs):
+        pass
 
-class Custom(SiteCrawler):
-    class Meta:
-        debug_mode = True
-        crawl = True
+    def start_from_json(self, windows=1, **kwargs):
+        pass
 
-
-c = Custom(browser_name='Edge', debug=True)
-c.start(
-    # filename='start_urls.csv',
-    start_urls=[
-        'http://example.com/1',
-        'http://example.com/2'
-    ]
-)
+    def boost_start(self, start_urls=[], *, windows=1, **kwargs):
+        pass
