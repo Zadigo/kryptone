@@ -1,10 +1,13 @@
 import asyncio
 import bisect
+import concurrent.futures
 import dataclasses
 import datetime
 import inspect
 import os
 import random
+import socket
+import threading
 import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
@@ -166,8 +169,15 @@ class Performance:
     end_date: datetime.datetime = field(
         default_factory=datetime.datetime.now
     )
+    timezone: str = 'UTC'
     error_count: int = 0
     duration: int = 0
+
+    def __post_init__(self):
+        # Since the end date is aware, we need to set
+        # the timezone on the start date
+        self.timezone = pytz.timezone(self.timezone)
+        self.start_date.replace(tzinfo=self.timezone)
 
     def calculate_duration(self):
         self.duration = (self.start_date - self.end_date)
@@ -257,6 +267,9 @@ class BaseCrawler(metaclass=Crawler):
         """Returns all the links present on the
         currently visited page"""
         found_urls = []
+        # Restrict the url collection to specific 
+        # section the page -; by default gets all
+        # the urls on the page
         if self._meta.restrict_search_to:
             for selector in self._meta.restrict_search_to:
                 script = f"""
@@ -379,6 +392,37 @@ class BaseCrawler(metaclass=Crawler):
         return URL(unquote(result))
 
     def run_url_filters(self, valid_urls):
+        """Excludes urls in the list of collected
+        urls based on the value of the functions in
+        `url_filters`. All conditions should be true
+        in order for the url be considered valid to
+        be visited"""
+        if self._meta.url_ignore_tests:
+            results = defaultdict(list)
+            for url in valid_urls:
+                truth_array = results[url]
+                for instance in self._meta.url_ignore_tests:
+                    truth_array.append(instance(url))
+
+            urls_kept = set()
+            urls_removed = set()
+            final_urls_filtering_audit = OrderedDict()
+
+            for url, truth_array in results.items():
+                final_urls_filtering_audit[url] = any(truth_array)
+
+                # Expect all the test results to
+                # be true. Otherwise the url is invalid
+                if any(truth_array):
+                    urls_removed.add(url)
+                    continue
+                urls_kept.add(url)
+
+            logger.info(
+                f"Filters completed. {len(urls_removed)} "
+                "url(s) removed"
+            )
+            return urls_kept
         return valid_urls
 
     def check_urls(self, urls, refresh=False):
@@ -550,6 +594,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         self.start_date = get_current_date(timezone=self.timezone)
         self.end_date = None
         self.performance_audit = Performance()
+        self.performance_audit.timezone = self.timezone
 
     def __del__(self):
         try:
@@ -562,6 +607,18 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     def transform_string_urls(urls):
         for url in urls:
             yield URL(url)
+        
+    # def start_udp_server(self, host='localhost', port=65432):
+    #     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #     server.bind((host, port))
+
+    #     def handle_client(data, address, server):
+    #         server.sendto(data.encode(), address)
+            
+    #     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    #         while True:
+    #             data, address = server.recvfrom(1024)
+    #             executor.submit(handle_client, data, address, server)
 
     def before_start(self, start_urls, *args, **kwargs):
         if self._meta.debug_mode:

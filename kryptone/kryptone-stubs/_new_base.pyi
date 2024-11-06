@@ -1,18 +1,13 @@
 import dataclasses
 import datetime
-import time
 from collections.abc import Generator
-from typing import (Any, Coroutine, DefaultDict, Iterator, List, Literal,
-                    OrderedDict, Union, override)
-from urllib.parse import ParseResult
-from urllib.robotparser import RobotFileParser
+from typing import (Any, DefaultDict, List, Literal, OrderedDict, Union,
+                    override)
 
 import pandas
 from selenium.webdriver import Chrome, Edge
-from selenium.webdriver.remote.webelement import WebElement
 
 from kryptone.routing import Router
-from kryptone.utils.iterators import AsyncIterator
 from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
                                  URLIgnoreTest, URLPaginationGenerator,
                                  URLQueryGenerator)
