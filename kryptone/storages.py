@@ -29,7 +29,7 @@ class BaseStorage:
 
     def __init__(self):
         self.spider = None
-        
+
     def __get__(self, instance, cls=None):
         self.spider = instance
         return self
@@ -109,7 +109,7 @@ class FileStorage(BaseStorage):
     def __repr__(self):
         return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
 
-    async def initialize(self):
+    def initialize(self):
         items = self.storage_path.glob('**/*')
         for item in items:
             if not item.is_file():
@@ -123,7 +123,7 @@ class FileStorage(BaseStorage):
     def get(self, filename):
         file = self.get_file(filename)
         return file.read()
-    
+
     def get_file(self, filename):
         return self.storage[filename]
 
@@ -173,7 +173,7 @@ class RedisStorage(BaseStorage):
         )
         self.is_connected = False
 
-    async def initialize(self):
+    def initialize(self):
         try:
             self.storage_connection.ping()
         except:
@@ -279,7 +279,6 @@ class ApiStorage(BaseStorage):
             raise requests.ConnectionError("Could not save data to endpoint")
 
 
-
 class MemCacheSerializer:
     def serialize(self, key, value):
         if isinstance(value, str):
@@ -287,11 +286,11 @@ class MemCacheSerializer:
         return (json.dumps(value).encode('utf-8'), 2)
 
     def deserialize(self, key, value, flags):
-       if flags == 1:
-           return value.decode('utf-8')
-       if flags == 2:
-           return json.loads(value.decode('utf-8'), cls=DefaultJsonEncoder)
-       raise Exception("Unknown serialization format")
+        if flags == 1:
+            return value.decode('utf-8')
+        if flags == 2:
+            return json.loads(value.decode('utf-8'), cls=DefaultJsonEncoder)
+        raise Exception("Unknown serialization format")
 
 
 class MemCacheStorage(BaseStorage):
