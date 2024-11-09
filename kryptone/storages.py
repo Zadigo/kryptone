@@ -54,7 +54,7 @@ class File:
     def is_csv(self):
         return self.path.suffix == '.csv'
 
-    def read(self):
+    async def read(self):
         with open(self.path, mode='r', encoding='utf-8') as f:
             if self.is_json:
                 return json.load(f)
@@ -78,7 +78,7 @@ class FileStorage(BaseStorage):
     def __repr__(self):
         return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
 
-    def initialize(self):
+    async def initialize(self):
         items = self.storage_path.glob('**/*')
         for item in items:
             if not item.is_file():
@@ -86,14 +86,14 @@ class FileStorage(BaseStorage):
             self.storage[item.name] = File(item)
         return True
 
-    def get_file(self, filename):
+    async def get_file(self, filename):
         return self.storage[filename]
 
-    def read_file(self, filename):
+    async def read_file(self, filename):
         file = self.get_file(filename)
         return file.read()
 
-    def save(self, filename, data):
+    async def save(self, filename, data):
         file = self.get_file(filename)
 
         with open(file.path, mode='w', encoding='utf-8') as f:
@@ -119,7 +119,7 @@ class RedisStorage(BaseStorage):
         )
         self.is_connected = False
 
-    def initialize(self):
+    async def initialize(self):
         try:
             self.storage_connection.ping()
         except:
@@ -152,7 +152,7 @@ class ApiStorage(BaseStorage):
             'Content-Type': 'application/json'
         }
 
-    def check(self, name, data):
+    async def check(self, name, data):
         """Checks that the data is returned is formatted
         to be understood and used by the spider. This is
         only for system type data"""
@@ -171,13 +171,12 @@ class ApiStorage(BaseStorage):
             if list(keys) != required_keys:
                 raise ValueError('Cache data is not valid')
 
-    def create_request(self, url, method='post', data=None):
-
+    async def create_request(self, url, method='post', data=None):
         request = requests.Request(
             method=method, url=url, headers=self.default_headers, data=data)
         return self.session.prepare_request(request)
 
-    def get(self, data_name):
+    async def get(self, data_name):
         """Endpoint that gets data by name on the
         given endpoint"""
         url = self.get_endpoint + f'?data={data_name}'
@@ -194,7 +193,7 @@ class ApiStorage(BaseStorage):
                 return self.check(data_name, response.json())
             raise requests.ConnectionError("Could not save data to endpoint")
 
-    def create(self, data_name, data):
+    async def create(self, data_name, data):
         """Endpoint that creates new data to the
         given endpoint. The endpoint sends the results
         under a given key which allows the endpoint to
