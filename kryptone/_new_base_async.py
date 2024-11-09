@@ -376,32 +376,28 @@ class BaseCrawler(metaclass=Crawler):
         if self.storage is None:
             self.storage = FileStorage(settings.MEDIA_PATH)
 
-        async def write_cache_file():
-            data = {
-                'spider': self.__class__.__name__,
-                'spider_uuid': self.spider_uuid,
-                'timestamp': self.get_current_date.strftime('%Y-%M-%d %H:%M:%S'),
-                'urls_to_visit': self.urls_to_visit,
-                'visited_urls': self.visited_urls
-            }
-            self.storage.save_or_create(
-                f'{settings.CACHE_FILE_NAME}.json',
-                data
-            )
+        data = {
+            'spider': self.__class__.__name__,
+            'spider_uuid': self.spider_uuid,
+            'timestamp': self.get_current_date.strftime('%Y-%M-%d %H:%M:%S'),
+            'urls_to_visit': self.urls_to_visit,
+            'visited_urls': self.visited_urls
+        }
 
-        async def write_seen_urls():
-            sorted_urls = []
-            for url in self.list_of_seen_urls:
-                bisect.insort(sorted_urls, url)
+        filename = f'{settings.CACHE_FILE_NAME}.json'
+        t1 = asyncio.create_task(self.storage.save_or_create(filename, data))
 
+        sorted_urls = []
+        for url in self.list_of_seen_urls:
+            bisect.insort(sorted_urls, url)
+
+        t2 = asyncio.create_task(
             self.storage.save_or_create(
                 'seen_urls.csv',
                 sorted_urls,
                 adapt_list=True
             )
-
-        t1 = asyncio.create_task(write_cache_file())
-        t2 = asyncio.create_task(write_seen_urls())
+        )
 
         aws = [t1, t2]
         for aw in asyncio.as_completed(aws):
@@ -1098,3 +1094,4 @@ class TestSpider(SiteCrawler):
 
 instance = TestSpider(browser_name='Edge')
 asyncio.run(instance.start())
+
