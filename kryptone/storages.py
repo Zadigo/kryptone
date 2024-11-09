@@ -3,11 +3,13 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
+from io import BytesIO
 
 import pyairtable
+import pymemcache
 import redis
 import requests
-from io import BytesIO
+
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
 
@@ -26,9 +28,8 @@ class BaseStorage:
     file_based = False
 
     def __init__(self):
-        self.storage_path = None
         self.spider = None
-
+        
     def __get__(self, instance, cls=None):
         self.spider = instance
         return self
@@ -39,7 +40,24 @@ class BaseStorage:
         return data
 
     def initialize(self):
+        """A hook function that can be used to
+        preload data (for example files) in the
+        storage container. This hook should be
+        called also when creating new files in
+        the storage in order to keep track"""
         return NotImplemented
+
+    def has(self, key):
+        return NotImplemented
+
+    def get(self, key):
+        return NotImplemented
+
+    def save(self, key, data, adapt_list=False, **kwargs):
+        return NotImplemented
+
+    def save_or_create(self, key, data, **kwargs):
+        return self.save(key, data, **kwargs)
 
 
 @dataclasses.dataclass
@@ -76,6 +94,7 @@ class FileStorage(BaseStorage):
     file_based = True
 
     def __init__(self, storage_path=None):
+        super().__init__()
         if storage_path is not None:
             if isinstance(storage_path, str):
                 storage_path = pathlib.Path(storage_path)
@@ -85,6 +104,7 @@ class FileStorage(BaseStorage):
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
+        self.initialize()
 
     def __repr__(self):
         return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
@@ -97,21 +117,21 @@ class FileStorage(BaseStorage):
             self.storage[item.name] = File(item)
         return True
 
-    def has_file(self, filename):
-        return filename in self.storage
+    def has(self, key):
+        return key in self.storage
 
-    def get_file(self, filename):
-        return self.storage[filename]
-
-    def read_file(self, filename):
+    def get(self, filename):
         file = self.get_file(filename)
         return file.read()
     
+    def get_file(self, filename):
+        return self.storage[filename]
+
     def save_or_create(self, filename, data, **kwargs):
-        if not self.has_file(filename):
+        if not self.has(filename):
             path = self.storage_path.joinpath(filename)
             instance = File(path)
-            
+
             if instance.is_json:
                 with open(path, mode='w', encoding='utf-8') as f:
                     json.dump(data, f, cls=DefaultJsonEncoder)
@@ -124,8 +144,8 @@ class FileStorage(BaseStorage):
         return self.save(filename, data, **kwargs)
 
     def save(self, filename, data, adapt_list=False):
-        file = self.get_file(filename)
         data = self.before_save(data)
+        file = self.get_file(filename)
 
         if file.is_json:
             with open(file.path, mode='w', encoding='utf-8') as f:
@@ -186,36 +206,38 @@ class ApiStorage(BaseStorage):
             'Content-Type': 'application/json'
         }
 
-    def check(self, name, data):
+    def check(self, key, data):
         """Checks that the data is returned is formatted
         to be understood and used by the spider. This is
         only for system type data"""
         names = ['cache']
 
-        if name not in names:
-            return data
+        if key not in names:
+            return False
 
         if not isinstance(data, dict):
             raise TypeError('Data should be a dictionnary')
 
         keys = data.keys()
 
-        if name == 'cache':
-            required_keys = ['spider', 'timestamp',
-                             'urls_to_visit', 'visited_urls']
+        if key == 'cache':
+            required_keys = [
+                'spider', 'timestamp',
+                'urls_to_visit', 'visited_urls'
+            ]
             if list(keys) != required_keys:
-                raise ValueError('Cache data is not valid')
+                return False
+        return True
 
     def create_request(self, url, method='post', data=None):
-
         request = requests.Request(
             method=method, url=url, headers=self.default_headers, data=data)
         return self.session.prepare_request(request)
 
-    def get(self, data_name):
+    def get(self, key):
         """Endpoint that gets data by name on the
         given endpoint"""
-        url = self.get_endpoint + f'?data={data_name}'
+        url = self.get_endpoint + f'?data={key}'
         request = self.create_request(url, method='get')
 
         try:
@@ -226,10 +248,10 @@ class ApiStorage(BaseStorage):
             raise
         else:
             if response.status_code == 200:
-                return self.check(data_name, response.json())
+                return self.check(key, response.json())
             raise requests.ConnectionError("Could not save data to endpoint")
 
-    def create(self, data_name, data):
+    def save(self, key, data, **kwargs):
         """Endpoint that creates new data to the
         given endpoint. The endpoint sends the results
         under a given key which allows the endpoint to
@@ -240,7 +262,7 @@ class ApiStorage(BaseStorage):
         data = self.before_save(data)
 
         template = {
-            'data_name': data_name,
+            'data_name': key,
             'results': data
         }
         request = self.create_request(self.save_endpoint, data=template)
@@ -255,3 +277,45 @@ class ApiStorage(BaseStorage):
             if resposne.status_code == 200:
                 return True
             raise requests.ConnectionError("Could not save data to endpoint")
+
+
+
+class MemCacheSerializer:
+    def serialize(self, key, value):
+        if isinstance(value, str):
+            return (value.encode('utf-8'), 1)
+        return (json.dumps(value).encode('utf-8'), 2)
+
+    def deserialize(self, key, value, flags):
+       if flags == 1:
+           return value.decode('utf-8')
+       if flags == 2:
+           return json.loads(value.decode('utf-8'), cls=DefaultJsonEncoder)
+       raise Exception("Unknown serialization format")
+
+
+class MemCacheStorage(BaseStorage):
+    storage_class = pymemcache.Client
+
+    def __init__(self):
+        super().__init__()
+
+        default_params = {
+            'connect_timeout': 30,
+            'timeout': 60,
+            'no_delay': True
+        }
+
+        if settings.STORAGE_MEMCACHE_LOAD_BALANCER:
+            self.storage_connection = pymemcache.HashClient(
+                settings.STORAGE_MEMCACHE_LOAD_BALANCER,
+                **default_params
+            )
+        else:
+            self.storage_connection = self.storage_class(
+                (
+                    settings.STORAGE_MEMCACHE_HOST,
+                    settings.STORAGE_MEMCACHE_PORT,
+                ),
+                **default_params
+            )

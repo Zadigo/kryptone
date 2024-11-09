@@ -3,7 +3,7 @@ import dataclasses
 from kryptone._new_base import SiteCrawler
 from kryptone.conf import settings
 
-setattr(settings, 'WAIT_TIME', 3)
+setattr(settings, 'WAIT_TIME', 25)
 
 
 @dataclasses.dataclass
@@ -21,6 +21,7 @@ class CustomSpider(SiteCrawler):
 
 try:
     c = CustomSpider(browser_name='Edge')
-    c.start()
+    # c.start()
+    c.resume()
 except KeyboardInterrupt:
     pass

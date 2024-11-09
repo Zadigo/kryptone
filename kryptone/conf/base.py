@@ -1,4 +1,3 @@
-import datetime
 import pathlib
 
 
@@ -119,3 +118,12 @@ STORAGE_GSHEET_CREDENTIALS = 'creds.json'
 STORAGE_GSHEET_SCOPE = [
     'https://www.googleapis.com/auth/spreadsheets.readonly'
 ]
+
+# Storage settings for memcache
+# https://pymemcache.readthedocs.io/en/latest/getting_started.html
+
+STORAGE_MEMCACHE_HOST = '127.0.0.1'
+
+STORAGE_MEMCACHE_PORT = 11211
+
+STORAGE_MEMCACHE_LOAD_BALANCER = []
