@@ -8,8 +8,8 @@ from kryptone.utils.urls import URL
 from kryptone.utils.urls import URLIgnoreTest, URLIgnoreRegexTest
 
 VALID_URLS = [
-    "http://www.djangoproject.com/",
-    "HTTP://WWW.DJANGOPROJECT.COM/",
+    "http://www.example.com/",
+    "HTTP://WWW.EXAMPLE.COM/",
     "http://localhost/",
     "http://example.com/",
     "http://example.com:0",
@@ -292,8 +292,12 @@ class TestSpider(unittest.TestCase):
             }
         )
 
-    def test_check_urls(self):
+    def test_check_invalid_urls(self):
         objs = (URL(value) for value in INVALID_URLS)
-        print(list(obj.is_valid for obj in objs))
-        # valid_urls = self.spider.check_urls(objs)
+        valid_urls = self.spider.check_urls(objs)
+        print(valid_urls)
         # self.assertSetEqual(valid_urls, set())
+
+    def test_check_valid_urls(self):
+        valid_urls = self.spider.check_urls(VALID_URLS)
+        self.assertEqual(len(valid_urls), len(VALID_URLS))

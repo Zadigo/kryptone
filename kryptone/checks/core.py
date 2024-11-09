@@ -44,7 +44,11 @@ class ApplicationChecks(GlobalMixins):
                     "required in your settings file."
                 )
 
-        requires_list_or_tuple = ['WAIT_TIME_RANGE', 'STORAGE_GSHEET_SCOPE']
+        requires_list_or_tuple = [
+            'WAIT_TIME_RANGE', 
+            'STORAGE_GSHEET_SCOPE',
+            'STORAGE_MEMCACHE_LOAD_BALANCER'
+        ]
         for item in requires_list_or_tuple:
             value = getattr(settings, item)
             if not isinstance(value, (list, tuple)):

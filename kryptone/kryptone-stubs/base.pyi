@@ -16,6 +16,7 @@ from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
                                  URLIgnoreTest, URLPaginationGenerator,
                                  URLQueryGenerator)
 
+
 def get_selenium_browser_instance(
     browser_name: str = ...,
     headless: bool = ...,
@@ -175,6 +176,8 @@ class SiteCrawler(BaseCrawler):
     def resume(self, windows: int = ..., **kwargs) -> None: ...
     def start_from_sitemap_xml(self, url: str, **kwargs) -> None: ...
     def start_from_html_sitemap(self, url: str, **kwargs) -> None: ...
+
+    def setup_class(self) -> None: ...
 
     def start(
         self,
