@@ -7,14 +7,23 @@ from collections import OrderedDict
 import pyairtable
 import redis
 import requests
-
+from io import BytesIO
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
+
+
+def simple_list_adapter(data):
+    """This is useful in cases where we send
+    a simple list [1, 2] which needs to be
+    adapted to a csv array [[1], [2]]
+    """
+    return list(map(lambda x: [x], data))
 
 
 class BaseStorage:
     storage_class = None
     storage_connection = None
+    file_based = False
 
     def __init__(self):
         self.storage_path = None
@@ -64,6 +73,8 @@ class File:
 
 
 class FileStorage(BaseStorage):
+    file_based = True
+
     def __init__(self, storage_path=None):
         if storage_path is not None:
             if isinstance(storage_path, str):
@@ -86,24 +97,47 @@ class FileStorage(BaseStorage):
             self.storage[item.name] = File(item)
         return True
 
+    def has_file(self, filename):
+        return filename in self.storage
+
     def get_file(self, filename):
         return self.storage[filename]
 
     def read_file(self, filename):
         file = self.get_file(filename)
         return file.read()
-
-    def save(self, filename, data):
-        file = self.get_file(filename)
-
-        with open(file.path, mode='w', encoding='utf-8') as f:
-            data = self.before_save(data)
-            if file.is_json:
-                json.dump(data, f, indent=4, cls=DefaultJsonEncoder)
-            elif file.is_csv:
-                writer = csv.writer(f)
-                writer.writerows(data)
+    
+    def save_or_create(self, filename, data, **kwargs):
+        if not self.has_file(filename):
+            path = self.storage_path.joinpath(filename)
+            instance = File(path)
+            
+            if instance.is_json:
+                with open(path, mode='w', encoding='utf-8') as f:
+                    json.dump(data, f, cls=DefaultJsonEncoder)
+            elif instance.is_csv:
+                with open(path, mode='w', newline='\n', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(data)
+            self.initialize()
             return True
+        return self.save(filename, data, **kwargs)
+
+    def save(self, filename, data, adapt_list=False):
+        file = self.get_file(filename)
+        data = self.before_save(data)
+
+        if file.is_json:
+            with open(file.path, mode='w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, cls=DefaultJsonEncoder)
+        elif file.is_csv:
+            with open(file.path, mode='w', newline='\n', encoding='utf-8') as f:
+                writer = csv.writer(f)
+
+                if adapt_list:
+                    data = simple_list_adapter(data)
+                writer.writerows(data)
+        return True
 
 
 class RedisStorage(BaseStorage):
@@ -160,14 +194,15 @@ class ApiStorage(BaseStorage):
 
         if name not in names:
             return data
-        
+
         if not isinstance(data, dict):
             raise TypeError('Data should be a dictionnary')
-        
+
         keys = data.keys()
-        
+
         if name == 'cache':
-            required_keys = ['spider', 'timestamp', 'urls_to_visit', 'visited_urls']
+            required_keys = ['spider', 'timestamp',
+                             'urls_to_visit', 'visited_urls']
             if list(keys) != required_keys:
                 raise ValueError('Cache data is not valid')
 
@@ -203,7 +238,7 @@ class ApiStorage(BaseStorage):
         to retrieve the given data with the given key once
         the user implements the logic to return it correctly"""
         data = self.before_save(data)
-        
+
         template = {
             'data_name': data_name,
             'results': data

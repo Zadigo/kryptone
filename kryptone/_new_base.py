@@ -34,7 +34,7 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import constants, exceptions, logger, receivers, signal_constants
 from kryptone.conf import settings
-from kryptone.storages import FileStorage
+from kryptone.storages import BaseStorage, FileStorage
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.iterators import AsyncIterator
@@ -268,6 +268,33 @@ class BaseCrawler(metaclass=Crawler):
         return hash((self.spider_uuid))
 
     @property
+    def get_page_title(self):
+        element = self.driver.find_element(By.TAG_NAME, 'title')
+        return element.text
+
+    @property
+    def get_current_date(self):
+        timezone = pytz.timezone(self.timezone)
+        return datetime.datetime.now(tz=timezone)
+
+    @property
+    def get_origin(self):
+        if self.start_url is None:
+            return ''
+
+        return urlunparse((
+            self.start_url.url_object.scheme,
+            self.start_url.url_object.netloc,
+            None,
+            None,
+            None,
+            None
+        ))
+
+    @cached_property
+    def calculate_completion_percentage(self):
+        return len(self.visited_urls) / len(self.urls_to_visit)
+
     def collect_page_urls(self):
         """Returns all the links present on the
         currently visited page"""
@@ -297,34 +324,6 @@ class BaseCrawler(metaclass=Crawler):
                 """
             )
         return found_urls
-
-    @property
-    def get_page_title(self):
-        element = self.driver.find_element(By.TAG_NAME, 'title')
-        return element.text
-
-    @property
-    def get_current_date(self):
-        timezone = pytz.timezone(self.timezone)
-        return datetime.datetime.now(tz=timezone)
-
-    @property
-    def get_origin(self):
-        if self.start_url is None:
-            return ''
-
-        return urlunparse((
-            self.start_url.url_object.scheme,
-            self.start_url.url_object.netloc,
-            None,
-            None,
-            None,
-            None
-        ))
-
-    @cached_property
-    def calculate_completion_percentage(self):
-        return len(self.visited_urls) / len(self.urls_to_visit)
 
     def save_object(self, data, check_fields_null=[]):
         """Saves a new object in the container"""
@@ -361,35 +360,61 @@ class BaseCrawler(metaclass=Crawler):
             self.DATA_CONTAINER.append(instance)
 
     def backup_urls(self):
+        if self.storage is None:
+            self.storage = FileStorage(settings.MEDIA_PATH)
+
         async def write_cache_file():
-            d = self.get_current_date.strftime('%Y-%M-%d %H:%M:%S')
-            urls_data = {
+            data = {
                 'spider': self.__class__.__name__,
-                'spider_uid': self.spider_uuid,
-                'timestamp': d,
+                'spider_uuid': self.spider_uuid,
+                'timestamp': self.get_current_date.strftime('%Y-%M-%d %H:%M:%S'),
                 'urls_to_visit': self.urls_to_visit,
                 'visited_urls': self.visited_urls
             }
-            file_readers.write_json_document(
-                f'{settings.CACHE_FILE_NAME}.json',
-                urls_data
-            )
+            self.storage.save_or_create(f'{settings.CACHE_FILE_NAME}.json', data)
 
         async def write_seen_urls():
             sorted_urls = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
-            file_readers.write_csv_document(
-                'seen_urls.csv',
-                sorted_urls,
-                adapt_data=True
-            )
+            self.storage.save_or_create('seen_urls.csv', sorted_urls, adapt_list=True)
+
+        # async def write_cache_file():
+        #     d = self.get_current_date.strftime('%Y-%M-%d %H:%M:%S')
+        #     urls_data = {
+        #         'spider': self.__class__.__name__,
+        #         'spider_uid': self.spider_uuid,
+        #         'timestamp': d,
+        #         'urls_to_visit': self.urls_to_visit,
+        #         'visited_urls': self.visited_urls
+        #     }
+        #     file_readers.write_json_document(
+        #         f'{settings.CACHE_FILE_NAME}.json',
+        #         urls_data
+        #     )
+
+        # async def write_seen_urls():
+        #     sorted_urls = []
+        #     for url in self.list_of_seen_urls:
+        #         bisect.insort(sorted_urls, url)
+
+        #     file_readers.write_csv_document(
+        #         'seen_urls.csv',
+        #         sorted_urls,
+        #         adapt_data=True
+        #     )
 
         async def main():
-            awaitable_funcs = [write_cache_file(), write_seen_urls()]
-            for awaitable_func in asyncio.as_completed(awaitable_funcs):
-                await awaitable_func
+            # aws = [write_cache_file(), write_seen_urls()]
+            
+            t1 = asyncio.create_task(write_cache_file())
+            t2 = asyncio.create_task(write_seen_urls())
+
+            aws = [t1, t2]
+            for aw in asyncio.as_completed(aws):
+                await aw
+
         asyncio.run(main())
 
     def urljoin(self, path):
@@ -614,7 +639,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         for url in urls:
             yield URL(url)
 
-    # def start_udp_server(self, host='localhost', port=65432):
+    # async def start_udp_server(self, host='localhost', port=65432):
     #     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     #     server.bind((host, port))
 
@@ -627,10 +652,24 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     #             executor.submit(handle_client, data, address, server)
 
     def load_storage(self, python_path):
+        """Use this function to load the different
+        storages that the user has implemented to be
+        used for the spider"""
         try:
-            klass = import_from_module(settings.STORAGES.get('default'))
+            default = settings.STORAGES.get('default')
+            klass = import_from_module(default)
         except Exception:
-            raise ValueError(f'Could not load storage module: {python_path}')
+            raise ValueError(
+                "Could not load storage "
+                f"module: {python_path}"
+            )
+
+        if not issubclass(klass, BaseStorage):
+            raise ValueError(
+                f"{klass} should be an instance "
+                "of BaseStorage"
+            )
+
         return klass
 
     def before_start(self, start_urls, *args, **kwargs):
@@ -639,9 +678,16 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         else:
             logger.info('Starting Kryptone')
 
-        self.storage = self.load_storage(settings.STORAGES.get('default'))
+        klass = self.load_storage(settings.STORAGES.get('default'))
+        if getattr(klass, 'file_based'):
+            self.storage = klass(settings.MEDIA_FOLDER)
+
         for path in settings.STORAGES.get('backends', []):
-            self.additional_storages.append(self.load_storage(path))
+            other = self.load_storage(path)
+            if getattr(other, 'file_based'):
+                self.additional_storages.append(other(settings.MEDIA_FOLDER))
+                continue
+            self.additional_storages.append(other())
 
         logger.info(f'{self.__class__.__name__} ready to crawl website')
 
@@ -660,7 +706,6 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             )
 
         self.start_url = URL(start_urls[-1])
-        self.list_of_seen_urls.update(start_urls)
         self.add_urls(start_urls)
 
     def start(self, start_urls=[], **kwargs):
@@ -713,7 +758,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.visited_urls.add(current_url)
 
             if self._meta.crawl:
-                self.add_urls(self.collect_page_urls)
+                self.add_urls(self.collect_page_urls())
                 self.backup_urls()
 
             current_page_actions_params = {}
@@ -746,7 +791,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.add_urls(self.collect_page_urls, refresh=True)
+                    self.add_urls(self.collect_page_urls(), refresh=True)
                     self.backup_urls()
 
             try:
