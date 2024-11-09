@@ -44,6 +44,8 @@ class URL:
     """
 
     def __init__(self, url, *, domain=None):
+        self.invalid_initial_check = False
+
         if isinstance(url, URL):
             url = str(url)
 
@@ -60,28 +62,41 @@ class URL:
         if callable(url):
             url = url()
 
-        if url.startswith('/') and domain is not None:
-            domain = URL(domain)
-            logic = [
-                domain.is_path,
-                domain.has_path,
-                domain.has_queries,
-                domain.has_fragment
-            ]
-            if any(logic):
-                raise ValueError(f'Domain is not valid: {domain}')
+        if url is None:
+            self.invalid_initial_check = True
+        elif isinstance(url, (int, float)):
+            self.invalid_initial_check = True
+            url = str(url)
+        else:
+            if url.startswith('/') and domain is not None:
+                domain = URL(domain)
+                logic = [
+                    domain.is_path,
+                    domain.has_path,
+                    domain.has_queries,
+                    domain.has_fragment
+                ]
+                if any(logic):
+                    raise ValueError(f'Domain is not valid: {domain}')
 
-            url = urljoin(str(domain), url)
+                url = urljoin(str(domain), url)
 
         self.raw_url = url
         self.domain = domain
-        self.url_object = urlparse(self.raw_url)
+
+        try:
+            # Try to parse the url even though it's
+            # invalid.
+            self.url_object = urlparse(self.raw_url)
+        except ValueError:
+            self.url_object = urlparse(None)
+            self.invalid_initial_check = True
 
     def __repr__(self):
         return f'<URL: {self.raw_url}>'
 
     def __str__(self):
-        return self.raw_url
+        return self.raw_url or ''
 
     def __eq__(self, obj):
         if not isinstance(obj, URL):
@@ -165,9 +180,13 @@ class URL:
 
     @property
     def is_valid(self):
+        if self.raw_url is None:
+            return False
+
         return any([
             self.raw_url.startswith('http://'),
-            self.raw_url.startswith('https://')
+            self.raw_url.startswith('https://'),
+            self.invalid_initial_check
         ])
 
     @property
@@ -249,11 +268,14 @@ class URL:
     def is_same_domain(self, url):
         """Checks that an incoming url is the same
         domain as the current one
-        
+
         >>> url = URL('http://example.com')
         ... url.is_same_domain('http://example.com')
         ... True
         """
+        if url is None:
+            return False
+
         if isinstance(url, str):
             url = URL(url)
         return url.url_object.netloc == self.url_object.netloc
@@ -434,7 +456,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         return f'<{self.__class__.__name__} [{self.regex}]>'
 
     def __call__(self, url):
-        result = self.regex.search(url)
+        result = self.regex.search(str(url))
         if result:
             logger.warning(
                 self.error_message.format(

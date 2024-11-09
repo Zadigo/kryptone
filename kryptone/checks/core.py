@@ -44,7 +44,7 @@ class ApplicationChecks(GlobalMixins):
                     "required in your settings file."
                 )
 
-        requires_list_or_tuple = ['WAIT_TIME_RANGE', 'ACTIVE_STORAGE_BACKENDS']
+        requires_list_or_tuple = ['WAIT_TIME_RANGE', 'STORAGE_GSHEET_SCOPE']
         for item in requires_list_or_tuple:
             value = getattr(settings, item)
             if not isinstance(value, (list, tuple)):
@@ -53,7 +53,7 @@ class ApplicationChecks(GlobalMixins):
                     f"be a list or a tuple ex. {item} = []"
                 )
 
-        requires_dictionnary = ['STORAGE_BACKENDS']
+        requires_dictionnary = ['STORAGES']
         for item in requires_dictionnary:
             value = getattr(settings, item)
             if not isinstance(value, dict):
@@ -65,10 +65,10 @@ class ApplicationChecks(GlobalMixins):
         # we should automatically assume that it is a path
         PROJECT_PATH = getattr(settings, 'PROJECT_PATH', None)
         if PROJECT_PATH is None:
-            raise ValueError((
-                "PROJECT_PATH is empty. You are calling Kryptone"
+            raise ValueError(
+                "PROJECT_PATH is empty. You are calling Kryptone "
                 "outside of a project"
-            ))
+            )
 
         # Also make sure that the path is one that really
         # exists in case the user changes this variable
@@ -93,6 +93,7 @@ class ApplicationChecks(GlobalMixins):
                 pass
         """
         tag_name = tag
+
         def inner(func):
             if not callable(func):
                 raise TypeError(

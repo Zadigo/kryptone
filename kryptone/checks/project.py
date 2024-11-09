@@ -59,7 +59,8 @@ def check_wait_time():
                 errors.append(E004.format(time=value))
 
             if value < 0:
-                errors.append(f"WAIT_TIME_RANGE[{i}] cannot be a negative number")
+                errors.append(
+                    f"WAIT_TIME_RANGE[{i}] cannot be a negative number")
 
     return errors
 
@@ -77,7 +78,7 @@ def check_strings():
         errors.append(["EMAIL_HOST should be a string"])
 
     if not isinstance(settings.EMAIL_USE_TLS, bool):
-        errors.append(["EMAIL_HOST should be a string"])
+        errors.append(["EMAIL_USE_TLS should be a string"])
 
     if not isinstance(settings.WEBSITE_LANGUAGE, str):
         errors.append(["WEBSITE_LANGUAGE should be a string"])
@@ -95,7 +96,7 @@ def check_strings():
 
 
 @checks_registry.register(tag='webhook_intervals')
-def check_webkook_interval():
+def check_webhook_interval():
     errors = []
     # TODO: There is a problem checking the webhook interval
     # if (not isinstance(settings.WEBHOOK_INTERVAL, int) or
@@ -118,4 +119,26 @@ def check_proxy_ip():
     #     result = re.match(r'^(\d+\.)+(\:\d+)$', settings.PROXY_IP_ADDRESS)
     #     if not result:
     #         return [f"PROXY_IP_ADDRESS is not a valid_urlsalid IP address"]
+    return errors
+
+
+@checks_registry.register(tag='storages')
+def check_storages():
+    errors = []
+
+    try:
+        settings.STORAGES['default']
+    except KeyError:
+        errors.append(['STORAGES should have a default key'])
+
+    for key in settings.keys():
+        if key.startswith('STORAGE_'):
+            if key == 'STORAGE_REDIS_PORT':
+                if not isinstance(key, (str, int)):
+                    errors.append(['STORAGE_REDIS_PORT is not valid'])
+
+            if key == 'STORAGE_GSHEET_SCOPE':
+                for value in settings.STORAGE_GSHEET_SCOPE:
+                    if not isinstance(value, str):
+                        errors.append([f"'{value}' should be a string"])
     return errors

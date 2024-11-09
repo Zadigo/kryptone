@@ -36,40 +36,6 @@ WAIT_TIME_RANGE = []
 CACHE_FILE_NAME = 'cache'
 
 
-# Register additional storage backends to
-# use for the project
-ACTIVE_STORAGE_BACKENDS = []
-
-
-# External storage backends to configure
-# for using in ACTIVE_STORAGE_BACKENDS
-STORAGE_BACKENDS = {
-    'airtable': {
-        'type': 'online',
-        'credentials': {
-            'API_KEY': None,
-            'BASE_ID': None,
-            'TABLE_NAME': None
-        }
-    },
-    'google_sheets': {
-        'type': 'online',
-        'spreadsheet_id': None,
-        'credentials': 'creds.json',
-        'scopes': [
-            'https://www.googleapis.com/auth/spreadsheets.readonly'
-        ]
-    },
-    'notion': {
-        'type': 'online',
-        'credentials': {
-            'TOKEN': None,
-            'DATABASE_ID': None
-        }
-    },
-    'webhooks': []
-}
-
 # Determines the frequency data should
 # be sent in the webhooks registered in
 # in storage backends
@@ -118,3 +84,38 @@ LOAD_JS = True
 
 # Use a proxy addresses
 PROXY_IP_ADDRESS = None
+
+
+# A list of storage paths to
+# use when storing or retrieving
+# data for the Spiders
+STORAGES = {
+    'default': 'kryptone.storages.FileStorage',
+    'backends': []
+}
+
+STORAGE_API_GET_ENDPOINT = None
+
+STORAGE_API_SAVE_ENDPOINT = None
+
+STORAGE_REDIS_HOST = 'localhost'
+
+STORAGE_REDIS_PORT = 6379
+
+STORAGE_REDIS_USERNAME = None
+
+STORAGE_REDIS_PASSWORD = None
+
+STORAGE_AIRTABLE_API_KEY = None
+
+STORAGE_NOTION_TOKEN = None
+
+STORAGE_NOTION_DATABASE_ID = None
+
+STORAGE_GSHEET_SPREADSHEET_ID = None
+
+STORAGE_GSHEET_CREDENTIALS = 'creds.json'
+
+STORAGE_GSHEET_SCOPE = [
+    'https://www.googleapis.com/auth/spreadsheets.readonly'
+]

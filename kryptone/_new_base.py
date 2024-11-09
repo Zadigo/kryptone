@@ -1,6 +1,5 @@
 import asyncio
 import bisect
-import concurrent.futures
 import dataclasses
 import datetime
 import inspect
@@ -12,6 +11,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
+from importlib import import_module
 from urllib.parse import unquote, urlencode, urljoin, urlunparse
 from urllib.robotparser import RobotFileParser
 from uuid import uuid4
@@ -34,9 +34,11 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import constants, exceptions, logger, receivers, signal_constants
 from kryptone.conf import settings
+from kryptone.storages import FileStorage
 from kryptone.utils import file_readers
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.iterators import AsyncIterator
+from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL
 from kryptone.webhooks import Webhooks
@@ -204,8 +206,8 @@ class Crawler(type):
             return super_new(cls, name, bases, attrs)
 
         new_class = super_new(cls, name, bases, attrs)
-        if name == 'SiteCrawler':
-            return new_class
+        # if name == 'SiteCrawler':
+        #     return new_class
 
         meta_object = attrs.pop('Meta', None)
         meta = CrawlerOptions(new_class, name)
@@ -242,6 +244,9 @@ class BaseCrawler(metaclass=Crawler):
     timezone = 'UTC'
     default_scroll_step = 80
 
+    storage = None
+    additional_storages = []
+
     def __init__(self, browser_name=None):
         self.start_url = None
         self.url_distribution = defaultdict(list)
@@ -267,7 +272,7 @@ class BaseCrawler(metaclass=Crawler):
         """Returns all the links present on the
         currently visited page"""
         found_urls = []
-        # Restrict the url collection to specific 
+        # Restrict the url collection to specific
         # section the page -; by default gets all
         # the urls on the page
         if self._meta.restrict_search_to:
@@ -305,6 +310,9 @@ class BaseCrawler(metaclass=Crawler):
 
     @property
     def get_origin(self):
+        if self.start_url is None:
+            return ''
+
         return urlunparse((
             self.start_url.url_object.scheme,
             self.start_url.url_object.netloc,
@@ -586,8 +594,6 @@ class OnPageActionsMixin:
 
 
 class SiteCrawler(OnPageActionsMixin, BaseCrawler):
-    start_urls = None
-
     def __init__(self, browser_name=None):
         super().__init__(browser_name=browser_name)
 
@@ -607,26 +613,36 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     def transform_string_urls(urls):
         for url in urls:
             yield URL(url)
-        
+
     # def start_udp_server(self, host='localhost', port=65432):
     #     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     #     server.bind((host, port))
 
     #     def handle_client(data, address, server):
     #         server.sendto(data.encode(), address)
-            
+
     #     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
     #         while True:
     #             data, address = server.recvfrom(1024)
     #             executor.submit(handle_client, data, address, server)
 
+    def load_storage(self, python_path):
+        try:
+            klass = import_from_module(settings.STORAGES.get('default'))
+        except Exception:
+            raise ValueError(f'Could not load storage module: {python_path}')
+        return klass
+
     def before_start(self, start_urls, *args, **kwargs):
         if self._meta.debug_mode:
-            logger.debug('Starting Kryptone in debug mode...')
+            logger.debug('Starting Kryptone in debug mode')
         else:
-            logger.info('Starting Kryptone...')
+            logger.info('Starting Kryptone')
 
-        # self.driver.maximize_window()
+        self.storage = self.load_storage(settings.STORAGES.get('default'))
+        for path in settings.STORAGES.get('backends', []):
+            self.additional_storages.append(self.load_storage(path))
+
         logger.info(f'{self.__class__.__name__} ready to crawl website')
 
         start_urls = start_urls or self._meta.start_urls
@@ -637,22 +653,24 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         # If we have absolutely no start_url and at the
         # same time we have no start_urls, raise an error
-        if self.start_url is None and not start_urls:
+        if not start_urls:
             raise exceptions.BadImplementationError(
-                "No start url was used. Provide either a "
-                "start url or start urls to crawl in the Meta"
+                "No start urls was used. Provide start urls list "
+                "in spider.Meta to start crawling a list of urls"
             )
 
-        if self.start_url is None and start_urls:
-            self.start_url = start_urls[-1]
-            self.list_of_seen_urls.update(start_urls)
-        else:
-            self.start_url = URL(self.start_url)
-            start_urls.append(self.start_url)
+        self.start_url = URL(start_urls[-1])
+        self.list_of_seen_urls.update(start_urls)
         self.add_urls(start_urls)
 
     def start(self, start_urls=[], **kwargs):
         self.before_start(start_urls, **kwargs)
+
+        if self._meta.debug_mode:
+            logger.warning("Calling start in debug mode will have no effect")
+            return False
+
+        self.driver.maximize_window()
 
         next_execution_date = None
         while self.urls_to_visit:
@@ -767,7 +785,15 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 break
 
     def resume(self, windows=1, **kwargs):
-        pass
+        """Resume a previous crawling sessiong by reloading
+        data from the urls to visit and visited urls json files
+        if present. The presence of previous data is checked 
+        in order by doing the following :
+
+            * Redis is checked as the primary database for a cache
+            * Memcache is checked in second place
+            * Finally, the file cache is used as a final resort if none exists
+        """
 
     def start_from_sitemap_xml(self, url, windows=1, **kwargs):
         pass
