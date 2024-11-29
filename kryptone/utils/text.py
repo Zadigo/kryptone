@@ -90,11 +90,16 @@ class Text:
         return self.__str__().split(' ')
 
 
-def remove_punctuation(text, email_exception=False):
+def remove_punctuation(text, keep=[], email_exception=False):
     """Remove the punctation from a given text. If the text
     is an email, consider using the email_exception so that the
     '@' symbol does not get removed"""
     punctuation = string.punctuation
+
+    if keep:
+        for value in keep:
+            punctuation = punctuation.replace(value, '')
+
     if email_exception:
         punctuation = punctuation.replace('@', '')
     return text.translate(str.maketrans('', '', punctuation))
