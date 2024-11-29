@@ -4,6 +4,7 @@ import pathlib
 
 from kryptone.utils.text import (normalize_spaces, remove_accents,
                                  remove_punctuation)
+from kryptone.utils.urls import URL
 
 
 def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]):
@@ -36,7 +37,7 @@ def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]
     return pathlib.Path('/'.join(tokens))
 
 
-def directory_from_url(path, exclude=[]):
+def directory_from_url(url_or_path, exclude=[]):
     """Build the logical local directory in the local project
     using the natural structure of the product url
 
