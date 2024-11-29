@@ -158,10 +158,10 @@ class CrawlerOptions:
 class Performance:
     iteration_count: int = 0
     start_date: datetime.datetime = field(
-        default_factory=datetime.datetime.now
+        default_factory=lambda: datetime.datetime.now(tz=pytz.UTC)
     )
     end_date: datetime.datetime = field(
-        default_factory=datetime.datetime.now
+        default_factory=lambda: datetime.datetime.now(tz=pytz.UTC)
     )
     timezone: str = 'UTC'
     error_count: int = 0
@@ -189,7 +189,9 @@ class Performance:
 
         date_format = '%Y-%m-%dT%H:%M:%S.%f'
         self.start_date = datetime.datetime.strptime(
-            data['start_date'], date_format)
+            data['start_date'],
+            date_format
+        )
         self.start_date.replace(tzinfo=pytz.timezone(data['timezone']))
 
         self.count_urls_to_visit = data.get('count_urls_to_visit', 0)
@@ -331,7 +333,8 @@ class BaseCrawler(metaclass=Crawler):
 
             inferred_filename = url.get_filename
             if inferred_filename is None:
-                logger.warning("File name could not be infered from url. Using random characters")
+                logger.warning(
+                    "File name could not be infered from url. Using random characters")
                 filename_attrs.update(suffix_with_date=True)
                 inferred_filename = create_filename(**filename_attrs)
             else:
@@ -474,7 +477,7 @@ class BaseCrawler(metaclass=Crawler):
                 'urls_to_visit': self.urls_to_visit,
                 'visited_urls': self.visited_urls
             }
-            self.storage.save_or_create(
+            await self.storage.save_or_create(
                 f'{settings.CACHE_FILE_NAME}.json',
                 data
             )
@@ -484,7 +487,7 @@ class BaseCrawler(metaclass=Crawler):
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
-            self.storage.save_or_create(
+            await self.storage.save_or_create(
                 'seen_urls.csv',
                 sorted_urls,
                 adapt_list=True
@@ -650,7 +653,7 @@ class BaseCrawler(metaclass=Crawler):
             await asyncio.create_task(calculate_urls_performance())
 
             data = self.performance_audit.json()
-            self.storage.save_or_create('performance.json', data)
+            await self.storage.save_or_create('performance.json', data)
 
         asyncio.run(main())
 
