@@ -52,7 +52,7 @@ def directory_from_url(path, exclude=[]):
 
     def clean_token(token):
         result = token.replace('-', '_')
-        return remove_accents(remove_punctuation(result.lower()))
+        return remove_accents(remove_punctuation(result.lower(), keep=['_']))
     tokens = list(map(clean_token, tokens))
 
     tokens.pop(-1)
