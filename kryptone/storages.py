@@ -159,7 +159,7 @@ class FileStorage(BaseStorage):
 
     async def save(self, filename, data, adapt_list=False):
         data = self.before_save(data)
-        file = self.get_file(filename)
+        file = await self.get_file(filename)
 
         if file.is_json:
             with open(file.path, mode='w', encoding='utf-8') as f:
