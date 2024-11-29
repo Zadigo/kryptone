@@ -56,7 +56,11 @@ class Settings:
         dotted_path = os.environ.get(ENVIRONMENT_VARIABLE)
         self._user_settings = UserSettings(dotted_path)
 
-        list_or_tuple_settings = ['STORAGE_MEMCACHE_LOAD_BALANCER']
+        list_or_tuple_settings = [
+            'STORAGE_MEMCACHE_LOAD_BALANCER', 
+            'STORAGE_GSHEET_SCOPE'
+        ]
+        
         for key in self._user_settings.__dict__.keys():
             if key.isupper():
                 if key not in list_or_tuple_settings:
