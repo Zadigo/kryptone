@@ -1,6 +1,4 @@
 import unittest
-
-from kryptone.utils.iterators import PagePaginationGenerator, URLIterator
 from kryptone.utils.urls import URL
 
 START_URLS = [
@@ -19,7 +17,7 @@ class TestPagination(unittest.TestCase):
         instance2 = PagePaginationGenerator('http://google.com', k=1)
         combinator = instance1 + instance2
         self.assertListEqual(
-            combinator.urls, 
+            combinator.urls,
             ['http://example.com?page=1', 'http://google.com?page=1']
         )
 

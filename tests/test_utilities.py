@@ -1,9 +1,12 @@
 import pathlib
 import unittest
+
 from bs4 import BeautifulSoup
 
+from kryptone.utils.functions import (directory_from_breadcrumbs,
+                                      directory_from_url)
 from kryptone.utils.text import Text
-from kryptone.utils.functions import directory_from_breadcrumbs, directory_from_url
+from kryptone.utils.urls import URL
 
 
 class TestFunctions(unittest.TestCase):
@@ -21,6 +24,13 @@ class TestFunctions(unittest.TestCase):
             str(result),
             'woman\\clothing\\dresses\\shortdresses'
         )
+
+    def test_dierectory_from_url_with_query(self):
+        url = URL(
+            'https://www.bershka.com/fr/femme/vetements/robes-n3802.html?tipology=1010193338%7C%7C1010193337&sort=1'
+        )
+        result = directory_from_url(url)
+        self.assertEqual(result, pathlib.Path('fr/femme/vetements'))
 
 
 class TestTextUtilities(unittest.TestCase):

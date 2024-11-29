@@ -117,6 +117,7 @@ class TestUrl(unittest.TestCase):
     #     url = URL('http://example.com')
     #     url2 = URL('http://example.com/2')
     #     print(url & url2)
+
     def test_is_same_domain(self):
         domain = 'https://www.defacto.com'
         self.assertTrue(self.instance.is_same_domain(domain))
@@ -134,97 +135,20 @@ class TestUrl(unittest.TestCase):
         new_url = result.remove_fragment()
         self.assertFalse(new_url.has_fragment)
 
+    def test_properties(self):
+        url = 'https://static.bershka.net/assets/public/1174/9ac3/e8384037903b/afaee790a05e/00623152505-a3f/00623152505-a3f.jpg?ts=1717510394290&w=800'
 
-# class TestUrlIgnore(unittest.TestCase):
-#     def test_result(self):
-#         instance = URLIgnoreTest('base_pages', paths=IGNORE_PATHS)
+        instance = URL(url)
+        self.assertTrue(instance.has_query)
+        self.assertTrue(instance.has_path)
 
-#         for url in URLS:
-#             with self.subTest(url=url):
-#                 self.assertTrue(instance(url))
+        self.assertEqual('00623152505-a3f.jpg', instance.get_filename)
 
-#     def test_multiple_ignores(self):
-#         ignore_instances = [
-#             URLIgnoreTest('base_pages', paths=IGNORE_PATHS),
-#             URLIgnoreTest('other_pages', paths=['baby'])
-#         ]
+    def test_rebuild_query(self):
+        instance = URL('http://example.com')
+        result = instance.rebuild_query(a=1)
+        self.assertEqual(str(result), 'http://example.com?a=1')
 
-#         # Logic used in
-#         def url_filters():
-#             results = defaultdict(list)
-#             for url in URLS:
-#                 truth_array = results[url]
-#                 for instance in ignore_instances:
-#                     truth_array.append(instance(url))
-#             return results
-#         results = url_filters()
-
-        self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
-        self.assertListEqual(
-            results['https://www.defacto.com/fr-ma/woman'],
-            [False, False]
-        )
-
-        self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
-        self.assertListEqual(
-            results['https://www.defacto.com/fr-ma/baby'],
-            [True, True]
-        )
-#         self.assertFalse(any(results['https://www.defacto.com/fr-ma/woman']))
-#         self.assertListEqual(
-#             results['https://www.defacto.com/fr-ma/woman'],
-#             [False, False]
-#         )
-
-#         self.assertTrue(any(results['https://www.defacto.com/fr-ma/baby']))
-#         self.assertListEqual(
-#             results['https://www.defacto.com/fr-ma/baby'],
-#             [True, True]
-#         )
-
-#     def test_regex_result(self):
-#         instance = URLIgnoreRegexTest('base_pages', regex=r'\/statik')
-#         self.assertTrue(instance(URLS[0]))
-#         self.assertFalse(instance(URLS[-1]))
-
-#     def test_different_ignores(self):
-#         ignore_instances = [
-#             URLIgnoreTest('base_pages', paths=['/baby']),
-#             URLIgnoreRegexTest('other_pages', regex=r'\/woman')
-#         ]
-
-        def url_filters():
-            results = defaultdict(list)
-            for url in URLS:
-                truth_array = results[url]
-                for instance in ignore_instances:
-                    truth_array.append(instance(url))
-            return results
-        results = url_filters()
-
-        self.assertFalse(
-            all(results['https://www.defacto.com/fr-ma/statik/new-member'])
-        )
-        self.assertTrue(
-            results['https://www.defacto.com/fr-ma/baby'],
-            [True, False]
-        )
-#         def url_filters():
-#             results = defaultdict(list)
-#             for url in URLS:
-#                 truth_array = results[url]
-#                 for instance in ignore_instances:
-#                     truth_array.append(instance(url))
-#             return results
-#         results = url_filters()
-
-#         self.assertFalse(
-#             all(results['https://www.defacto.com/fr-ma/statik/new-member'])
-#         )
-#         self.assertTrue(
-#             results['https://www.defacto.com/fr-ma/baby'],
-#             [True, False]
-#         )
-
-if __name__ == '__main__':
-    unittest.main()
+        instance = URL('http://example.com?b=2')
+        result = instance.rebuild_query(c=4)
+        self.assertEqual(str(result), 'http://example.com?c=4&b=2')

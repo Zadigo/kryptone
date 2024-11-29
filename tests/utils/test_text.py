@@ -24,6 +24,9 @@ class TestTextCleaning(unittest.TestCase):
         text = remove_punctuation('kendall, jenner')
         self.assertEqual(text, 'kendall jenner')
 
+        text = remove_punctuation('kendall_jenner', keep=['_'])
+        self.assertEqual(text, 'kendall_jenner')
+
 
 if __name__ == '__main__':
     unittest.main()

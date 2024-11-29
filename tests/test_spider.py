@@ -1,11 +1,9 @@
 import pathlib
 import unittest
 
-from kryptone._new_base import SiteCrawler
+from kryptone.base import SiteCrawler
 from kryptone.conf import settings
-from tests.items import BaseTestSpider
-from kryptone.utils.urls import URL
-from kryptone.utils.urls import URLIgnoreTest, URLIgnoreRegexTest
+from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest
 
 VALID_URLS = [
     "http://www.example.com/",
@@ -242,9 +240,20 @@ class TestSpider(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spider = MySpider()
+        cls.spider.setup_class()
 
-        setattr(settings, 'PROJECT_PATH', pathlib.Path(
-            './testproject').absolute())
+        test_project_path = pathlib.Path('./tests/testproject').absolute()
+        setattr(
+            settings,
+            'PROJECT_PATH',
+            test_project_path
+        )
+
+        setattr(
+            settings,
+            'MEDIA_FOLDER',
+            test_project_path / 'media'
+        )
 
     def test_structure(self):
         # In debug mode makes no sense to run
@@ -301,3 +310,14 @@ class TestSpider(unittest.TestCase):
     def test_check_valid_urls(self):
         valid_urls = self.spider.check_urls(VALID_URLS)
         self.assertEqual(len(valid_urls), len(VALID_URLS))
+
+    def test_download_images(self):
+        test_urls = [
+            'https://static.bershka.net/assets/public/1174/9ac3/e8384037903b/afaee790a05e/00623152505-a3f/00623152505-a3f.jpg?ts=1717510394290&w=800',
+            'https://static.bershka.net/assets/public/86b5/ec66/38704722bb2c/75f953f6182b/00623152505-p/00623152505-p.jpg?ts=1717510451241&w=800',
+            'https://static.bershka.net/assets/public/1bb9/b521/03744fb982bc/8cff09929be0/00623152505-a1t/00623152505-a1t.jpg?ts=1717510385997&w=800'
+        ]
+        url = URL(
+            'https://www.bershka.com/fr/robe-midi-bretelles-col-carr%C3%A9-c0p164869795.html?colorId=505'
+        )
+        self.spider.download_images(test_urls, url, filename_attrs={'suffix': 'some name'})
