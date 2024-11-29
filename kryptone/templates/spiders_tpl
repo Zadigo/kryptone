@@ -1,19 +1,23 @@
 """
-This is the main module for creating
-a spider that will crawl an entire website
+This is the main module for creating a web spider 
+using the Kryptone framework.
 
-    1. Define a start url from which the spider
-       should begin gathering additional urls to crawl
+The `MyFirstCrawler` class is a customizable spider for 
+crawling and automating  interactions with websites. Follow these 
+steps to set up and run your spider:
 
-       Or, optionally, load start urls in 
-       MyFirstCrawler.Meta.start_urls through a list 
-       of urls to visit
+    1. Specify a list of urls in ``MyFirstCrawler.Meta.start_urls` that
+       the spider should visit and gathering additional urls to crawl
     
-    2. Define a set of actions that the spider should execute
-       on each page. You can also define actions that
-       will be executed just after the spider has visited a page
+    2. Define actions to execute on each visited page by overriding 
+       the `current_page_actions` method. Optionally, define post-navigation 
+       actions that run after each page is visited by overriding the 
+       `post_navigation_actions` method
+    
+    3. Customize the behavior when the spider encounters errors or fails 
+       to complete an action by overriding the `after_fail` method
 
-    3. Run python manage.py start MyFirstCrawler
+    3. Run the following command to start crawling: `python manage.py start MyFirstCrawler`
 
 To read more visit: https://github.com/Zadigo/kryptone/wiki
 """
@@ -22,13 +26,17 @@ from kryptone.base import SiteCrawler
 
 
 class MyFirstCrawler(SiteCrawler):
-    start_url = None
+    """A customizable web spider class for crawling websites 
+    and performing automated tasks"""
+    
+    class Meta:
+        start_urls = []
 
     def post_navigation_actions(self, current_url, **kwargs):
-        pass
+        """Define actions to perform after navigating to a page"""
 
     def current_page_actions(self, current_url, **kwargs):
-        pass
+        """Define actions to perform while on the current page"""
 
     def after_fail(self):
-        pass
+        """Define behavior when the spider encounters an error or fails to complete an action"""

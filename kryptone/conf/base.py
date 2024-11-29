@@ -21,7 +21,7 @@ WEBDRIVER = 'Chrome'
 # Name of the media folder, used for storing 
 # resources like downloads and screenshots. 
 # The resolved path will point to 
-# `PROJECT_PATH / MEDIA_FOLDER`.
+# `PROJECT_PATH / MEDIA_FOLDER`
 MEDIA_FOLDER = 'media'
 
 

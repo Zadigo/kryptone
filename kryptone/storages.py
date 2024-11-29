@@ -33,7 +33,7 @@ class BaseStorage:
     def __get__(self, instance, cls=None):
         self.spider = instance
         return self
-    
+
     def before_save(self, data):
         """A hook that is execute before data
         is saved to the storage"""
@@ -142,7 +142,8 @@ class FileStorage(BaseStorage):
         return self.storage[filename]
 
     async def save_or_create(self, filename, data, **kwargs):
-        if not self.has(filename):
+        file_exists = await self.has(filename)
+        if not file_exists:
             path = self.storage_path.joinpath(filename)
             instance = File(path)
 
@@ -155,7 +156,7 @@ class FileStorage(BaseStorage):
                     writer.writerow(data)
             self.initialize()
             return True
-        return self.save(filename, data, **kwargs)
+        return await self.save(filename, data, **kwargs)
 
     async def save(self, filename, data, adapt_list=False):
         data = self.before_save(data)
@@ -245,9 +246,9 @@ class ApiStorage(BaseStorage):
 
     def create_request(self, url, method='post', data=None):
         request = requests.Request(
-            method=method, 
-            url=url, 
-            headers=self.default_headers, 
+            method=method,
+            url=url,
+            headers=self.default_headers,
             data=data
         )
         return self.session.prepare_request(request)

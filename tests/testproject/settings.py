@@ -1,85 +1,68 @@
+# This is the main settings file for a
+# Kryptone project. To read more about
+# settings and discover additional settings
+# that you can use please visit:
+# https://github.com/Zadigo/kryptone/wiki/List-of-settings
+
 import pathlib
 
 # Absolute path to the local project
+# This should be set to the root directory
+# of your specific spider project
 PROJECT_PATH = pathlib.Path(__file__).parent.absolute()
 
 
-# Register spiders to crawl
-# pages on a website
-SPIDERS = ['Jennyfer']
-
-
-# Indicates the Selenium
-# browser to use
+# Specifies the Selenium WebDriver to use for browser automation.
+# Example values: 'Chrome', 'Firefox', 'Edge', etc.
 WEBDRIVER = 'Edge'
 
 
-# Indicates the name of the media folder
-# which will also be used as a path
+# Name of the media folder, used for storing
+# resources like downloads and screenshots.
+# The resolved path will point to
+# `PROJECT_PATH / MEDIA_FOLDER`
 MEDIA_FOLDER = 'media'
 
 
-# The amount of time the driver should
-# wait before moving to the next url
-WAIT_TIME = 5
+# Specifies the default wait time (in seconds)
+# for the browser before navigating to the next URL
+WAIT_TIME = 25
 
 
-# Indicates the range the driver should
-# use as the waiting time before moving
-# to the next url
-WAIT_TIME_RANGE = [2, 5]
+# Specifies a range for the browser's waiting time
+# before moving to the next URL. Example: [10, 30] would
+# randomly choose a wait time between 10 and 30 seconds
+WAIT_TIME_RANGE = []
 
 
-# The name of the file used to cache
-# the urls to visit and the visited urls
+# Name of the file used for caching URLs
+# to visit and already visited URLs
 CACHE_FILE_NAME = 'cache'
 
 
-# Register additional storage backends to
-# use for the project
-ACTIVE_STORAGE_BACKENDS = []
+# Storage settings for saving and retrieving data during spider execution
 
+# A dictionary mapping storage aliases to their respective
+# backend classes
 
-# External storage backends to use to save the
-# data gathered by the spiders
-STORAGE_BACKENDS = {
-    'airtable': {
-        'type': 'online',
-        'credentials': {
-            'API_KEY': None,
-            'BASE_ID': None,
-            'TABLE_NAME': None
-        }
-    },
-    'google_sheets': {
-        'type': 'online',
-        'credentials': {
-            'KEY': None,
-            'item_name': None,
-            'item_id': None
-        }
-    },
-    'notion': {
-        'type': 'online',
-        'credentials': {
-            'TOKEN': None,
-            'DATABASE_ID': None
-        }
-    },
-    'webhooks': []
+# Example:
+
+# 'default': 'kryptone.storages.FileStorage',
+# 'backends': ['kryptone.storages.RedisStorage', 'kryptone.storages.AirtableStorage']
+STORAGES = {
+    'default': 'kryptone.storages.FileStorage',
+    'backends': []
 }
 
-# Determines the frequency data should
-# be sent in the webhooks registered in
-# in storage backends
+
+# Frequency (in seconds) at which data
+# is sent to registered webhooks
 WEBHOOK_INTERVAL = 15
 
-# Determines the amount of data that should
-# be sent per request. If the amount of data
-# is lowert than the pagination, the request
-# is not sent until the requirement is met
+# Pagination size for data sent to webhooks.
+# Data is only sent if the accumulated data size
+# meets this threshold.
 WEBHOOK_PAGINATION = 100
-
 
 
 # Email setting values used essentially
@@ -99,7 +82,25 @@ DEFAULT_FROM_EMAIL = None
 
 
 # The default language used by the website.
-# This is useful when auditing the website by
-# determining the nature of the stop words to
-# block when gathering the text
+# Useful for text analysis and determining the stop
+# words for content processing
 WEBSITE_LANGUAGE = 'fr'
+
+
+# Allow Selenium to be launched in headless mode
+HEADLESS = False
+
+
+# Determines whether to load images
+# when launching the browser
+LOAD_IMAGES = True
+
+# Determines whether to execute JavaScript
+# when launching the browser
+LOAD_JS = True
+
+
+# IP address of the proxy server
+# to use for web scraping. Example:
+# '192.168.0.1:8080'
+PROXY_IP_ADDRESS = None
