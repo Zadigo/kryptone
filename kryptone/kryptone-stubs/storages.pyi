@@ -1,7 +1,7 @@
 import dataclasses
 import pathlib
-from typing import (Any, Callable, Generic, List, Literal, OrderedDict, Type, TypeVar, Union,
-                    override)
+from typing import (Any, Callable, Generic, List, Literal, OrderedDict, Type,
+                    TypeVar, Union, override)
 
 import pyairtable
 import redis

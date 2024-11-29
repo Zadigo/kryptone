@@ -1,4 +1,7 @@
 import pathlib
+from typing import Union
+
+from kryptone.utils.urls import URL
 
 
 def directory_from_breadcrumbs(
@@ -10,7 +13,9 @@ def directory_from_breadcrumbs(
 
 
 def directory_from_url(
-    path: str, exclude: list[str] = ...) -> pathlib.Path: ...
+    url_or_path: Union[URL, str],
+    exclude: list[str] = ...
+) -> pathlib.Path: ...
 
 
 def create_filename(
