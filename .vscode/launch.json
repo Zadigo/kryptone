@@ -22,44 +22,16 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tests/testproject/manage.py",
-            "args": ["start"],
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "presentation": {
-                "hidden": false,
-                "group": "Kryptone",
-                "order": 2
-            }
-        },
-        {
-            "name": "Kryptone: Local Project",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "../myscrap/manage.py",
             "args": [
                 "start",
-                "Accenture",
-                "--windows=2"
+                "ExampleSpider"
             ],
             "console": "integratedTerminal",
             "justMyCode": true,
             "presentation": {
                 "hidden": false,
                 "group": "Kryptone",
-                "order": 3
-            }
-        },
-        {
-            "name": "Kryptone: Blackbox",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/blackbox.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "presentation": {
-                "hidden": false,
-                "group": "Kryptone",
-                "order": 4
+                "order": 2
             }
         }
     ]

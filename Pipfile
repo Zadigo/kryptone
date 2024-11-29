@@ -9,7 +9,6 @@ nltk = "*"
 selenium = "*"
 requests = "*"
 beautifulsoup4 = "*"
-airtable = "*"
 quart = "*"
 quart-cors = "*"
 webdriver-manager = "*"
@@ -23,8 +22,15 @@ twisted = "*"
 lxml = "*"
 wordcloud = "*"
 matplotlib = "*"
+pyairtable = "*"
+pandas = "*"
+autometrics = "*"
+psycopg = {extras = ["binary", "pool"], version = "*"}
+celery = "*"
+asgiref = "*"
 
 [dev-packages]
+autopep8 = "*"
 
 [requires]
 python_version = "3.12"

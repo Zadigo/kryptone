@@ -467,7 +467,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def backup_urls(self):
         if self.storage is None:
-            self.storage = FileStorage(settings.MEDIA_PATH)
+            self.storage = FileStorage(settings.MEDIA_FOLDER)
 
         async def write_cache_file():
             data = {
@@ -494,8 +494,6 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         async def main():
-            # aws = [write_cache_file(), write_seen_urls()]
-
             t1 = asyncio.create_task(write_cache_file())
             t2 = asyncio.create_task(write_seen_urls())
 
@@ -843,6 +841,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         wait_time = settings.WAIT_TIME
         next_execution_date = None
+
         while self.urls_to_visit:
             if next_execution_date is not None:
                 if self.get_current_date < next_execution_date:
@@ -856,6 +855,10 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
             if not current_url.is_same_domain(self.start_url):
                 continue
+            
+            # TODO: Factorize this section into one single function
+            # from 859:935 so that it can be used by both start and
+            # bootstart without having to write two codes
 
             logger.info(f'Going to url: {current_url}')
 
@@ -1009,6 +1012,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         Selenium will open an url in each window or tab and
         sequentically call `current_page_actions` on the
         given page"""
+        self.setup_class()
         self.before_start(start_urls, **kwargs)
 
         wait_time = settings.WAIT_TIME
@@ -1021,6 +1025,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         # Get position on the first opened window
         # as opposed to the being on the last created one
         self.driver.switch_to.window(self.driver.window_handles[0])
+        next_execution_date = None
 
         while self.urls_to_visit:
             if next_execution_date is not None:
@@ -1152,7 +1157,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 if self._meta.crawl:
                     self.calculate_performance()
 
-                self.current_iteration = self.current_iteration + 1
+                self.performance_audit.add_iteration_count()
 
             if settings.WAIT_TIME_RANGE:
                 start = settings.WAIT_TIME_RANGE[0]
@@ -1163,8 +1168,6 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 self.get_current_date +
                 datetime.timedelta(seconds=wait_time)
             )
-
-            self.performance_audit.add_iteration_count()
 
             if len(self.urls_to_visit) == 0:
                 self.performance_audit.end_date = self.get_current_date
