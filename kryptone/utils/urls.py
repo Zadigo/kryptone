@@ -208,6 +208,10 @@ class URL:
         return self.url_object.path != ''
 
     @property
+    def has_query(self):
+        return self.url_object.query != ''
+
+    @property
     def is_image(self):
         return self.as_path.suffix in load_image_extensions()
 
@@ -224,7 +228,9 @@ class URL:
 
     @property
     def as_path(self):
-        return pathlib.Path(self.raw_url)
+    @property
+    def url_path(self):
+        return unquote_plus(self.url_object.path)
 
     @property
     def get_extension(self):
@@ -243,6 +249,14 @@ class URL:
     @property
     def query(self):
         return parse_qs(self.url_object.query)
+
+    @property
+    def get_filename(self):
+        """If the url points to a file, try to
+        return it's actual name """
+        if self.is_file:
+            return self.as_path.name
+        return None
 
     @classmethod
     def create(cls, url):
