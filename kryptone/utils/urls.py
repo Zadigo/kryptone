@@ -7,7 +7,7 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property, lru_cache
 from string import Template
-from urllib.parse import (ParseResult, parse_qs, unquote, urlencode, urljoin,
+from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus, urlencode, urljoin,
                           urlparse, urlunparse)
 
 import pandas
@@ -888,6 +888,9 @@ class LoadStartUrls(BaseURLGenerator):
     >>> class MyCrawler(SiteCrawler):
     ...     class Meta:
     ...         start_urls = LoadStartUrls()
+
+    The class can also laod urls from the internet by running a request
+    to an api endpoint
     """
 
     def __init__(self, *, filename=None, is_json=False):
