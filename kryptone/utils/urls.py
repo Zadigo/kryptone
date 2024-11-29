@@ -228,6 +228,15 @@ class URL:
 
     @property
     def as_path(self):
+        # Rebuild the url without the query
+        # part since it's not important for
+        # the path resolution
+        if self.has_query:
+            return pathlib.Path(unquote_plus(self.url_object.path))
+
+        clean_path = unquote_plus(self.raw_url)
+        return pathlib.Path(clean_path)
+
     @property
     def url_path(self):
         return unquote_plus(self.url_object.path)
