@@ -118,10 +118,10 @@ def clean_dictionnary(item, accents=False, punctation=False):
     """
     if item is None:
         return {}
-    
+
     if isinstance(item, list):
         return [clean_dictionnary(data) for data in item]
-    
+
     if not isinstance(item, dict):
         raise ValueError('Object to clean should a dictionnary')
 

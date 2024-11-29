@@ -319,7 +319,9 @@ class BaseCrawler(metaclass=Crawler):
                 # Use the default url structure to determine
                 # the actual directory structure for the image
                 qualified_directory = directory_from_url(
-                    page_url, exclude=exclude_paths)
+                    page_url, 
+                    exclude=exclude_paths
+                )
             else:
                 if isinstance(directory, str):
                     qualified_directory = pathlib.Path(directory)
@@ -327,7 +329,8 @@ class BaseCrawler(metaclass=Crawler):
                     qualified_directory = directory
 
             qualified_directory = settings.MEDIA_FOLDER.joinpath(
-                qualified_directory)
+                qualified_directory
+            )
             if not qualified_directory.exists():
                 qualified_directory.mkdir()
 
