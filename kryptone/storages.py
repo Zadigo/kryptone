@@ -3,15 +3,15 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
-from io import BytesIO
+
 import pyairtable
 import pymemcache
 import redis
 import requests
 
 from kryptone.conf import settings
-from kryptone.utils.urls import load_image_extensions
 from kryptone.utils.encoders import DefaultJsonEncoder
+from kryptone.utils.urls import load_image_extensions
 
 
 def simple_list_adapter(data):
