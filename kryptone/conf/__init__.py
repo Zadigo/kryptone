@@ -1,5 +1,4 @@
 import importlib
-import inspect
 import os
 
 from kryptone.constants import ENVIRONMENT_VARIABLE
@@ -57,7 +56,7 @@ class Settings:
         dotted_path = os.environ.get(ENVIRONMENT_VARIABLE)
         self._user_settings = UserSettings(dotted_path)
 
-        list_or_tuple_settings = ['ACTIVE_STORAGE_BACKENDS']
+        list_or_tuple_settings = ['STORAGE_MEMCACHE_LOAD_BALANCER']
         for key in self._user_settings.__dict__.keys():
             if key.isupper():
                 if key not in list_or_tuple_settings:
@@ -72,7 +71,7 @@ class Settings:
 
                     if isinstance(user_setting, tuple):
                         user_setting = list(user_setting)
-
+                    
                     if isinstance(user_setting, list):
                         user_setting.extend(global_setting)
                     elif isinstance(user_setting, dict):
