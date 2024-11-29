@@ -153,7 +153,7 @@ class FileStorage(BaseStorage):
             elif instance.is_csv:
                 with open(path, mode='w', newline='\n', encoding='utf-8') as f:
                     writer = csv.writer(f)
-                    writer.writerow(data)
+                    writer.writerows(data)
             self.initialize()
             return True
         return await self.save(filename, data, **kwargs)
