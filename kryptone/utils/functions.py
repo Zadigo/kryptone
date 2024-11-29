@@ -44,7 +44,10 @@ def directory_from_url(path, exclude=[]):
     ... directory_from_url(path, exclude=['ma'])
     ... "/woman/clothing/dresses/short-dresses"
     """
-    tokens = path.split('/')
+    if isinstance(url_or_path, URL):
+        url_or_path = url_or_path.url_object.path
+
+    tokens = url_or_path.split('/')
     tokens = filter(lambda x: x not in exclude and x != '', tokens)
 
     def clean_token(token):
