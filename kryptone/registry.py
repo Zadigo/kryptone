@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import inspect
 import os
@@ -83,7 +84,7 @@ class SpiderConfig:
             settings['ACTIVE_SPIDER'] = spider_instance
 
             # This will tell the driver to open
-            # one more window in additin to the 
+            # one more window in additin to the
             # one that is opened
             if windows >= 1:
                 spider_instance.boost_start(windows=windows, **params)
@@ -164,7 +165,8 @@ class MasterRegistry:
     def pre_configure_project(self, dotted_path, settings):
         # If the user did not explicitly set the path
         # to a MEDIA_FOLDER, we will be doing it
-        # autmatically here
+        # autmatically here. FIXME: If no explicit path
+        # is defined use project path?
         media_folder = getattr(settings, 'MEDIA_FOLDER')
         if media_folder is None or media_folder == 'media':
             media_path = settings.PROJECT_PATH.joinpath('media')
@@ -172,7 +174,7 @@ class MasterRegistry:
             media_path = Path(settings.MEDIA_FOLDER)
 
         if not media_path.exists():
-            raise ValueError("MEDIA_FOLDER path does does not exist")
+            raise ValueError("'MEDIA_FOLDER' path does not exist")
         setattr(settings, 'MEDIA_FOLDER', media_path)
 
         # Set the webhook interval to a
@@ -207,7 +209,7 @@ class MasterRegistry:
                 f"related module: '{dotted_path}'"
             )
 
-        from kryptone.base import BaseCrawler, JSONCrawler
+        from kryptone.base import BaseCrawler
         from kryptone.conf import settings
 
         self.absolute_path = Path(project_module.__path__[0])
@@ -218,7 +220,8 @@ class MasterRegistry:
         except Exception as e:
             logger.critical(e)
             raise ExceptionGroup(
-                f"An error occured when trying to load the project '{self.project_name}'",
+                f"An error occured when trying to load the project '{
+                    self.project_name}'",
                 [
                     Exception(e),
                     ImportError(
@@ -236,7 +239,7 @@ class MasterRegistry:
         )
 
         valid_spiders = filter(
-            lambda x: issubclass(x[1], (BaseCrawler, JSONCrawler)),
+            lambda x: issubclass(x[1], (BaseCrawler)),
             spiders
         )
         valid_spider_names = list(map(lambda x: x[0], valid_spiders))
