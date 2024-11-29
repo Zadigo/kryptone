@@ -4,13 +4,13 @@ import json
 import pathlib
 from collections import OrderedDict
 from io import BytesIO
-
 import pyairtable
 import pymemcache
 import redis
 import requests
 
 from kryptone.conf import settings
+from kryptone.utils.urls import load_image_extensions
 from kryptone.utils.encoders import DefaultJsonEncoder
 
 
@@ -33,7 +33,7 @@ class BaseStorage:
     def __get__(self, instance, cls=None):
         self.spider = instance
         return self
-
+    
     def before_save(self, data):
         """A hook that is execute before data
         is saved to the storage"""
@@ -81,6 +81,10 @@ class File:
     def is_csv(self):
         return self.path.suffix == '.csv'
 
+    @property
+    def is_image(self):
+        return self.path.suffix in load_image_extensions()
+
     async def read(self):
         with open(self.path, mode='r', encoding='utf-8') as f:
             if self.is_json:
@@ -91,9 +95,12 @@ class File:
 
 
 class FileStorage(BaseStorage):
+    """This file based storage api is used to write
+    to files in the selected user storage"""
+
     file_based = True
 
-    def __init__(self, storage_path=None):
+    def __init__(self, storage_path=None, ignore_images=True):
         super().__init__()
         if storage_path is not None:
             if isinstance(storage_path, str):
@@ -104,6 +111,7 @@ class FileStorage(BaseStorage):
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
+        self.ignore_images = ignore_images
         self.initialize()
 
     def __repr__(self):
@@ -114,7 +122,13 @@ class FileStorage(BaseStorage):
         for item in items:
             if not item.is_file():
                 continue
-            self.storage[item.name] = File(item)
+            instance = File(item)
+
+            if self.ignore_images:
+                if instance.is_image:
+                    continue
+
+            self.storage[item.name] = instance
         return True
 
     async def has(self, key):
