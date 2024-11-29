@@ -23,6 +23,11 @@ def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]
     if remove_last:
         tokens = tokens[0:len(tokens) - 1]
 
+    clean_tokens = map(lambda x: x.strip(), tokens)
+
+    if exclude:
+        tokens = list(filter(lambda x: x not in exclude, clean_tokens))
+
     def build(token):
         token = remove_punctuation(token.strip()).replace(' ', '_')
         return token.lower()
