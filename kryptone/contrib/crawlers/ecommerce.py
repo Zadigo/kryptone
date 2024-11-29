@@ -8,7 +8,7 @@ import pandas
 import pytz
 import requests
 from kryptone import logger
-from kryptone.base import PerformanceAudit
+from kryptone.base import Performance
 from kryptone.conf import settings
 from kryptone.contrib.models import Product
 from kryptone.utils.file_readers import write_json_document
@@ -19,7 +19,7 @@ from kryptone.utils.text import clean_dictionnary, slugify
 TEMPORARY_PRODUCT_CACHE = set()
 
 
-class EcommercePerformanceAudit(PerformanceAudit):
+class EcommercePerformanceAudit(Performance):
     products_gathered: int = 0
     products_urls: list = field(default_factory=list)
 
