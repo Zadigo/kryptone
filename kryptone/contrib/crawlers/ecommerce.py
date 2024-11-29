@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import pandas
 import pytz
 import requests
+
 from kryptone import logger
 from kryptone.base import Performance
 from kryptone.conf import settings
@@ -85,133 +86,6 @@ class EcommerceCrawlerMixin:
         self.found_products_counter = self.found_products_counter + 1
         TEMPORARY_PRODUCT_CACHE.add(product[duplicate_key])
         return True, product
-
-    def save_product(self, data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference'):
-        """Adds a single product data gathered from the website to the
-        underlying container and then creates a file called `products_xyz.json`
-        in the current project's media folder
-
-        >>> instance.save_product([{...}], track_id=False)
-        ... (True, Product)
-        """
-        if data is None:
-            logger.warning('Received None when trying to save a product')
-            return (False, None)
-        
-        if 'date' not in data:
-            data['date'] = datetime.datetime.now(tz=pytz.UTC)
-
-        self._check_products_json_file()
-
-        result = self.add_product(
-            data,
-            collection_id_regex=collection_id_regex,
-            avoid_duplicates=avoid_duplicates,
-            duplicate_key=duplicate_key
-        )
-        write_json_document(self.current_product_file_path, self.products)
-        return result
-    
-    def bulk_add_products(self, data, collection_id_regex=None):
-        """Adds multiple products to the internal list product container
-
-        >>> instance.add_product([{...}], track_id=False)
-        ... (True, Product)
-        """
-        products = []
-        for item in data:
-            state, product = self.add_product(
-                item, 
-                collection_id_regex=collection_id_regex
-            )
-            products.append(product)
-        return products
-
-    def bulk_save_products(self, data=None, collection_id_regex=None):
-        """Adds multiple products at once to the underlying container
-        if data is provided otherwise will save the current stored products
-        to the `products_xyz.json` file"""
-        products = []
-        if data is not None:
-            self.bulk_add_products(data)
-        self._check_products_json_file()
-        write_json_document(self.current_product_file_path, self.products)
-        return products
-
-    def save_images(self, product, path, filename=None, download_first=False):
-        """Asynchronously save images to the project's
-        media folder. Only one image could be downloaded using
-        the `download_first` parameter"""
-        async def main():
-            urls_to_use = product.images.copy()
-
-            if download_first:
-                urls_to_use = urls_to_use[:1]
-
-            queue = asyncio.Queue()
-
-            async def request_image():
-                while urls_to_use:
-                    url = urls_to_use.pop()
-                    headers = {'User-Agent': RANDOM_USER_AGENT()}
-
-                    try:
-                        response = requests.get(url, headers=headers)
-                    except Exception as e:
-                        logger.error(f'Failed to fetch image data: {url}')
-                        logger.error(e)
-                    else:
-                        url_object = urlparse(url)
-
-                        if response.status_code == 200:
-                            # Guess the extension of the image that we
-                            # want to save locally
-                            mimetype, _ = mimetypes.guess_type(url_object.path)
-                            extension = mimetypes.guess_extension(
-                                mimetype,
-                                strict=True
-                            )
-
-                            await queue.put((extension, response.content))
-                        else:
-                            logger.error(f'Image request error: {url}')
-                    finally:
-                        await asyncio.sleep(1)
-
-            async def save_image():
-                index = 1
-                while not queue.empty():
-                    extension, content = await queue.get()
-                    name = filename or product.url_stem
-                    # We'll create directories that map the url
-                    # path structure. It's the easiest way to
-                    # find images in the local folder based
-                    # on the path the website's url
-                    # TEST: Instead of using the index below, we
-                    # can also create directory with product reference
-                    # that we retrieved from the url. Then generate
-                    # random names for the images
-                    directory_path = settings.MEDIA_FOLDER / path
-                    if not directory_path.exists():
-                        directory_path.mkdir(parents=True)
-
-                    final_path = directory_path.joinpath(
-                        f'{name}_{index}{extension}'
-                    )
-                    with open(final_path, mode='wb') as f:
-                        if content is not None:
-                            f.write(content)
-                        index = index + 1
-
-                    logger.info(f"Downloaded image: '{final_path}'")
-                    # Delay this task slightly more than the
-                    # one above to allow requests to populate
-                    # the queue on time
-                    await asyncio.sleep(3)
-
-            await asyncio.gather(request_image(), save_image())
-
-        asyncio.run(main())
 
     def as_dataframe(self, sort_by=None):
         # columns_to_keep = [

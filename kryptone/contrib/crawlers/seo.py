@@ -1,8 +1,6 @@
 import asyncio
-from collections import defaultdict
 
 from kryptone import logger
-from kryptone.base import SiteCrawler
 from kryptone.mixins import SEOMixin
 from kryptone.utils import file_readers
 
@@ -40,7 +38,9 @@ class SEOCrawler(SEOMixin):
 
         async def write_audit_documents():
             file_readers.write_json_document(
-                'word_frequency.json', self.word_frequency_by_page)
+                'word_frequency.json', 
+                self.word_frequency_by_page
+            )
             file_readers.write_json_document('audit.json', self.page_audits)
 
         async def write_vocabulary():
