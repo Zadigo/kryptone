@@ -131,8 +131,6 @@ class MockupSpider:
 
 
 class BaseTestSpider(MockupSpider):
-    start_url = 'http://example.com/1'
-
     def handle_1(self, current_url, route=None):
         pass
 

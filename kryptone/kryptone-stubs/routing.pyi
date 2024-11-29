@@ -34,13 +34,21 @@ def route(
 
 
 class Router:
-    routes: OrderedDict[str, Callable[
-        [str, SiteCrawler], bool]
-    ] = OrderedDict()
+    routes: OrderedDict[
+        str, 
+        Callable[
+            [str, SiteCrawler], 
+            bool
+        ]
+    ] = ...
 
     def __init__(self: Self, routes: List[Route]) -> None: ...
     def __repr__(self: Self) -> str: ...
 
     @property
     def has_routes(self) -> bool: ...
-    def resolve(self, current_url: Union[str, URL]) -> None: ...
+
+    def resolve(
+        self, current_url: Union[str, URL],
+        spider_instance: SiteCrawler
+    ) -> None: ...

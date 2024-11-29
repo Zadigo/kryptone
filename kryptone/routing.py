@@ -73,18 +73,16 @@ class Route:
 
 
 def route(function_name, *, path=None, regex=None, name=None):
+    """Function that calls a new `Route` instance that uses
+    extra functionnalities to better identify the route"""
     instance = Route.new()
     return instance(function_name, path=path, regex=regex, name=name)
 
 
 class Router:
-    """Call specific functions depending or whether the current
-    visited url matches one of the routes.
-
-    Let's say we have `http://example.com/product` and
-    `http://example.com/products` and that we need to apply two
-    different logics to these urls. That's where the Router comes
-    in handy
+    """Manages a collection of routes and resolves URL matches by invoking 
+    specific functions on a web crawler. The router enables the execution of 
+    different logic for different URL patterns.
 
     >>> class MySpider:
     ...     start_url = 'http://example.com'
@@ -123,8 +121,9 @@ class Router:
         return len(self.routes.keys()) > 0
 
     def resolve(self, current_url, spider_instance):
-        """handles the routing for each matched urls to
-        the corresponding function on the class"""
+        """Resolves the given URL by matching it against the router's 
+        routes and invoking the corresponding function on the spider 
+        instance"""
         resolution_states = []
         for route in self.routes.values():
             state = route(current_url, spider_instance)
