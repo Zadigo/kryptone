@@ -268,15 +268,30 @@ class URL:
         return clean_url, urlparse(clean_url)
 
     def rebuild_query(self, **query):
-        if self.url_object.query:
+        """Creates a new instance of the url
+        with the existing query and and key/value
+        parameters of the query parameter"""
+        if self.has_query:
             clean_values = {}
-            initial_query = parse_qs(self.url_object.query)
-            for key, value in initial_query.items():
-                clean_values[key] = value[0] if isinstance(
-                    value, list) else value
-            query = initial_query | clean_values
+
+            for key, value in self.query.items():
+                if isinstance(value, list):
+                    clean_values[key] = ','.join(value)
+                    continue
+
+                clean_values[key] = value
+
+            query = query | clean_values
+
         string_query = urlencode(query)
-        url = self.raw_url + f'?{string_query}'
+        url = urlunparse((
+            self.url_object.scheme,
+            self.url_object.netloc,
+            self.url_object.path,
+            None,
+            string_query,
+            None
+        ))
         return URL(url)
 
     def is_same_domain(self, url):
