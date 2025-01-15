@@ -112,6 +112,9 @@ class FileStorage(BaseStorage):
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
         self.ignore_images = ignore_images
+        # Since it's a file, the connection to the
+        # local path is always considered active
+        self.is_connected = True
         self.initialize()
 
     def __repr__(self):
