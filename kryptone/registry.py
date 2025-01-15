@@ -98,12 +98,12 @@ class SpiderConfig:
             logger.error(e)
             raise Exception(e)
 
-    def resume(self, windows=1, **params):
+    def resume(self, windows=1, **spider_params):
         """Interface function used to call `SpiderCrawler.resume`"""
         spider_instance = self.get_spider_instance()
 
         try:
-            spider_instance.resume(windows=windows, **params)
+            spider_instance.resume(windows=windows, **spider_params)
         except KeyboardInterrupt:
             spider_instance.after_fail()
             sys.exit(0)
@@ -113,7 +113,7 @@ class SpiderConfig:
             raise Exception(e)
 
     # TODO: Add enrichment to spider process
-    def enrich(self,  windows=1, **params):
+    def enrich(self,  windows=1, **spider_params):
         """Runs the spider by calling the spider class
         which in return calls "start_from_json" method on the
         spider via the __init__ method"""
@@ -121,7 +121,7 @@ class SpiderConfig:
 
         try:
             settings['ACTIVE_SPIDER'] = spider_instance
-            spider_instance.start_from_json(windows=windows, **params)
+            spider_instance.start_from_json(windows=windows, **spider_params)
         except KeyboardInterrupt:
             spider_instance.after_fail()
             sys.exit(0)
