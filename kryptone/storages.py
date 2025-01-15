@@ -11,7 +11,7 @@ import requests
 
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
-from kryptone.utils.urls import load_image_extensions
+from kryptone.utils.urls import URL, load_image_extensions
 
 
 def simple_list_adapter(data):
@@ -23,16 +23,30 @@ def simple_list_adapter(data):
 
 
 class BaseStorage:
+    """Storage backends are primarily used for storing the
+    current state of the spider either to a local source
+    (such as a file) or external sources such as a database
+    (e.g. Redis, PostGres) or HTTP endpoints. Their primary
+    role is to also resume the previous known state of the
+    spider if it has happened for it to be stopped and
+    relaunched to its previous known point
+    
+    All storages must extend from this base storage class and
+    therefore implement three base functions: `save`, `save_or_create`,
+    `has` and `get`. They must return a coroutine.
+    """
+
     storage_class = None
     storage_connection = None
     file_based = False
 
-    def __init__(self):
-        self.spider = None
+    def __init__(self, spider=None):
+        self.spider = spider
+        self.is_connected = False
 
-    def __get__(self, instance, cls=None):
-        self.spider = instance
-        return self
+    # def __get__(self, instance, cls=None):
+    #     self.spider = instance
+    #     return self
 
     def before_save(self, data):
         """A hook that is execute before data
@@ -57,6 +71,10 @@ class BaseStorage:
         return NotImplemented
 
     async def save_or_create(self, key, data, **kwargs):
+        """Alternate save function that can be used to either
+        save existing data or create a new record if the element
+        does not exist. The logic needs to be implemented by the
+        subclasses since the default behaviour is to call `save`"""
         return self.save(key, data, **kwargs)
 
 
@@ -179,25 +197,88 @@ class FileStorage(BaseStorage):
 
 
 class RedisStorage(BaseStorage):
+    """A storage backend that implements basic storage
+    functionnalities in addition of more advanced features
+    in order to run complexe spider operations on Redis"""
+
     storage_class = redis.Redis
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *, spider=None):
+        super().__init__(spider=spider)
         self.storage_connection = self.storage_class(
-            settings.STORAGE_REDIS_HOST,
-            settings.STORAGE_REDIS_PORT,
+            host=settings.STORAGE_REDIS_HOST,
+            port=settings.STORAGE_REDIS_PORT,
             username=getattr(settings, 'STORAGE_REDIS_USERNAME'),
             password=getattr(settings, 'STORAGE_REDIS_PASSWORD')
         )
-        self.is_connected = False
+        self.initialize()
+        self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
 
     def initialize(self):
+        self.spider_uuid = getattr(self.spider, 'spider_uuid')
+
         try:
             self.storage_connection.ping()
         except:
             return False
         self.is_connected = True
         return self.is_connected
+
+    def before_save(self, data):
+        if isinstance(data, URL):
+            data = str(data)
+
+        if isinstance(data, (set, tuple)):
+            data = list(data)
+
+        if isinstance(data, (list, dict)):
+            data = json.dumps(data, cls=DefaultJsonEncoder)
+
+        return str(data)
+
+    async def has(self, key):
+        value = self.storage_connection.get(key)
+        return False if value is None else True
+
+    async def update_iteration(self, by=1):
+        self.storage_connection.incrby('iteration', by)
+
+    async def save(self, key, data):
+        data = self.before_save(data)
+        return self.storage_connection.hset(self.spider_uuid, key, data)
+
+    async def save_or_create(self, key, data, **kwargs):
+        # Based on the type of data that we get in the
+        # backend, we should ensure that the saving function
+        # matches the type of data that we are passing
+        if key == f'{settings.CACHE_FILE_NAME}.json':
+            for key, value in data.items():
+                await self.save(key, value)
+        elif key == 'seen_urls.csv':
+            await self.save('seen_urls.csv', data)
+        else:
+            await self.save(key, data)
+
+    async def get(self, key):
+        result = self.storage_connection.hget(self.spider_uuid, key)
+
+        if result is not None:
+            data = result.decode()
+
+            try:
+                # If the item is a list or dict,
+                # this will attempt to return it
+                return json.loads(data)
+            except:
+                pass
+
+            try:
+                return int(data)
+            except:
+                pass
+
+            return data
+        return None
 
 
 class AirtableStorag(BaseStorage):
@@ -211,7 +292,8 @@ class AirtableStorag(BaseStorage):
 
 class ApiStorage(BaseStorage):
     """A storage that uses GET/POST requests in order
-    to save data that was processed by the Spider"""
+    to save data that was processed by the Spider to
+    HTTP endpoints"""
 
     def __init__(self):
         self.session = requests.Session()
@@ -225,9 +307,9 @@ class ApiStorage(BaseStorage):
         }
 
     async def check(self, key, data):
-        """Checks that the data is returned is formatted
+        """Checks that the data that is returned is formatted
         to be understood and used by the spider. This is
-        only for system type data"""
+        only for system type data like the cache"""
         names = ['cache']
 
         if key not in names:
@@ -272,7 +354,7 @@ class ApiStorage(BaseStorage):
             if response.status_code == 200:
                 return self.check(key, response.json())
             raise requests.ConnectionError("Could not save data to endpoint")
-
+        
     async def save(self, key, data, **kwargs):
         """Endpoint that creates new data to the
         given endpoint. The endpoint sends the results
@@ -290,13 +372,13 @@ class ApiStorage(BaseStorage):
         request = self.create_request(self.save_endpoint, data=template)
 
         try:
-            resposne = self.session.send(request)
+            response = self.session.send(request)
         except requests.ConnectionError:
             raise
         except Exception:
             raise
         else:
-            if resposne.status_code == 200:
+            if response.status_code == 200:
                 return True
             raise requests.ConnectionError("Could not save data to endpoint")
 
