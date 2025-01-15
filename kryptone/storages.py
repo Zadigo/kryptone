@@ -3,12 +3,14 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
+from urllib.parse import urlencode
 
 import pyairtable
 import pymemcache
 import redis
 import requests
 
+from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.urls import URL, load_image_extensions
@@ -30,7 +32,7 @@ class BaseStorage:
     role is to also resume the previous known state of the
     spider if it has happened for it to be stopped and
     relaunched to its previous known point
-    
+
     All storages must extend from this base storage class and
     therefore implement three base functions: `save`, `save_or_create`,
     `has` and `get`. They must return a coroutine.
@@ -43,10 +45,7 @@ class BaseStorage:
     def __init__(self, spider=None):
         self.spider = spider
         self.is_connected = False
-
-    # def __get__(self, instance, cls=None):
-    #     self.spider = instance
-    #     return self
+        self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
 
     def before_save(self, data):
         """A hook that is execute before data
@@ -212,11 +211,8 @@ class RedisStorage(BaseStorage):
             password=getattr(settings, 'STORAGE_REDIS_PASSWORD')
         )
         self.initialize()
-        self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
 
     def initialize(self):
-        self.spider_uuid = getattr(self.spider, 'spider_uuid')
-
         try:
             self.storage_connection.ping()
         except:
@@ -295,7 +291,8 @@ class ApiStorage(BaseStorage):
     to save data that was processed by the Spider to
     HTTP endpoints"""
 
-    def __init__(self):
+    def __init__(self, *, spider=None):
+        super().__init__(spider=spider)
         self.session = requests.Session()
         self.get_endpoint = getattr(settings, 'STORAGE_API_GET_ENDPOINT')
         self.save_endpoint = getattr(settings, 'STORAGE_API_SAVE_ENDPOINT')
@@ -322,26 +319,43 @@ class ApiStorage(BaseStorage):
 
         if key == 'cache':
             required_keys = [
-                'spider', 'timestamp',
-                'urls_to_visit', 'visited_urls'
+                'spider', 'spider_uuid',
+                'timestamp', 'urls_to_visit',
+                'visited_urls'
             ]
             if list(keys) != required_keys:
                 return False
         return True
 
     def create_request(self, url, method='post', data=None):
+        if method == 'post':
+            params = {'json': data}
+        else:
+            params = {'data': data}
+
         request = requests.Request(
             method=method,
             url=url,
             headers=self.default_headers,
-            data=data
+            **params
         )
         return self.session.prepare_request(request)
 
+    async def has(self, key):
+        # Assume the user ensures that the key that
+        # he is trying to get exists on the enpoint
+        return True
+
     async def get(self, key):
         """Endpoint that gets data by name on the
-        given endpoint"""
-        url = self.get_endpoint + f'?data={key}'
+        given endpoint. For example returning the
+        cache or the seen_urls"""
+        query = urlencode({
+            'q': key,
+            'id': self.spider_uuid
+        })
+
+        url = self.get_endpoint + f'?{query}'
         request = self.create_request(url, method='get')
 
         try:
@@ -352,9 +366,10 @@ class ApiStorage(BaseStorage):
             raise
         else:
             if response.status_code == 200:
-                return self.check(key, response.json())
+                state = await self.check(key, response.json())
+                return response.json()
             raise requests.ConnectionError("Could not save data to endpoint")
-        
+
     async def save(self, key, data, **kwargs):
         """Endpoint that creates new data to the
         given endpoint. The endpoint sends the results
@@ -366,8 +381,9 @@ class ApiStorage(BaseStorage):
         data = self.before_save(data)
 
         template = {
-            'data_name': key,
-            'results': data
+            'q': key,
+            'id': self.spider_uuid,
+            'items': data
         }
         request = self.create_request(self.save_endpoint, data=template)
 
@@ -375,11 +391,11 @@ class ApiStorage(BaseStorage):
             response = self.session.send(request)
         except requests.ConnectionError:
             raise
-        except Exception:
+        except Exception as e:
             raise
         else:
             if response.status_code == 200:
-                return True
+                return response.json()
             raise requests.ConnectionError("Could not save data to endpoint")
 
 
