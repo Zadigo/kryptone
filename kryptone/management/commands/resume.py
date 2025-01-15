@@ -27,6 +27,12 @@ class Command(ProjectCommand):
             default=3,
             help='Number of windows to launch for a spider'
         )
+        parser.add_argument(
+            '-s',
+            '--source',
+            help='The index of the storage to use to resume the crawling',
+            type=int
+        )
 
     def execute(self, namespace):
         kryptone.setup()
@@ -38,17 +44,16 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        params = {}
         spider_config = registry.get_spider(namespace.name)
-        if namespace.windows < 0 or namespace.windows > 5:
-            raise ValueError('Number of windows should be between 2 and 5')
+        if namespace.windows < 0 or namespace.windows > 16:
+            raise ValueError('Number of windows should be between 1 and 16')
+
+        spider_params = {
+            'source': namespace.source,
+            'language': namespace.language
+        }
 
         spider_config.resume(
             windows=namespace.windows,
-            **params
+            **spider_params
         )
-        # spider_config.run(
-        #     windows=namespace.windows,
-        #     **params
-        # )
-        # spider_config.resume(**params)

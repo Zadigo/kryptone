@@ -477,6 +477,18 @@ class BaseCrawler(metaclass=Crawler):
                 storage_path=settings.MEDIA_FOLDER
             )
 
+        async def run_additional_storages(key, value):
+            for storage in self.additional_storages:
+                # Only use storages that are connected.
+                # This is a none block loop
+                if not storage.is_connected:
+                    logger.warning(
+                        f"Could not use {storage}. "
+                        "Connection broken"
+                    )
+                    continue
+                await storage.save_or_create(key, value)
+
         async def write_cache_file():
             data = {
                 'spider': self.__class__.__name__,
@@ -488,14 +500,7 @@ class BaseCrawler(metaclass=Crawler):
 
             key_or_filename = f'{settings.CACHE_FILE_NAME}.json'
             await self.storage.save_or_create(key_or_filename, data)
-
-            for storage in self.additional_storages:
-                # Only use storages that are connected.
-                # This is a none block loop
-                if not storage.is_connected:
-                    logger.warning(f'Could not use {storage}. Connection broken')
-                    continue
-                await storage.save_or_create(key_or_filename, data)
+            await run_additional_storages(key_or_filename, data)
 
         async def write_seen_urls():
             sorted_urls = []
@@ -509,13 +514,7 @@ class BaseCrawler(metaclass=Crawler):
                 adapt_list=True
             )
 
-            for storage in self.additional_storages:
-                # Only use storages that are connected.
-                # This is a none block loop
-                if not storage.is_connected:
-                    logger.warning(f'Could not use {storage}. Connection broken')
-                    continue
-                await storage.save_or_create(key_or_filename, sorted_urls)
+            await run_additional_storages(key_or_filename, sorted_urls)
 
         async def main():
             t1 = asyncio.create_task(write_cache_file())
@@ -1014,6 +1013,30 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         - Finally, the file cache is used as a final resort if none exists
         """
         self.setup_class()
+        # The spider will use the default storage by
+        # in order to resume its previous state. This
+        # can be altered by providing a "source" that
+        # indicates the index of the alternative storage
+        # to use -- note: using an alternative storage will
+        # overwrite all the data stored in the other
+        # storage pool
+        # source = kwargs.get('soure', None)
+        # if source is not None:
+        #     try:
+        #         storage = self.additional_storages[source]
+        #     except IndexError:
+        #         raise Exception(
+        #             "The storage you are trying to get does not "
+        #             "exist in your STORAGES.backends"
+        #         )
+        #     else:
+        #         # TODO: In order to use none file based storages,
+        #         # we need to know the previous spider uuid, not
+        #         # the current one created above
+        #         if not storage.file_based:
+        #             urls_to_visit = storage.get('urls_to_vist')
+        #             visited_urls = storage.get('visited_urls')
+        # else:
         data = self.storage.get('cache.json')
 
         self.start_url = URL(self._meta.start_urls[0])
