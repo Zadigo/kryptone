@@ -483,10 +483,17 @@ class BaseCrawler(metaclass=Crawler):
                 'urls_to_visit': self.urls_to_visit,
                 'visited_urls': self.visited_urls
             }
-            await self.storage.save_or_create(
-                f'{settings.CACHE_FILE_NAME}.json',
-                data
-            )
+
+            key_or_filename = f'{settings.CACHE_FILE_NAME}.json'
+            await self.storage.save_or_create(key_or_filename, data)
+
+            for storage in self.additional_storages:
+                # Only use storages that are connected.
+                # This is a none block loop
+                if not storage.is_connected:
+                    logger.warning(f'Could not use {storage}. Connection broken')
+                    continue
+                await storage.save_or_create(key_or_filename, data)
 
         async def write_seen_urls():
             sorted_urls = []
