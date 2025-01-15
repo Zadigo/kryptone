@@ -507,6 +507,14 @@ class BaseCrawler(metaclass=Crawler):
                 adapt_list=True
             )
 
+            for storage in self.additional_storages:
+                # Only use storages that are connected.
+                # This is a none block loop
+                if not storage.is_connected:
+                    logger.warning(f'Could not use {storage}. Connection broken')
+                    continue
+                await storage.save_or_create(key_or_filename, sorted_urls)
+
         async def main():
             t1 = asyncio.create_task(write_cache_file())
             t2 = asyncio.create_task(write_seen_urls())
