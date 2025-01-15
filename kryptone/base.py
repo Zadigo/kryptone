@@ -500,8 +500,9 @@ class BaseCrawler(metaclass=Crawler):
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
+            key_or_filename = 'seen_urls.csv'
             await self.storage.save_or_create(
-                'seen_urls.csv',
+                key_or_filename,
                 sorted_urls,
                 adapt_list=True
             )
