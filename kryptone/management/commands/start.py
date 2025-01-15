@@ -45,16 +45,17 @@ class Command(ProjectCommand):
                 "were not properly configured"
             ))
 
-        params = {
-            'start_urls': namespace.start_urls,
-            'language': namespace.language
-        }
 
         spider_config = registry.get_spider(namespace.name)
         if namespace.windows < 0 or namespace.windows > 16:
-            raise ValueError('Number of windows should be between 1 and 8')
+            raise ValueError('Number of windows should be between 1 and 16')
 
+        spider_params = {
+            'start_urls': namespace.start_urls,
+            'language': namespace.language
+        }
+        
         spider_config.run(
             windows=namespace.windows,
-            **params
+            **spider_params
         )
