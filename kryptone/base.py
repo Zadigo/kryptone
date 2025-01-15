@@ -606,8 +606,16 @@ class BaseCrawler(metaclass=Crawler):
                 invalid_urls.add(url)
                 continue
 
-            if (url.url_object.path == '/' and
-                    self.start_url.url_object.path == '/'):
+            is_home_page = [
+                url.url_object.path == '/',
+                self.start_url.url_object.path == '/',
+                # To prevent returning an empty list when running
+                # the spider for the first time, require at least
+                # on rotation before running this check
+                self.performance_audit.iteration_count > 0
+            ]
+
+            if all(is_home_page):
                 invalid_urls.add(url)
                 continue
 
