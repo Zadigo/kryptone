@@ -1,7 +1,13 @@
-from unittest import IsolatedAsyncioTestCase, TestCase
+from unittest import IsolatedAsyncioTestCase
+from uuid import uuid4
 
 from kryptone.conf import settings
-from kryptone.storages import FileStorage, File
+from kryptone.storages import File, FileStorage, RedisStorage
+
+
+class MockupSpider:
+    def __init__(self):
+        self.spider_uuid = uuid4()
 
 
 class TestFileStorage(IsolatedAsyncioTestCase):
@@ -30,10 +36,33 @@ class TestFileStorage(IsolatedAsyncioTestCase):
     async def test_read_file(self):
         file = await self.instance.get_file('performance.json')
         data = await file.read()
-        self.assertIn('days', data)
+        self.assertIn('duration', data)
 
     async def test_save_file(self):
         file = await self.instance.get_file('performance.json')
         data = await file.read()
-        data['days'] = 1
+        data['duration'] = 1
         await self.instance.save('performance.json', data)
+
+
+class TestRedisStorage(IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        spider = MockupSpider()
+        connection = RedisStorage(spider=spider)
+        cls.connection = connection
+
+    async def test_connection(self):
+        self.assertTrue(self.connection.is_connected)
+
+    async def test_check_has_key(self):
+        self.connection.has('performance.json')
+
+    async def test_save(self):
+        result = await self.connection.save('kryptone_tests', 1)
+        self.assertEqual(result, 1)
+        
+        expected = {'a': 1}
+        await self.connection.save('kryptone_tests', expected)
+        data = await self.connection.get('kryptone_tests')
+        self.assertDictEqual(data, expected)

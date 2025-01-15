@@ -16,6 +16,3 @@ class TestSetup(unittest.TestCase):
     def test_webhook_interval(self):
         self.assertIsInstance(settings.WEBHOOK_INTERVAL, datetime.timedelta)
 
-
-if __name__ == '__main__':
-    unittest.main()

@@ -51,7 +51,9 @@ CACHE_FILE_NAME = 'cache'
 # 'backends': ['kryptone.storages.RedisStorage', 'kryptone.storages.AirtableStorage']
 STORAGES = {
     'default': 'kryptone.storages.FileStorage',
-    'backends': []
+    'backends': [
+        'kryptone.storages.RedisStorage'
+    ]
 }
 
 
@@ -61,7 +63,7 @@ WEBHOOK_INTERVAL = 15
 
 # Pagination size for data sent to webhooks.
 # Data is only sent if the accumulated data size
-# meets this threshold.
+# meets this threshold
 WEBHOOK_PAGINATION = 100
 
 

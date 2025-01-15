@@ -20,8 +20,6 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import logger
 from kryptone.conf import settings
-from kryptone.db import backends
-from kryptone.db.connections import memcache_connection, redis_connection
 from kryptone.mixins import EmailMixin, SEOMixin
 from kryptone.signals import Signal
 from kryptone.utils.file_readers import (read_json_document,
@@ -171,7 +169,3 @@ def start(start_urls=[], url_cache=None, **kwargs):
 
         logger.info(f"Waiting {wait_time}s")
         time.sleep(wait_time)
-
-
-# if __name__ == '__main__':
-#     start()
