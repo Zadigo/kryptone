@@ -470,7 +470,10 @@ class BaseCrawler(metaclass=Crawler):
 
     def backup_urls(self):
         if self.storage is None:
-            self.storage = FileStorage(settings.MEDIA_FOLDER)
+            self.storage = FileStorage(
+                spider=self, 
+                storage_path=settings.MEDIA_FOLDER
+            )
 
         async def write_cache_file():
             data = {
