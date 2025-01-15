@@ -100,8 +100,8 @@ class FileStorage(BaseStorage):
 
     file_based = True
 
-    def __init__(self, storage_path=None, ignore_images=True):
-        super().__init__()
+    def __init__(self, *, spider=None, storage_path=None, ignore_images=True):
+        super().__init__(spider=spider)
         if storage_path is not None:
             if isinstance(storage_path, str):
                 storage_path = pathlib.Path(storage_path)
