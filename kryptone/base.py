@@ -790,8 +790,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         using a pyton path e.g. storages.FileStorage. The storage
         should be a subclass of `BaseStorage`"""
         try:
-            default = settings.STORAGES.get('default')
-            klass = import_from_module(default)
+            klass = import_from_module(python_path)
         except Exception:
             raise ValueError(
                 "Could not load storage "
