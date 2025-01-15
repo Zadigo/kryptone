@@ -25,7 +25,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import exceptions, logger
+from kryptone import exceptions, logger, signal_constants
 from kryptone.conf import settings
 from kryptone.storages import BaseStorage, FileStorage
 from kryptone.utils.date_functions import get_current_date
@@ -33,7 +33,6 @@ from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.urls import URL
-from kryptone import signal_constants
 
 DEFAULT_META_OPTIONS = {
     'domains', 'url_ignore_tests', 'url_rule_tests',
@@ -88,7 +87,10 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
         )
         options.add_argument('--disable-gpu')
 
-    service = Service(manager_instance().install())
+    try:
+        service = Service(manager_instance().install())
+    except Exception:
+        raise ConnectionError('And error occured. Are you offline?')
     return browser(service=service, options=options)
 
 
@@ -319,7 +321,7 @@ class BaseCrawler(metaclass=Crawler):
                 # Use the default url structure to determine
                 # the actual directory structure for the image
                 qualified_directory = directory_from_url(
-                    page_url, 
+                    page_url,
                     exclude=exclude_paths
                 )
             else:
@@ -812,17 +814,26 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         klass = self.load_storage(default_storage_path)
 
         if getattr(klass, 'file_based'):
-            self.storage = klass(settings.MEDIA_FOLDER)
+            self.storage = klass(
+                spider=self,
+                storage_path=settings.MEDIA_FOLDER
+            )
+
         logger.info(f"Using default storage: {default_storage_path}")
 
         other_storages_path = settings.STORAGES.get('backends', [])
-
         for path in other_storages_path:
             other = self.load_storage(path)
             if getattr(other, 'file_based'):
-                self.additional_storages.append(other(settings.MEDIA_FOLDER))
+                instance = other(
+                    spider=self,
+                    storage_path=settings.MEDIA_FOLDER
+                )
+                self.additional_storages.append(instance)
                 continue
-            self.additional_storages.append(other())
+
+            instance = other(spider=self)
+            self.additional_storages.append(instance)
 
         if other_storages_path:
             logger.info(f"Attached additional storages: {other_storages_path}")
@@ -885,7 +896,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
             if not current_url.is_same_domain(self.start_url):
                 continue
-            
+
             # TODO: Factorize this section into one single function
             # from 859:935 so that it can be used by both start and
             # bootstart without having to write two codes

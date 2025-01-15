@@ -1,7 +1,7 @@
 import dataclasses
 import pathlib
-from typing import (Any, Callable, Generic, List, Literal, OrderedDict, Type,
-                    TypeVar, Union, override)
+from typing import (Any, Callable, Generic, List, Literal,
+                    OrderedDict, Type, TypeVar, Union, override)
 
 import pyairtable
 import redis
@@ -10,9 +10,11 @@ from requests.models import PreparedRequest
 
 from kryptone.base import SiteCrawler
 
+T = TypeVar('T')
+
 S = TypeVar('S', bound='BaseStorage')
 
-T = TypeVar('T')
+C = TypeVar('C')
 
 
 def simple_list_adapter(
@@ -20,7 +22,7 @@ def simple_list_adapter(
 ) -> List[List[str, int, float]]: ...
 
 
-class BaseStorage:
+class BaseStorage(Generic[S, C, T]):
     storage_class: Type[S] = ...
     storage_connection: S = ...
     storage_path: str = ...
@@ -30,27 +32,47 @@ class BaseStorage:
 
     def __get__(
         self,
-        instance: SiteCrawler,
         cls: Type[SiteCrawler] = ...
     ) -> BaseStorage: ...
 
     def before_save(self, data: T) -> T: ...
     def initialize(self) -> bool: ...
 
+    async def has(self, key: str) -> bool: ...
 
-@dataclasses.dataclass
+    async def get(
+        self,
+        key: str
+    ) -> Union[int, bool, str, dict[str, Any], list[Any]]: ...
+
+    async def save(
+        self,
+        key: str,
+        data: Union[int, bool, str, dict[str, Any], list[Any]],
+        adapt_list: bool = ...,
+        **kwargs
+    ) -> bool: ...
+
+    async def save_or_create(
+        self,
+        key: str,
+        data: Union[int, bool, str, dict[str, Any], list[Any]]
+    ) -> bool: ...
+
+
+@ dataclasses.dataclass
 class File:
     path: pathlib.Path
 
     def __eq__(self, value) -> bool: ...
 
-    @property
+    @ property
     def is_json(self) -> bool: ...
 
-    @property
+    @ property
     def is_csv(self) -> bool: ...
 
-    @property
+    @ property
     def is_image(self) -> bool: ...
 
     def has(self, key: str) -> bool: ...
@@ -79,16 +101,16 @@ class FileStorage(BaseStorage, Generic[S]):
 
     def __repr__(self) -> str: ...
 
-    @override
+    @ override
     def initialize(self) -> bool: ...
 
-    @override
+    @ override
     def has(self, filename: str) -> bool: ...
 
-    @override
+    @ override
     def get(self, filename: str) -> File: ...
 
-    @override
+    @ override
     def save(self, filename: str, data: Union[list, dict]) -> bool: ...
 
     def get_file(self, filename: str) -> File: ...
@@ -101,7 +123,7 @@ class RedisStorage(BaseStorage, Generic[S]):
 
     def __init__(self) -> None: ...
 
-    @override
+    @ override
     def initialize(self) -> bool: ...
 
 
@@ -119,7 +141,7 @@ class ApiStorage(BaseStorage, Generic[S]):
 
     def __init__(self) -> None: ...
 
-    @property
+    @ property
     def default_headers(self) -> dict[str, str]: ...
 
     def check(self, name: str, data: Any) -> None: ...
