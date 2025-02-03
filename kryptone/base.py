@@ -27,7 +27,7 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 from kryptone import exceptions, logger, signal_constants
 from kryptone.conf import settings
-from kryptone.storages import BaseStorage, FileStorage
+from kryptone.data_storages import BaseStorage, FileStorage
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module

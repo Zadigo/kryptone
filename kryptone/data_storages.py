@@ -438,3 +438,115 @@ class MemCacheStorage(BaseStorage):
                 ),
                 **default_params
             )
+
+
+class PostGresStorage(BaseStorage):
+    TRANSACTION = 'begin {sql} commit'
+
+    CREATE_TABLE = 'create table if not exists {table} ({columns})'
+
+    SELECT = 'select {columns} from {table}'
+    WHERE_CONDITION = 'where {condition}'
+
+    INSERT = 'insert into {table} ({columns}) values({values})'
+
+    @staticmethod
+    def comma_join(fields):
+        return ', '.join(fields)
+
+    @staticmethod
+    def quote_value(value):
+        if isinstance(value, (int, float)):
+            return value
+
+        if isinstance(value, bool):
+            return 1 if value else 0
+        
+        if value.startswith("'"):
+            return value
+        return f"'{value}'"
+
+    @staticmethod
+    def finalize(value):
+        if value.endswith(';'):
+            return value
+        return f"{value};"
+
+    def quote_values(self, *values):
+        for value in values:
+            yield self.quote_value(value)
+
+    def build_condition(self, **params):
+        column = params.get('column')
+        condition_value = params.get('condition', '=')
+        quoted_value = self.quote_value(params.get('value'))
+        return f"{column}{condition_value}{quoted_value}"
+
+    def join_tokens(self, *tokens, finalize_each=False):
+        if finalize_each:
+            return ' '.join(self.finalize(x) for x in tokens)
+        return ' '.join(tokens)
+    
+    def initialize(self):
+        import psycopg
+        self.storage_connection = connection = psycopg.connect()
+        self.is_connected = True
+
+        # Tables
+        table1 = self.CREATE_TABLE.format_map(**{
+            'table': 'spider.seen_urls',
+            'columns': self.comma_join(
+                [
+                    'id integer primary key',
+                    "url varchar(500) unique not null check(url <> '')",
+                    'created_on timestamp'
+                ]
+            )
+        })
+
+        table2 = self.CREATE_TABLE.format_map(**{
+            'table': 'spider.url_cache',
+            'columns': self.comma_join(
+                [
+                    'id integer primary key',
+                    "url varchar(500) unique not null check(url <> '')",
+                    'visited boolean default 0'
+                    'created_on timestamp'
+                ]
+            )
+        })
+
+        transaction = self.TRANSACTION.format(**{
+            'sql': self.join_tokens(table1, finalize_each=True)
+        })
+
+        cursor = connection.cursor()
+        cursor.execute(self.finalize(transaction))
+
+        cursor.close()
+        return True
+
+    def select_sql(self, table):
+        return self.SELECT.format_map(**{'table': table})
+
+    def create_sql(self, table, column, value):
+        return 
+    
+    def insert_sql(self, table, columns=[], values=[]):
+        columns = self.comma_join(columns)
+        values = self.comma_join(self.quote_values(*values))
+        return self.INSERT.format(table=table, columns=columns, values=values)
+
+    def run_sql_statements(self, *tokens):
+        sql = self.join_tokens(*tokens)
+        cursor = self.storage_connection.cursor()
+        return cursor.execute(self.finalize(sql))
+
+    def save(self, key, data, adapt_list=False, **kwargs):
+        return
+
+    def visited_urls(self, state=True):
+        select_sql = self.select_sql('url_cache')
+        condition = self.build_condition(visited=state)
+        where_condition = self.WHERE_CONDITION.format(condition=condition)
+        return self.run_sql_statements(select_sql, where_condition)
