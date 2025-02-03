@@ -4,12 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 dynamic = ["version"]
-name = "Zineb"
+name = "Kryptone"
 description = "Kryptone is a hight level web scapper dedicated to marketers and wrapped around the Selenium library in order to automate and simplify website auditing and scraping."
 requires-python = ">= 3.13"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICEN[CS]E.*"]
 keywords = [
   "scraping",
   "data-scraping",
@@ -53,34 +51,30 @@ keywords = [
   "python-automation"
 ]
 dependencies = [
-  "redis"
-  "nltk"
-  "selenium"
-  "requests"
-  "beautifulsoup4"
-  "quart"
-  "quart-cors"
-  "webdriver-manager"
-  "gspread"
-  "unidecode"
-  "google-api-python-client"
-  "google-auth-httplib2"
-  "google-auth-oauthlib"
-  "pymemcache"
-  "twisted"
-  "lxml"
-  "wordcloud"
-  "matplotlib"
-  "pyairtable"
-  "pandas"
-  "autometrics"
-  "psycopg[binary,pool]"
-  "celery"
+  "redis",
+  "nltk",
+  "selenium",
+  "requests",
+  "beautifulsoup4",
+  "quart",
+  "quart-cors",
+  "webdriver-manager",
+  "gspread",
+  "unidecode",
+  "google-api-python-client",
+  "google-auth-httplib2",
+  "google-auth-oauthlib",
+  "pymemcache",
+  "twisted",
+  "lxml",
+  "wordcloud",
+  "matplotlib",
+  "pyairtable",
+  "pandas",
+  "autometrics",
+  "psycopg[binary,pool]",
+  "celery",
   "asgiref"
-]
-packages = [
-  {include = "kryptone"},
-  {include = "py.typed"}
 ]
 authors = [
   {name = "John Pendenque", email = "pendenquejohn@gmail.com"},
@@ -90,7 +84,11 @@ maintainers = [
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
+  "Operating System :: POSIX",
+  "Operating System :: Unix",
   "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Internet",
   "Topic :: Internet :: WWW/HTTP",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
