@@ -10,6 +10,8 @@ COPY Pipfile.lock .
 
 RUN pipenv install --system --deploy
 
+RUN pip install Kryptone
+
 COPY . .
 
 EXPOSE 8000
