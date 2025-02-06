@@ -1,0 +1,13 @@
+networks:
+  spider:
+    driver: bridge
+
+services:
+  spider:
+    build: ./testproject
+    container_name: testproject
+    command: "python manage.py start ExampleSpider"
+    restart: always
+    volumes:
+      - ./testproject:/app
+
