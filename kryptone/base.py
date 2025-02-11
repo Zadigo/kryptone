@@ -467,7 +467,8 @@ class BaseCrawler(metaclass=Crawler):
             for check_field in check_fields_null:
                 if getattr(instance, check_field) is None:
                     continue
-
+            
+            logger.info(f'Saving: {instance}')
             self.DATA_CONTAINER.append(instance)
 
     def backup_urls(self):
