@@ -535,26 +535,70 @@ class URLQueryGenerator(BaseURLGenerator):
     ... ['http://example.com?year=2001', 'http://example.com?year=2002', 'http://example.com?year=2003']
     """
 
-    def __init__(self, url, *, param=None, param_values=[], query={}):
-        from kryptone.utils.urls import URL
+    def __init__(self, url, *, param=None, initial_value=0, end_value=0, step=1, param_type='number', query={}):
+        acceptable_types = ['number', 'letter']
+
+        if param_type not in acceptable_types:
+            raise ValueError('Valid parameter types are: number, letter')
 
         self.url_instance = URL(url)
+        self.parameter_type = param_type
+        self.query = self.check_initial_query(query)
 
-        items = []
-        for value in param_values:
-            items.append({param: value})
-
-        self.query = query
-        self.generated_params = items
+        self.initial_value = initial_value
+        self.end_value = end_value
+        self.step = step
+        self.param = param
 
     def __len__(self):
         return len(self.resolve_generator())
 
+    @staticmethod
+    def check_initial_query(query):
+        """Function that checks if a value of the
+        query dict is None and replaces it with an
+        empty string"""
+        clean_query = {}
+        for key, value in query.items():
+            if value is None:
+                clean_query[key] = ''
+                continue
+            clean_query[key] = value
+        return clean_query
+
     def resolve_generator(self):
-        for item in self.generated_params:
-            full_query = item | self.query
-            query = urlencode(full_query)
-            yield str(self.url_instance) + f'?{query}'
+        if self.parameter_type == 'number':
+            calculated_range = 0
+            if self.initial_value < 0 or self.end_value < 0:
+                raise ValueError('End value cannot be below initial value')
+
+            calculated_range = self.end_value - self.initial_value
+            for i in range(calculated_range):
+                value = self.initial_value + i
+                full_query = self.query | {self.param: value}
+                query = urlencode(full_query)
+                yield URL(str(self.url_instance) + f'?{query}')
+
+    # def __init__(self, url, *, param=None, param_values=[], query={}):
+    #     from kryptone.utils.urls import URL
+
+    #     self.url_instance = URL(url)
+
+    #     items = []
+    #     for value in param_values:
+    #         items.append({param: value})
+
+    #     self.query = query
+    #     self.generated_params = items
+
+    # def __len__(self):
+    #     return len(self.resolve_generator())
+
+    # def resolve_generator(self):
+    #     for item in self.generated_params:
+    #         full_query = item | self.query
+    #         query = urlencode(full_query)
+    #         yield str(self.url_instance) + f'?{query}'
 
 
 class URLPathGenerator(BaseURLGenerator):

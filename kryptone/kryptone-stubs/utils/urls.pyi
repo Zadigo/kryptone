@@ -3,11 +3,12 @@ import re
 from collections import defaultdict
 from functools import lru_cache
 from string import Template
-from typing import (Any, DefaultDict, Generator, List, Literal, Tuple, Union,
+from typing import (Any, DefaultDict, Dict, Generator, List, Literal, Tuple, Union,
                     override)
 from urllib.parse import ParseResult
 
 import pandas
+
 
 @lru_cache(maxsize=100)
 def load_image_extensions() -> list[str]: ...
@@ -135,14 +136,28 @@ class BaseURLGenerator:
 
 
 class URLQueryGenerator(BaseURLGenerator):
+    url_instance: URL = ...
+    parameter_type = 'number' | 'letter' = ...
+    query: Dict[str, str] = ...
+    initial_value: int = ...
+    end_valye: int = ...
+    step: int = ...
+    param: str = ...
+
     def __init__(
         self,
         url: str,
         *,
         param: str = ...,
-        param_values: list[str] = ...,
+        initial_value: int = ...,
+        end_value: int = ...,
+        step: int = ...,
+        param_type: str = ...,
         query: dict[str, str] = ...
     ) -> None: ...
+
+    @staticmethod
+    def check_initial_query(query) -> Dict[str, str]: ...
 
 
 class URLPathGenerator(BaseURLGenerator):
