@@ -159,6 +159,8 @@ class FileStorage(BaseStorage):
         return file.read()
 
     async def get_file(self, filename):
+        """Return a file from the storage. The extension
+        of the filename should be specified"""
         return self.storage[filename]
 
     async def save_or_create(self, filename, data, **kwargs):
