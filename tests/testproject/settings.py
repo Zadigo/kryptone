@@ -47,12 +47,12 @@ CACHE_FILE_NAME = 'cache'
 
 # Example:
 
-# 'default': 'kryptone.storages.FileStorage',
-# 'backends': ['kryptone.storages.RedisStorage', 'kryptone.storages.AirtableStorage']
+# 'default': 'kryptone.data_storages.FileStorage',
+# 'backends': ['kryptone.data_storages.RedisStorage', 'kryptone.data_storages.AirtableStorage']
 STORAGES = {
-    'default': 'kryptone.storages.FileStorage',
+    'default': 'kryptone.data_storages.FileStorage',
     'backends': [
-        'kryptone.storages.RedisStorage'
+        'kryptone.data_storages.RedisStorage'
     ]
 }
 

@@ -10,7 +10,7 @@ from uuid import UUID
 from selenium.webdriver import Chrome, Edge
 
 from kryptone.routing import Router
-from kryptone.storages import (AirtableStorage, ApiStorage, BaseStorage,
+from kryptone.data_storages import (AirtableStorage, ApiStorage, BaseStorage,
                                FileStorage, RedisStorage)
 from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
                                  URLIgnoreTest, URLPaginationGenerator,

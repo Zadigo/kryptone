@@ -1,9 +1,10 @@
 from unittest import IsolatedAsyncioTestCase
+from urllib.parse import urljoin
 from uuid import uuid4
 
 from kryptone.conf import settings
-from kryptone.storages import ApiStorage, BaseStorage, File, FileStorage, RedisStorage
-from urllib.parse import urljoin
+from kryptone.data_storages import (ApiStorage, BaseStorage, File, FileStorage,
+                                    RedisStorage)
 
 
 class MockupSpider:
