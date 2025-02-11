@@ -1,0 +1,1 @@
+- [ ] To call `StorageClass.save` on the spider instance we have to use a workaround `async_to_sync(self.storage.save)('key', self.DATA_CONTAINER)`
