@@ -166,7 +166,19 @@ class TestURLQueryGenerator(unittest.TestCase):
 
         items = list(instance)
         self.assertTrue(len(items), 2)
-
+        print(items)
         for url in items:
             with self.subTest(url=url):
                 self.assertIn('winnerYear', url)
+
+    def test_step(self):
+        base_url = 'https://www.billboardmusicawards.com/winners-database/'
+        instance = URLQueryGenerator(
+            base_url, param='winnerYear',
+            initial_value=1990,
+            end_value=2000,
+            query={'winnerKeyword': None},
+            step=2
+        )
+        items = list(instance)
+        self.assertEqual(len(items), 5)

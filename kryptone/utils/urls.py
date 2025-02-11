@@ -530,7 +530,7 @@ class URLQueryGenerator(BaseURLGenerator):
     for substitution. It generates new URLs by replacing the specified query 
     parameter's value with each value from the provided list.
 
-    >>> instance = URLQueryGenerator('http://example.com?year=2001', param='year', param_values=['2002', '2003'])
+    >>> instance = URLQueryGenerator('http://example.com?year=2001', param='year', initial_value=2001, end_value=2003)
     ... instance.resolve_generator()
     ... ['http://example.com?year=2001', 'http://example.com?year=2002', 'http://example.com?year=2003']
     """
@@ -574,10 +574,16 @@ class URLQueryGenerator(BaseURLGenerator):
 
             calculated_range = self.end_value - self.initial_value
             for i in range(calculated_range):
-                value = self.initial_value + i
-                full_query = self.query | {self.param: value}
-                query = urlencode(full_query)
-                yield URL(str(self.url_instance) + f'?{query}')
+                if (i % self.step) == 0:
+                    value = self.initial_value + i
+                    
+                    full_query = self.query | {self.param: value}
+                    query = urlencode(full_query)
+
+                    yield URL(str(self.url_instance) + f'?{query}')
+
+        if self.parameter_type == 'letter':
+            pass
 
     # def __init__(self, url, *, param=None, param_values=[], query={}):
     #     from kryptone.utils.urls import URL
