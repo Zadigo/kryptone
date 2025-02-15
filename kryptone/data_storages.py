@@ -155,7 +155,7 @@ class FileStorage(BaseStorage):
         return key in self.storage
 
     async def get(self, filename):
-        file = self.get_file(filename)
+        file = await self.get_file(filename)
         return file.read()
 
     async def get_file(self, filename):
