@@ -839,6 +839,9 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             logger.info(f"Attached additional storages: {other_storages_path}")
 
     def before_start(self, start_urls, *args, **kwargs):
+        # TODO: Maybe reunite the "before_start" and the
+        # "setup_class" funcitons into one single function
+        # "setup_class"
         if self._meta.debug_mode:
             logger.debug('Starting Kryptone in debug mode')
         else:

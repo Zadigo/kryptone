@@ -245,7 +245,10 @@ class TestSpider(unittest.TestCase):
         settings['MEDIA_FOLDER'] = test_project_path / 'media'
 
         cls.spider = MySpider()
+        # TODO: Reunite these two functions
+        # into one single efficient one
         cls.spider.setup_class()
+        cls.spider.before_start([])
 
     def test_structure(self):
         # In debug mode makes no sense to run
@@ -253,9 +256,13 @@ class TestSpider(unittest.TestCase):
         self.assertFalse(self.spider.start())
 
     def test_get_urls(self):
+        # We should get the start_url plus
+        # the other urls that we were able
+        # to get on the current page
         test_urls = {
+            URL('https://example.com/product/1'),
             URL('https://example.com'),
-            URL('http://example.com/1')
+            URL('http://example.com/product/2')
         }
         self.spider.add_urls(test_urls)
         self.assertSetEqual(
@@ -263,12 +270,49 @@ class TestSpider(unittest.TestCase):
             test_urls
         )
 
+    def test_check_invalid_urls(self):
+        objs = (URL(value) for value in INVALID_URLS)
+        valid_urls = self.spider.check_urls(objs)
+        print(valid_urls)
+        # self.assertSetEqual(valid_urls, set())
+
+    def test_check_valid_urls(self):
+        result = self.spider.check_urls(VALID_URLS)
+        self.assertEqual(len(result), len(VALID_URLS))
+
+    def test_download_images(self):
+        test_urls = [
+            'https://static.bershka.net/assets/public/1174/9ac3/e8384037903b/afaee790a05e/00623152505-a3f/00623152505-a3f.jpg?ts=1717510394290&w=800',
+            'https://static.bershka.net/assets/public/86b5/ec66/38704722bb2c/75f953f6182b/00623152505-p/00623152505-p.jpg?ts=1717510451241&w=800',
+            'https://static.bershka.net/assets/public/1bb9/b521/03744fb982bc/8cff09929be0/00623152505-a1t/00623152505-a1t.jpg?ts=1717510385997&w=800'
+        ]
+        url = URL(
+            'https://www.bershka.com/fr/robe-midi-bretelles-col-carr%C3%A9-c0p164869795.html?colorId=505'
+        )
+        self.spider.download_images(
+            test_urls,
+            url,
+            filename_attrs={'suffix': 'some name'}
+        )
+
+
+class TestIgnoresSpider(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        test_project_path = pathlib.Path('./tests/testproject').absolute()
+
+        settings['PROJECT_PATH'] = test_project_path
+        settings['MEDIA_FOLDER'] = test_project_path / 'media'
+
+        cls.spider = MySpider()
+        cls.spider.setup_class()
+        cls.spider.before_start([])
+
     def test_url_ignore_test(self):
         self.spider._meta.url_ignore_tests.append(
             URLIgnoreTest('ignore', paths=['/ignore'])
         )
         url = 'http://example.com/ignore'
-        self.spider.start()
         self.spider.add_urls([url])
 
         self.assertSetEqual(
@@ -292,25 +336,3 @@ class TestSpider(unittest.TestCase):
                 URL('https://example.com')
             }
         )
-
-    def test_check_invalid_urls(self):
-        objs = (URL(value) for value in INVALID_URLS)
-        valid_urls = self.spider.check_urls(objs)
-        print(valid_urls)
-        # self.assertSetEqual(valid_urls, set())
-
-    def test_check_valid_urls(self):
-        valid_urls = self.spider.check_urls(VALID_URLS)
-        self.assertEqual(len(valid_urls), len(VALID_URLS))
-
-    def test_download_images(self):
-        test_urls = [
-            'https://static.bershka.net/assets/public/1174/9ac3/e8384037903b/afaee790a05e/00623152505-a3f/00623152505-a3f.jpg?ts=1717510394290&w=800',
-            'https://static.bershka.net/assets/public/86b5/ec66/38704722bb2c/75f953f6182b/00623152505-p/00623152505-p.jpg?ts=1717510451241&w=800',
-            'https://static.bershka.net/assets/public/1bb9/b521/03744fb982bc/8cff09929be0/00623152505-a1t/00623152505-a1t.jpg?ts=1717510385997&w=800'
-        ]
-        url = URL(
-            'https://www.bershka.com/fr/robe-midi-bretelles-col-carr%C3%A9-c0p164869795.html?colorId=505'
-        )
-        self.spider.download_images(test_urls, url, filename_attrs={
-                                    'suffix': 'some name'})
