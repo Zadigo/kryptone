@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import decimal
 import uuid
@@ -5,10 +6,9 @@ from json.encoder import JSONEncoder
 
 
 class DefaultJsonEncoder(JSONEncoder):
-    """
-    An encoder specially created to encode datetime
+    """An encoder specially created to encode datetime
     objects or other specific Python representations
-    """
+    such as dataclasses"""
 
     def default(self, obj):
         from kryptone.utils.urls import URL
@@ -35,6 +35,9 @@ class DefaultJsonEncoder(JSONEncoder):
 
         if isinstance(obj, decimal.Decimal):
             return float(obj)
+
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)
 
         if isinstance(obj, URL):
             return str(obj)
