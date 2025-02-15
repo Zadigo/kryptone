@@ -239,21 +239,13 @@ class MySpider(SiteCrawler):
 class TestSpider(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        test_project_path = pathlib.Path('./tests/testproject').absolute()
+
+        settings['PROJECT_PATH'] = test_project_path
+        settings['MEDIA_FOLDER'] = test_project_path / 'media'
+
         cls.spider = MySpider()
         cls.spider.setup_class()
-
-        test_project_path = pathlib.Path('./tests/testproject').absolute()
-        setattr(
-            settings,
-            'PROJECT_PATH',
-            test_project_path
-        )
-
-        setattr(
-            settings,
-            'MEDIA_FOLDER',
-            test_project_path / 'media'
-        )
 
     def test_structure(self):
         # In debug mode makes no sense to run
@@ -320,4 +312,5 @@ class TestSpider(unittest.TestCase):
         url = URL(
             'https://www.bershka.com/fr/robe-midi-bretelles-col-carr%C3%A9-c0p164869795.html?colorId=505'
         )
-        self.spider.download_images(test_urls, url, filename_attrs={'suffix': 'some name'})
+        self.spider.download_images(test_urls, url, filename_attrs={
+                                    'suffix': 'some name'})
