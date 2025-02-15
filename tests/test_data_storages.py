@@ -58,7 +58,8 @@ class TestFileStorage(IsolatedAsyncioTestCase):
 class TestRedisStorage(IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        spider = MockupSpider()
+        settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
+        cls.spider = spider = MockupSpider()
         connection = RedisStorage(spider=spider)
         cls.connection = connection
 
@@ -66,7 +67,7 @@ class TestRedisStorage(IsolatedAsyncioTestCase):
         self.assertTrue(self.connection.is_connected)
 
     async def test_check_has_key(self):
-        self.connection.has('performance.json')
+        await self.connection.has('performance.json')
 
     async def test_save(self):
         result = await self.connection.save('kryptone_tests', 1)
@@ -76,6 +77,22 @@ class TestRedisStorage(IsolatedAsyncioTestCase):
         await self.connection.save('kryptone_tests', expected)
         data = await self.connection.get('kryptone_tests')
         self.assertDictEqual(data, expected)
+
+    async def test_saving_cache(self):
+        cache = {
+            'spider': 'ExampleSpider',
+            'spider_uuid': self.spider.spider_uuid,
+            'timestamp': '2024-45-29 14:45:23',
+            'urls_to_visit': [],
+            'visited_urls': [
+                'http://example.com'
+            ]
+        }
+        await self.connection.save(settings.CACHE_FILE_NAME, cache)
+        await self.connection.save('seen_urls.csv', ['http://example.com'])
+
+        result = await self.connection.get(settings.CACHE_FILE_NAME)
+        self.assertEqual(result['spider_uuid'], str(cache['spider_uuid']))
 
 
 class TestApiStorage(IsolatedAsyncioTestCase):
