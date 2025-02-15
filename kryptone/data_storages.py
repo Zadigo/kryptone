@@ -124,7 +124,7 @@ class FileStorage(BaseStorage):
                 storage_path = pathlib.Path(storage_path)
 
         if not storage_path.is_dir():
-            raise ValueError("Storage should be a folder")
+            raise ValueError(f"Storage should be a folder. Got: {storage_path}")
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
