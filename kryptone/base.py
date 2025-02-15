@@ -873,6 +873,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         logger.info(f'Spider ID is: {str(self.spider_uuid)}')
 
         if self._meta.debug_mode:
+            # TODO: Create a simplified version of the start funciton in
+            # order to test the other functions of this class
             logger.warning("Calling start in debug mode will have no effect")
             return False
 
