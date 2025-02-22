@@ -1,12 +1,6 @@
-import datetime
 import itertools
-import re
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from functools import cached_property
-from string import Template
-from urllib.parse import urlencode, urlparse
-
-import pytz
 
 
 def drop_null(items, remove_empty_strings=True):

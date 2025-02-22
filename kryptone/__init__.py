@@ -1,11 +1,10 @@
 import logging
-
+import re
 from kryptone.signals import Signal
 
 __all__ = [
     'Signal'
 ]
-
 
 class Logger:
     instance = None
@@ -24,6 +23,22 @@ class Logger:
         handler.setFormatter(log_format)
 
         file_handler = logging.FileHandler('access.log')
+
+        # Since there might be colors in use for logging
+        # messages, ensure that ANSI string a removed from
+        # log files since they are not correctly parsed
+        
+        def remove_ansi(text):
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            return ansi_escape.sub('', text)
+
+        class NoAnsiFilter(logging.Filter):
+            def filter(self, record):
+                record.msg = remove_ansi(record.msg)
+                return True
+        
+        file_handler.addFilter(NoAnsiFilter())
+
         logger.addHandler(file_handler)
         file_handler.setFormatter(log_format)
 

@@ -336,3 +336,25 @@ class TestIgnoresSpider(unittest.TestCase):
                 URL('https://example.com')
             }
         )
+
+
+class CustomSpider(SiteCrawler):
+    class Meta:
+        crawl = False
+        start_urls = [
+            'https://www.etam.com/'
+        ]
+
+
+class TestSpiderExecution(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        settings['WEBDRIVER'] = 'Edge'
+        settings['MEDIA_FOLDER'] = pathlib.Path(
+            './tests/testproject/media'
+        ).absolute()
+        cls.settings = settings
+
+    def test_execution(self):
+        instance = CustomSpider()
+        instance.start()

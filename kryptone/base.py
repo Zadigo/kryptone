@@ -32,6 +32,7 @@ from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL
 
 DEFAULT_META_OPTIONS = {
@@ -339,7 +340,12 @@ class BaseCrawler(metaclass=Crawler):
             inferred_filename = url.get_filename
             if inferred_filename is None:
                 logger.warning(
-                    "File name could not be infered from url. Using random characters")
+                    color_text(
+                        'yellow',
+                        "File name could not be infered "
+                        "from url. Using random characters"
+                    )
+                )
                 filename_attrs.update(suffix_with_date=True)
                 inferred_filename = create_filename(**filename_attrs)
             else:
@@ -386,7 +392,7 @@ class BaseCrawler(metaclass=Crawler):
             try:
                 response = requests.get(url)
             except:
-                logger.warning(f"Could not download image: {url}")
+                logger.warning(f"Could not download image: {color_text('red', url)}")
                 return False
             else:
                 if response.status_code == 200:
@@ -467,14 +473,14 @@ class BaseCrawler(metaclass=Crawler):
             for check_field in check_fields_null:
                 if getattr(instance, check_field) is None:
                     continue
-            
+
             logger.info(f'Saving: {instance}')
             self.DATA_CONTAINER.append(instance)
 
     def backup_urls(self):
         if self.storage is None:
             self.storage = FileStorage(
-                spider=self, 
+                spider=self,
                 storage_path=settings.MEDIA_FOLDER
             )
 
@@ -843,9 +849,9 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         # "setup_class" funcitons into one single function
         # "setup_class"
         if self._meta.debug_mode:
-            logger.debug('Starting Kryptone in debug mode')
+            logger.debug(color_text('blue', 'Starting Kryptone in debug mode', background=True))
         else:
-            logger.info('Starting Kryptone')
+            logger.info(color_text('green', 'Starting Kryptone', background=True))
 
         start_urls = start_urls or self._meta.start_urls
         if (hasattr(start_urls, 'resolve_generator') or
@@ -861,7 +867,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 "in spider.Meta to start crawling a list of urls"
             )
 
-        logger.info(f'{self.__class__.__name__} ready to crawl website')
+        logger.info(f'{color_text('blue', self.__class__.__name__)} ready to crawl website')
 
         if self.start_url is None:
             self.start_url = URL(start_urls[-1])
@@ -873,7 +879,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.setup_class()
 
         self.before_start(start_urls, **kwargs)
-        logger.info(f'Spider ID is: {str(self.spider_uuid)}')
+        logger.info(f'Spider ID is: {color_text('green', str(self.spider_uuid))}')
 
         if self._meta.debug_mode:
             # TODO: Create a simplified version of the start funciton in
@@ -894,7 +900,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     continue
 
             current_url = URL(self.urls_to_visit.pop())
-            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
+            logger.info(f"{color_text('green', len(self.urls_to_visit))} urls left to visit")
 
             if current_url.is_empty:
                 continue
@@ -906,12 +912,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             # from 859:935 so that it can be used by both start and
             # bootstart without having to write two codes
 
-            logger.info(f'Going to url: {current_url}')
+            logger.info(f'Going to url: {color_text('green', current_url)}')
 
             try:
                 self.driver.get(str(current_url))
             except Exception as e:
-                logger.critical(f'Failed to go to: {current_url}: {e.args}')
+                logger.critical(f'Failed to go to: {color_text('red', current_url)}: {e.args}')
                 continue
 
             try:
@@ -1003,7 +1009,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             )
             self.performance_audit.count_visited_urls = len(self.visited_urls)
 
-            logger.info(f"Next execution time: {next_execution_date}")
+            logger.info(f"Next execution time: {color_text('blue', next_execution_date)}")
 
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break
