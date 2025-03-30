@@ -1,3 +1,4 @@
+from unittest.mock import MagicMock, Mock, patch
 import pathlib
 import unittest
 
@@ -340,15 +341,35 @@ class TestIgnoresSpider(unittest.TestCase):
 
 class CustomSpider(SiteCrawler):
     class Meta:
-        crawl = False
+        crawl = True
         start_urls = [
             'https://www.etam.com/'
         ]
 
 
-class TestSpiderExecution(unittest.TestCase):
+class TestSpiderWithFile(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        settings['WEBDRIVER'] = 'Edge'
+        settings['MEDIA_FOLDER'] = pathlib.Path(
+            './tests/testproject/media'
+        ).absolute()
+        cls.settings = settings
+
+    def test_execution(self):
+        instance = CustomSpider()
+        instance.start()
+
+
+class TestSpiderWithRedis(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        settings['STORAGES'] = {
+            'default': 'kryptone.data_storages.RedisStorage',
+            'backends': []
+        }
+        settings['STORAGE_REDIS_USERNAME'] = None
+        settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
         settings['WEBDRIVER'] = 'Edge'
         settings['MEDIA_FOLDER'] = pathlib.Path(
             './tests/testproject/media'

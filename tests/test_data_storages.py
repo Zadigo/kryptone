@@ -1,15 +1,14 @@
 from unittest import IsolatedAsyncioTestCase
+from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import urljoin
 from uuid import uuid4
 
+from kryptone.base import SiteCrawler
 from kryptone.conf import settings
 from kryptone.data_storages import (ApiStorage, BaseStorage, File, FileStorage,
-                                    RedisStorage)
-
-
-class MockupSpider:
-    def __init__(self):
-        self.spider_uuid = uuid4()
+                                    PostGresStorage, RedisStorage)
+from kryptone.utils.urls import URL
+from selenium.webdriver import Edge
 
 
 class TestBaseStorage(IsolatedAsyncioTestCase):
@@ -57,11 +56,31 @@ class TestFileStorage(IsolatedAsyncioTestCase):
 
 class TestRedisStorage(IsolatedAsyncioTestCase):
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls, spider):
         settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
-        cls.spider = spider = MockupSpider()
+        cls.spider = spider
         connection = RedisStorage(spider=spider)
         cls.connection = connection
+
+    # def setUp(self):
+    #     self.spider = None
+    #     self.connection = None
+    #     self.test_redis()
+
+    # @patch('kryptone.base.get_selenium_browser_instance')
+    # @patch('kryptone.base.SiteCrawler')
+    # @patch('redis.Redis')
+    # def test_redis(self, mock_func, mock_site_crawler: MagicMock, mock_redis: MagicMock):
+    #     spider = mock_site_crawler.return_value
+    #     spider.spider_uuid.return_value = uuid4()
+    #     spider._meta.debug_mode.return_value = True
+    #     self.spider = SiteCrawler()
+
+    #     client = mock_redis.return_value
+    #     client.hget.return_value = {'a': 1 }
+
+    #     result = client.hget('key')
+    #     self.assertDictEqual(result, {'a': 1 })
 
     async def test_connection(self):
         self.assertTrue(self.connection.is_connected)
@@ -130,3 +149,23 @@ class TestApiStorage(IsolatedAsyncioTestCase):
     async def test_save(self):
         result = await self.instance.save('cache', self.example_cache)
         self.assertDictEqual(result, {'state': True})
+
+
+class TestPostgreSQLStorage(IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        settings['STORAGE_POSTGRESQL_DB_NAME'] = 'kryptone'
+        settings['STORAGE_POSTGRESQL_USER'] = 'kryptone'
+        settings['STORAGE_POSTGRESQL_PASSWORD'] = 'kryptone'
+        settings['STORAGE_POSTGRESQL_HOST'] = 'localhost'
+        cls.settings = settings
+        cls.instance = PostGresStorage(spider=MockupSpider())
+
+    def test_connection(self):
+        self.assertTrue(self.instance.is_connected)
+        self.instance.storage_connection.close()
+
+    def test_insert_sql(self):
+        values = [URL('http://example.com'), URL('http://example.com/1')]
+        sql = self.instance.insert_sql('url_cache', *values)
+        print(sql)

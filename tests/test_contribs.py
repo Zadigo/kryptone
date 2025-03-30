@@ -43,7 +43,3 @@ class TestEcommerceContrib(unittest.TestCase):
     def test_dataframe(self):
         self.instance.add_product(DATA)
         self.assertIsInstance(self.instance.as_dataframe(), pandas.DataFrame)
-
-
-if __name__ == '__main__':
-    unittest.main()

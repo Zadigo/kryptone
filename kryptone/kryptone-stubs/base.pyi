@@ -3,15 +3,15 @@ import datetime
 import pathlib
 from collections.abc import Generator
 from functools import cached_property
-from typing import (Any, DefaultDict, List, Literal, OrderedDict, Set, Union,
-                    override)
+from typing import (Any, DefaultDict, Dict, List, Literal, OrderedDict, Set,
+                    Tuple, Union, override)
 from uuid import UUID
 
 from selenium.webdriver import Chrome, Edge
 
-from kryptone.routing import Router
 from kryptone.data_storages import (AirtableStorage, ApiStorage, BaseStorage,
-                               FileStorage, RedisStorage)
+                                    FileStorage, RedisStorage)
+from kryptone.routing import Router
 from kryptone.utils.urls import (URL, LoadStartUrls, URLIgnoreRegexTest,
                                  URLIgnoreTest, URLPaginationGenerator,
                                  URLQueryGenerator)
@@ -107,7 +107,7 @@ class BaseCrawler(metaclass=Crawler):
     start_url: URL = ...
     storage: Union[FileStorage, ApiStorage, AirtableStorage, RedisStorage]
     spider_uuid: UUID = ...
-    additional_storages: list = ...
+    additional_storages: list[Tuple[str, FileStorage | RedisStorage]] = ...
 
     class Meta:
         ...
@@ -127,6 +127,15 @@ class BaseCrawler(metaclass=Crawler):
 
     @cached_property
     def calculate_completion_percentage(self) -> Union[int, float]: ...
+
+    def download_images(
+        self, 
+        urls: List[URL], 
+        page_url: URL, 
+        directory: str=..., 
+        exclude_paths: list[str]=..., 
+        filename_attrs: dict[str, str | bool]=...
+    ) -> None: ...
 
     def download_images(
         self,
@@ -157,9 +166,9 @@ class BaseCrawler(metaclass=Crawler):
         self,
         valid_urls: list[Union[URL, str]],
         refresh: bool = ...
-    ) -> set[str]: ...
+    ) -> set[URL]: ...
 
-    def add_urls(self, urls: Union[URL, str]) -> None: ...
+    def add_urls(self, urls: Union[URL, str], refresh: bool = ...) -> None: ...
     def calculate_performance(self) -> None: ...
 
     def current_page_actions(
@@ -168,7 +177,11 @@ class BaseCrawler(metaclass=Crawler):
         **kwargs
     ) -> None: ...
 
-    def post_navigation_actions(self, current_url: URL, **kwargs) -> None: ...
+    def post_navigation_actions(
+        self, 
+        current_url: URL, 
+        **kwargs
+    ) -> None: ...
 
     def before_next_page_actions(
         self,
@@ -179,7 +192,7 @@ class BaseCrawler(metaclass=Crawler):
 
     def after_fail(self) -> None: ...
 
-    def after_data_save(self, data) -> None: ...
+    def after_data_save(self, data: List[Dict[str, Any]]) -> None: ...
 
     def before_start(
         self,

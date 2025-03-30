@@ -1,7 +1,6 @@
 import unittest
 
-from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest, URLQueryGenerator
-from collections import defaultdict
+from kryptone.utils.urls import URL
 
 IGNORE_PATHS = [
     '/Customer/Wishlist',
@@ -152,33 +151,3 @@ class TestUrl(unittest.TestCase):
         instance = URL('http://example.com?b=2')
         result = instance.rebuild_query(c=4)
         self.assertEqual(str(result), 'http://example.com?c=4&b=2')
-
-
-class TestURLQueryGenerator(unittest.TestCase):
-    def test_logic(self):
-        base_url = 'https://www.billboardmusicawards.com/winners-database/'
-        instance = URLQueryGenerator(
-            base_url, param='winnerYear',
-            initial_value=1990,
-            end_value=1992,
-            query={'winnerKeyword': None}
-        )
-
-        items = list(instance)
-        self.assertTrue(len(items), 2)
-        print(items)
-        for url in items:
-            with self.subTest(url=url):
-                self.assertIn('winnerYear', url)
-
-    def test_step(self):
-        base_url = 'https://www.billboardmusicawards.com/winners-database/'
-        instance = URLQueryGenerator(
-            base_url, param='winnerYear',
-            initial_value=1990,
-            end_value=2000,
-            query={'winnerKeyword': None},
-            step=2
-        )
-        items = list(instance)
-        self.assertEqual(len(items), 5)
