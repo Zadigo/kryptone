@@ -106,3 +106,9 @@ LOAD_JS = True
 # to use for web scraping. Example:
 # '192.168.0.1:8080'
 PROXY_IP_ADDRESS = None
+
+
+# Set the timezone for the current
+# givent project
+
+# TIMEZONE = 'utc'
