@@ -74,7 +74,8 @@ dependencies = [
   "autometrics",
   "psycopg[binary,pool]",
   "celery",
-  "asgiref"
+  "asgiref",
+  "kagglehub"
 ]
 authors = [
   {name = "John Pendenque", email = "pendenquejohn@gmail.com"},

@@ -1,6 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch, Mock
-from kryptone.utils.urls import URLIgnoreTest
+from unittest.mock import Mock, patch
+
 from kryptone.utils.urls import (URL, MultipleURLManager,
                                  URLPaginationGenerator, URLPathGenerator,
                                  URLQueryGenerator)
