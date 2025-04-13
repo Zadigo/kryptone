@@ -576,7 +576,7 @@ class URLQueryGenerator(BaseURLGenerator):
             for i in range(calculated_range):
                 if (i % self.step) == 0:
                     value = self.initial_value + i
-                    
+
                     full_query = self.query | {self.param: value}
                     query = urlencode(full_query)
 
@@ -689,27 +689,19 @@ class MultipleURLManager:
     """
     _urls_to_visit = set()
     _visited_urls = set()
-    _seen_urls = set()
     _grouped_by_page = defaultdict(set)
     _current_url = None
+    list_of_seen_urls = set()
+    custom_url_filters = []
 
-    def __init__(self, start_urls=[], start_url=None, sort_urls=False, convert_objects=False):
-        if start_url is None:
-            start_url = URL(start_urls[0])
-        self.start_url = start_url
-
-        df = pandas.DataFrame({'urls': start_urls})
-        df['visited'] = False
-        df['visited_on'] = None
-        self.dataframe = df
-
-        if sort_urls:
-            self.dataframe = self.dataframe.sort_values('urls')
-
+    def __init__(self, ignore_images=True, sort_urls=False):
+        self.start_url = None
+        self.ignore_images = ignore_images
         self.sort_urls = sort_urls
-        # start_urls
-        result = self.pre_save(self.dataframe.urls.to_list())
-        self._urls_to_visit.update(result)
+        # This attribute is updated every time
+        # "get" is called on the class
+        self.current_iteration = 0
+        self.dataframe: pandas.DataFrame = None
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -787,26 +779,148 @@ class MultipleURLManager:
             self._urls_to_visit
         ))
 
-    def url_structural_check(self, url):
-        """Checks the structure of an
-        incoming url. When the the string
-        is a path, it is readapted to suit
-        the expected pattern of an url"""
-        url = str(url)
-        clean_url = unquote(url)
-        if url.startswith('/'):
-            clean_url = self.urljoin(clean_url)
-        return clean_url, urlparse(clean_url)
+    def urljoin(self, path):
+        if self.start_url is None:
+            raise Exception(
+                'You should call populate at least once '
+                'in order to join paths to their base domain'
+            )
+        return URL(urljoin(str(self.start_url), str(path)))
 
-    def pre_save(self, urls):
-        # final_urls = set()
-        # urls = map(lambda x: URL(x), urls)
-        # for url in urls:
-        #     if url.is_file:
-        #         continue
-        #     final_urls.add(str(url))
-        # return list(final_urls)
-        return urls
+    def add_urls(self, urls, refresh=False):
+        """Manually add urls to the current urls to
+        visit list. This is useful for cases where urls are
+        nested in other elements than links and that
+        cannot actually be retrieved by the spider
+
+        * Runs `self.check_urls` on each url
+        * RUns user custom url filters `self.run_url_filters`
+        * Updates `self.urls_to_visit`"""
+        checked_urls = self.check_urls(urls, refresh=refresh)
+        filtered_urls = self.run_url_filters(checked_urls)
+        self._urls_to_visit.update(filtered_urls)
+
+        if self.start_url is not None:
+            container = self._grouped_by_page[self.start_url]
+            container.update(filtered_urls)
+
+    def run_url_filters(self, valid_urls):
+        """Excludes urls in the list of collected
+        urls based on the value of the functions in
+        `url_filters`. All conditions should be true
+        in order for the url be considered valid to
+        be visited"""
+        if self.custom_url_filters:
+            results = defaultdict(list)
+            for url in valid_urls:
+                truth_array = results[url]
+                for instance in self.custom_url_filters:
+                    truth_array.append(instance(url))
+
+            urls_kept = set()
+            urls_removed = set()
+            final_urls_filtering_audit = OrderedDict()
+
+            for url, truth_array in results.items():
+                final_urls_filtering_audit[url] = any(truth_array)
+
+                # Expect all the test results to
+                # be false. If only one test turns
+                # out being true, then the url is
+                # considered to be not valid
+                if any(truth_array):
+                    urls_removed.add(url)
+                    continue
+                urls_kept.add(url)
+
+            logger.info(
+                f"Filters completed. {len(urls_removed)} "
+                "url(s) removed"
+            )
+            return urls_kept
+        return valid_urls
+
+    def check_urls(self, urls, refresh=False):
+        raw_urls = set(urls)
+
+        if self.current_iteration > 0:
+            logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
+
+        raw_urls_objs = list(map(lambda x: URL(x), raw_urls))
+
+        valid_urls = set()
+        invalid_urls = set()
+
+        for url in raw_urls_objs:
+            if url.is_path:
+                url = self.urljoin(url)
+
+            if refresh:
+                # If we are for example paginating a page,
+                # then we only need to keep the new urls
+                # that have appeared and that we have
+                # not yet seen
+                if url in self.list_of_seen_urls:
+                    invalid_urls.add(url)
+                    continue
+
+            if not url.is_same_domain(self.start_url):
+                invalid_urls.add(url)
+                continue
+
+            if url.is_empty:
+                invalid_urls.add(url)
+                continue
+
+            if url.has_fragment:
+                invalid_urls.add(url)
+                continue
+
+            is_home_page = [
+                url.url_object.path == '/',
+                self.start_url.url_object.path == '/',
+                # To prevent returning an empty list when running
+                # the spider for the first time, require at least
+                # on rotation before running this check
+                self.current_iteration > 0
+            ]
+
+            if all(is_home_page):
+                invalid_urls.add(url)
+                continue
+
+            if self.ignore_images:
+                if url.is_image:
+                    invalid_urls.add(url)
+                    continue
+
+            if url in self.visited_urls:
+                invalid_urls.add(url)
+                continue
+
+            if url in self.list_of_seen_urls:
+                invalid_urls.add(url)
+                continue
+
+            valid_urls.add(url)
+
+        self.list_of_seen_urls.update(valid_urls)
+        self.list_of_seen_urls.update(invalid_urls)
+
+        if valid_urls:
+            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+
+        newly_discovered_urls = []
+        for url in valid_urls:
+            if url not in self.list_of_seen_urls:
+                newly_discovered_urls.append(url)
+
+        if newly_discovered_urls:
+            logger.info(
+                f"Discovered {len(newly_discovered_urls)} "
+                "unseen url(s)"
+            )
+        return valid_urls
 
     def backup(self):
         return {
@@ -822,78 +936,18 @@ class MultipleURLManager:
             }
         }
 
-    def pre_append(self, urls):
-        pass
-
-    def append_multiple(self, urls):
-        counter = 0
-        valid_urls = set()
-        invalid_urls = set()
-
-        for url in urls:
-            state = self.append(url)
-            if state:
-                valid_urls.add(url)
-                continue
-            counter = counter + 1
-            invalid_urls.add(url)
-        return valid_urls, invalid_urls
-
-    def append(self, url):
-        if url is None:
-            return False
-
-        clean_url = URL(url)
-        self._seen_urls.add(url)
-
-        if url in self._visited_urls:
-            return False
-
-        if url in self._urls_to_visit:
-            return False
-
-        if (clean_url.url_object.netloc == '' or
-                clean_url.url_object.path == ''):
-            return False
-
-        self._urls_to_visit.add(url)
-        new_urls = pandas.DataFrame({'urls': [url]})
-        self.dataframe = pandas.concat([self.dataframe, new_urls])
-
-        if self.sort_urls:
-            self._urls_to_visit = set(sorted(self._urls_to_visit))
-            self._visited_urls = set(sorted(self._visited_urls))
-
-    def appendleft(self, url):
-        urls_to_visit = list(self._urls_to_visit)
-        urls_to_visit.insert(0, url)
-        self._urls_to_visit = set(urls_to_visit)
-
     def clear(self):
         self._urls_to_visit.clear()
         self._visited_urls.clear()
 
     def reverse(self):
-        container = []
-        for i in range(self.urls_to_visit_count, 0, -1):
-            try:
-                container.append(list(self._urls_to_visit)[i - 1])
-            except IndexError:
-                continue
-        self._urls_to_visit = set(container)
-
-    def update(self, urls, current_url=None):
-        keys = self._grouped_by_page.keys()
-        if keys:
-            key = current_url or list(keys)[-1] + 1
-        else:
-            key = current_url or 1
-
-        for url in urls:
-            self._grouped_by_page[key].add(url)
-            self.append(url)
+        return list(reversed(self.urls_to_visit))
 
     def get(self):
+        """Gets an url from the list of urls to visit.
+        This is a destructive function, in other words,
+        when the function is called, it removed from the
+        list of urls to visit"""
         url = self._urls_to_visit.pop()
         self._current_url = URL(url)
         self._visited_urls.add(url)
@@ -902,7 +956,37 @@ class MultipleURLManager:
         for item in found_urls.itertuples():
             self.dataframe.loc[item.Index, 'visited'] = True
             self.dataframe.loc[item.Index, 'visited_on'] = get_current_date()
-        return self._current_url
+        self.current_iteration += 1
+        return url
+
+    def populate(self, start_urls):
+        """Function that populates the `urls_to_visit` and
+        sets `start_url`. If called more than once, the other
+        calls will have no effect"""
+        if self.start_url is None:
+            start_url = URL(start_urls[0])
+            if start_url.is_path:
+                raise ValueError(
+                    "The first url in the list of startin urls is a path "
+                    "you need to implement a valid url string as a "
+                    "fist value in the list"
+                )
+            self.start_url = start_url
+            self.add_urls(start_urls)
+
+            self.dataframe = pandas.DataFrame(
+                {
+                    'urls': list(self.urls_to_visit)
+                }
+            )
+            self.dataframe['visited'] = False
+            self.dataframe['visited_on'] = None
+
+            if self.sort_urls:
+                self.dataframe = self.dataframe.sort_values('urls')
+
+            result = self.dataframe.urls.to_list()
+            self._urls_to_visit.update(result)
 
 
 class LoadStartUrls(BaseURLGenerator):
@@ -933,7 +1017,12 @@ class LoadStartUrls(BaseURLGenerator):
             with open(path, mode='r', encoding='utf-8') as f:
                 if self.is_json:
                     data = json.load(f)
-                    yield from list(set(item['url'] for item in data))
+                    for item in data:
+                        if isinstance(item, dict):
+                            yield item['url']
+
+                        if isinstance(item, str):
+                            yield item
                 else:
                     yield from list(itertools.chain(*csv.reader(f)))
         except FileNotFoundError:

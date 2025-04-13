@@ -1,66 +1,79 @@
 from functools import cached_property
-from typing import (Any, Callable, DefaultDict, Deque, List, Literal, Tuple,
-                    Union)
+from typing import (Any, Callable, DefaultDict, Deque, Dict, Iterable, List,
+                    Literal, Optional, Tuple, TypedDict, Union)
 
 from nltk import FreqDist
 from selenium.webdriver.remote.webelement import WebElement
 
 from kryptone.utils.urls import URL
 
-EMAIL_REGEX = Literal[r'\S+\@\S+']
+EMAIL_REGEX: str
+
+
+def long_text_processor(tokens) -> bool: ...
+
+
+class PageAudit(TypedDict, total=False):
+    date: str
+    title: Optional[str]
+    description: Optional[str]
+    url: str
+    page_content_length: int
+    is_https: bool
+    has_title: bool
+    has_h1: bool
+    h1: Optional[str]
+
+
+class TFIDFProcessor:
+    def __init__(self, documents: list[str] = ...) -> None: ...
+
+    def _calculate_tf(
+        self,
+        document: Union[str, Iterable[str]]
+    ) -> Dict[str, float]: ...
+
+    def _calculate_idf(self) -> Dict[str, float]: ...
+
+    def add_documents(self, documents: Union[str, List[str]]) -> None: ...
+    def compute_tfidf(self) -> List[Dict[str, float]]: ...
+    def compute_tfidf_matrix(self) -> Any: ...
+
+    def filter_tokens_by_tfidf(
+        self, 
+        document_idx: int, 
+        top_n: Optional[int] = ..., 
+        threshold: Optional[float] = ...
+    ) -> List[str]: ...
+
+    def get_top_terms(
+        self, 
+        document_idx: int,
+        n: int = 10
+    ) -> List[tuple[str, float]]: ...
+
+    def preprocess_text_with_tfidf(
+        self, 
+        keep_top_n: Optional[int] = ..., 
+        min_tfidf: Optional[float] = ...
+    ) -> List[List[str]]: ...
 
 
 class TextMixin:
-    page_documents: List[str] = ...
-    fitted_page_documents: List[str] = ...
+    nltk_downloads: bool = ...
     text_processors: List[Callable[[list[str]], bool]] = ...
 
-    @cached_property
-    def stop_words_html(self) -> str: ...
-    @staticmethod
-    def tokenize(text) -> list[str]: ...
-    def stop_words(self, language: str = ...) -> List[str]: ...
-
-    @property
-    def _fitted_text_tokens(self) -> List[str]: ...
-    @staticmethod
-    def _tokenize(text: str) -> List[str]: ...
-    def _common_words(self, tokens: list[str]) -> List[Tuple[str, int]]: ...
-    def _rare_words(self, tokens: list[str]) -> List[Tuple[str, int]]: ...
-
-    def _remove_stop_words(
-        self,
-        tokens: list[str],
-        language: str = ...
-    ) -> list[str]: ...
-
-    def _remove_stop_words_multipass(self, tokens: list[str]) -> list[str]: ...
-
-    def get_page_text(self) -> str: ...
-
-    def run_processors(
-        self,
-        tokens: List[str],
-    ) -> List[str]: ...
-
-    def normalize_spaces(self, text: str) -> str: ...
-    def validate_text(self, text: str) -> Union[str, Literal['']]: ...
-    def fit(self, text: str) -> str: ...
+    def get_page_text(self) -> Optional[str]: ...
+    def run_processors(self, tokens) -> list[str]: ...
 
     def fit_transform(
         self,
-        text: str = ...,
-        language: str = ...,
-        email_exception: bool = ...
-    ) -> tuple[str, list[str]]: ...
+        text: str,
+        language: str = Literal['english'],
+        keep_emails: bool = Literal[False]
+    ) -> str: ...
 
-    def fit(
-        self,
-        raw_text: str,
-        email_exception: bool = ...,
-        use_multipass: bool = ...,
-        language: str = ...
-    ) -> tuple[str, list[str]]: ...
+    def fit(self, raw_text: str, **kwargs) -> str: ...
 
 
 class SEOMixin(TextMixin):
@@ -118,7 +131,7 @@ class SEOMixin(TextMixin):
         self,
         current_url: URL,
         generate_graph: bool = ...
-    ) -> dict: ...
+    ) -> PageAudit: ...
 
 
 class EmailMixin(TextMixin):
@@ -126,8 +139,10 @@ class EmailMixin(TextMixin):
 
     @staticmethod
     def identify_email(value: str) -> Union[str, None]: ...
+    
     @staticmethod
     def parse_url(element: WebElement) -> Union[str, None]: ...
+
     def parse_protected_email(self, email: Union[URL, str]) -> str: ...
     def emails(self, text: str, elements: List[WebElement] = ...) -> None: ...
     def find_emails_from_text(self, text: str) -> set[str]: ...
@@ -136,23 +151,3 @@ class EmailMixin(TextMixin):
         self,
         elements: List[WebElement]
     ) -> set[str]: ...
-
-
-class ScrollMixin:
-    def scroll_window(
-        self,
-        wait_time: int = Literal[5],
-        increment: int = Literal[1000],
-        stop_at: int = None
-    ) -> None: ...
-
-    def scroll_page_section(
-        self,
-        xpath: str = None,
-        css_selector: str = None
-    ) -> str: ...
-
-    def scroll_into_view(
-        self,
-        css_selector: str
-    ) -> None: ...

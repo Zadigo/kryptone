@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import pytz
 import requests
+from asgiref.sync import async_to_sync
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -258,10 +259,15 @@ class BaseCrawler(metaclass=Crawler):
     additional_storages = []
 
     def __init__(self, browser_name=None):
+        # The start url which corresponds
+        # to the first url of "Meta.start_urls"
+        # allows us to track the domain to which
+        # crawling needs to be limited to
         self.start_url = None
+
         self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
-
+        
         if not self._meta.debug_mode:
             self.driver = get_selenium_browser_instance(
                 browser_name=browser_name or self.browser_name,
@@ -485,12 +491,12 @@ class BaseCrawler(metaclass=Crawler):
             )
 
         async def run_additional_storages(key, value):
-            for storage in self.additional_storages:
+            for name, storage in self.additional_storages:
                 # Only use storages that are connected.
                 # This is a none block loop
                 if not storage.is_connected:
                     logger.warning(
-                        f"Could not use {storage}. "
+                        f"Could not use {name}. "
                         "Connection broken"
                     )
                     continue
@@ -813,36 +819,82 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         return klass
 
+    def non_default_storage_by_name(self, name):
+        candidates = list(filter(lambda x: x[0] == name, self.additional_storages))
+        if len(candidates) == 0:
+            return False
+        return candidates[-1]
+
     def setup_class(self):
         """A function that sets up the final elements of the
         class before actually running the spider e.g. storages"""
         default_storage_path = settings.STORAGES.get('default')
         klass = self.load_storage(default_storage_path)
 
+        params = {'spider': self}
         if getattr(klass, 'file_based'):
-            self.storage = klass(
-                spider=self,
-                storage_path=settings.MEDIA_FOLDER
+            params['storage_path'] = settings.MEDIA_FOLDER
+
+        self.storage = klass(**params)
+
+        if self.storage.is_connected:
+            logger.info(f"Default storage: {color_text('blue', default_storage_path)}")
+        
+        # Even though the user swapped out the file based storage
+        # for a cloud one, we will still need the file based one
+        # for simple local operations. So reimplement it.
+        is_swapped = default_storage_path != 'kryptone.data_storages.FileStorage'
+        if is_swapped:
+            settings.STORAGES['backends'].append(
+                {
+                    'name': 'basic',
+                    'storage': 'kryptone.data_storages.FileStorage'
+                }
             )
 
-        logger.info(f"Using default storage: {default_storage_path}")
-
         other_storages_path = settings.STORAGES.get('backends', [])
-        for path in other_storages_path:
-            other = self.load_storage(path)
-            if getattr(other, 'file_based'):
-                instance = other(
-                    spider=self,
-                    storage_path=settings.MEDIA_FOLDER
-                )
-                self.additional_storages.append(instance)
-                continue
+        for storage_info in other_storages_path:
+            other = self.load_storage(storage_info['storage'])
 
-            instance = other(spider=self)
-            self.additional_storages.append(instance)
+            params = {'spider': self}
+            if getattr(other, 'file_based'):
+                params['storage_path'] = settings.MEDIA_FOLDER
+            
+            instance = other(**params)
+            custom_name = storage_info['name']
+            self.additional_storages.append((custom_name, instance))
 
         if other_storages_path:
             logger.info(f"Attached additional storages: {other_storages_path}")
+
+        # Here we are going to check the file that allows
+        # us to keep track of the uuid constant which will
+        # allow other backends to be able to consistently
+        # track the state for the given spider -; storages
+        # like Redis rely on this conssitent uuuid ortherwise
+        # a new key will always be created preventing us from
+        # updating the data consistently
+        if is_swapped:
+            _, storage = self.non_default_storage_by_name('basic')
+        else:
+            storage = self.storage
+
+        file_exists = async_to_sync(storage.has)('uuid_map.json')
+        if file_exists:
+            file = async_to_sync(storage.get_file)('uuid_map.json')
+            existing_data = async_to_sync(file.read)()
+
+            # Re-use an existing uuid so that other backends can
+            # track the state of the spider
+            exisiting_uuid = existing_data.get(self.__class__.__name__)
+            if exisiting_uuid is not None:
+                self.spider_uuid = exisiting_uuid
+            logger.warning(f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
+        else:            
+            data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
+            async_to_sync(storage.save_or_create)('uuid_map.json', data)
+            file = async_to_sync(storage.get)('uuid_map.json')
+            logger.warning(f'Created uuid file @ {color_text('blue', file.path)}')
 
     def before_start(self, start_urls, *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
@@ -1025,7 +1077,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         - Finally, the file cache is used as a final resort if none exists
         """
         self.setup_class()
-        # The spider will use the default storage by
+        # The spider will use the default storage
         # in order to resume its previous state. This
         # can be altered by providing a "source" that
         # indicates the index of the alternative storage

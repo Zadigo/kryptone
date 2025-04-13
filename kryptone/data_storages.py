@@ -3,16 +3,19 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
+import datetime
 from urllib.parse import urlencode
 
 import pyairtable
 import pymemcache
 import redis
 import requests
+import io
 
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
+from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL, load_image_extensions
 
 
@@ -41,6 +44,10 @@ class BaseStorage:
     storage_class = None
     storage_connection = None
     file_based = False
+    connection_error = (
+        'Failed connection to {storage_name}. The spider will '
+        'keep running without a storage backend. Data might be lost!'
+    )
 
     def __init__(self, spider=None):
         self.spider = spider
@@ -124,13 +131,14 @@ class FileStorage(BaseStorage):
                 storage_path = pathlib.Path(storage_path)
 
         if not storage_path.is_dir():
-            raise ValueError(f"Storage should be a folder. Got: {storage_path}")
+            raise ValueError(
+                f"Storage should be a folder. Got: {storage_path}")
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
         self.ignore_images = ignore_images
         # Since it's a file, the connection to the
-        # local path is always considered active
+        # local file is always considered to be True
         self.is_connected = True
         self.initialize()
 
@@ -156,7 +164,7 @@ class FileStorage(BaseStorage):
 
     async def get(self, filename):
         file = await self.get_file(filename)
-        return file.read()
+        return await file.read()
 
     async def get_file(self, filename):
         """Return a file from the storage. The extension
@@ -218,9 +226,11 @@ class RedisStorage(BaseStorage):
         try:
             self.storage_connection.ping()
         except:
-            return False
-        self.is_connected = True
-        return self.is_connected
+            message = self.connection_error.format(
+                storage_name=self.__class__.__name__)
+            logger.critical(color_text('red', message))
+        else:
+            self.is_connected = True
 
     def before_save(self, data):
         if isinstance(data, URL):
@@ -443,14 +453,23 @@ class MemCacheStorage(BaseStorage):
 
 
 class PostGresStorage(BaseStorage):
-    TRANSACTION = 'begin {sql} commit'
+    TRANSACTION = 'begin; {sql} commit'
 
     CREATE_TABLE = 'create table if not exists {table} ({columns})'
 
     SELECT = 'select {columns} from {table}'
     WHERE_CONDITION = 'where {condition}'
 
-    INSERT = 'insert into {table} ({columns}) values({values})'
+    INSERT = 'insert into {table} ({columns}) values ({values})'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.initialize()
+        self.schema = 'spider'
+
+    def __quit__(self):
+        if self.is_connected:
+            self.storage_connection.close()
 
     @staticmethod
     def comma_join(fields):
@@ -463,7 +482,9 @@ class PostGresStorage(BaseStorage):
 
         if isinstance(value, bool):
             return 1 if value else 0
-        
+
+        value = str(value)
+
         if value.startswith("'"):
             return value
         return f"'{value}'"
@@ -484,71 +505,132 @@ class PostGresStorage(BaseStorage):
         quoted_value = self.quote_value(params.get('value'))
         return f"{column}{condition_value}{quoted_value}"
 
-    def join_tokens(self, *tokens, finalize_each=False):
+    def join_tokens(self, *tokens, separator=' ', finalize_each=False):
         if finalize_each:
-            return ' '.join(self.finalize(x) for x in tokens)
-        return ' '.join(tokens)
-    
+            return separator.join(self.finalize(x) for x in tokens)
+        return separator.join(tokens)
+
+    def get_cursor(self):
+        if self.is_connected:
+            return self.storage_connection.cursor()
+        return None
+
+    def run_cursor(self, sql):
+        """Get a cursor and execute an initial
+        sql statement returns both the result and
+        the cursor for more operations"""
+        cursor = self.get_cursor()
+        if cursor is not None:
+            try:
+                sql = self.finalize(sql)
+                result = cursor.execute(sql)
+            except Exception as e:
+                print(e)
+            else:
+                return result, cursor
+
     def initialize(self):
         import psycopg
-        self.storage_connection = connection = psycopg.connect()
-        self.is_connected = True
+
+        try:
+            template = 'dbname={db} user={user} password={password} host={host} port={port}'
+            conn_information = template.format(**{
+                'db': settings.STORAGE_POSTGRESQL_DB_NAME,
+                'user': settings.STORAGE_POSTGRESQL_USER,
+                'password': settings.STORAGE_POSTGRESQL_PASSWORD,
+                'host': settings.STORAGE_POSTGRESQL_HOST,
+                'port': settings.STORAGE_POSTGRESQL_PORT,
+            })
+            self.storage_connection = connection = psycopg.connect(
+                conninfo=conn_information
+            )
+        except Exception as e:
+            message = self.connection_error.format(
+                storage_name=self.__class__.__name__)
+            logger.critical(color_text('red', message))
+            logger.critical(str(e))
+            return
+        else:
+            self.is_connected = True
+
+        sql = 'create schema if not exists spider'
+        result, cursor = self.run_cursor(sql)
 
         # Tables
-        table1 = self.CREATE_TABLE.format_map(**{
+        table1 = self.CREATE_TABLE.format(**{
             'table': 'spider.seen_urls',
             'columns': self.comma_join(
                 [
-                    'id integer primary key',
-                    "url varchar(500) unique not null check(url <> '')",
+                    'id bigserial primary key',
+                    "url varchar(1500) unique not null check(url <> '')",
                     'created_on timestamp'
                 ]
             )
         })
 
-        table2 = self.CREATE_TABLE.format_map(**{
+        table2 = self.CREATE_TABLE.format(**{
             'table': 'spider.url_cache',
             'columns': self.comma_join(
                 [
-                    'id integer primary key',
-                    "url varchar(500) unique not null check(url <> '')",
-                    'visited boolean default 0'
+                    'id bigserial primary key',
+                    "url varchar(1500) unique not null check(url <> '')",
+                    'visited boolean default false',
                     'created_on timestamp'
                 ]
             )
         })
 
         transaction = self.TRANSACTION.format(**{
-            'sql': self.join_tokens(table1, finalize_each=True)
+            'sql': self.join_tokens(table1, table2, finalize_each=True)
         })
 
-        cursor = connection.cursor()
-        cursor.execute(self.finalize(transaction))
-
+        cursor.execute(transaction)
+        connection.commit()
         cursor.close()
-        return True
 
     def select_sql(self, table):
         return self.SELECT.format_map(**{'table': table})
 
-    def create_sql(self, table, column, value):
-        return 
-    
-    def insert_sql(self, table, columns=[], values=[]):
-        columns = self.comma_join(columns)
-        values = self.comma_join(self.quote_values(*values))
-        return self.INSERT.format(table=table, columns=columns, values=values)
+    def insert_sql(self, table, *values):
+        d = str(datetime.datetime.now().date())
+        data = [(str(value), False, d) for value in values]
 
-    def run_sql_statements(self, *tokens):
-        sql = self.join_tokens(*tokens)
-        cursor = self.storage_connection.cursor()
-        return cursor.execute(self.finalize(sql))
+        with self.get_cursor() as c:
+            sql = self.INSERT.format(**{
+                'table': f'{self.schema}.{table}',
+                'columns': self.join_tokens('url', 'visited', 'created_on', separator=', '),
+                'values': '%s, %s, %s'
+            })
+            on_conlict_sql = f'{sql} on conflict (url) do nothing'
+            c.executemany(on_conlict_sql, data)
+            self.storage_connection.commit()
 
-    def save(self, key, data, adapt_list=False, **kwargs):
-        return
+    async def save(self, key, data, adapt_list=False, **kwargs):
+        if key == f'{settings.CACHE_FILE_NAME}.json':
+            urls_to_visit = data['urls_to_visit']
+            visited_urls = data['visited_urls']
+            self.insert_sql('url_cache', urls_to_visit)
+        elif key == 'seen_urls.csv':
+            self.insert_sql('url_cache', data)
 
-    def visited_urls(self, state=True):
-        select_sql = self.select_sql('url_cache')
-        condition = self.build_condition(visited=state)
-        where_condition = self.WHERE_CONDITION.format(condition=condition)
-        return self.run_sql_statements(select_sql, where_condition)
+    # def create_sql(self, table, column, value):
+    #     return
+
+    # def insert_sql(self, table, columns=[], values=[]):
+    #     columns = self.comma_join(columns)
+    #     values = self.comma_join(self.quote_values(*values))
+    #     return self.INSERT.format(table=table, columns=columns, values=values)
+
+    # def run_sql_statements(self, *tokens):
+    #     sql = self.join_tokens(*tokens)
+    #     cursor = self.storage_connection.cursor()
+    #     return cursor.execute(self.finalize(sql))
+
+    # def save(self, key, data, adapt_list=False, **kwargs):
+    #     return
+
+    # def visited_urls(self, state=True):
+    #     select_sql = self.select_sql('url_cache')
+    #     condition = self.build_condition(visited=state)
+    #     where_condition = self.WHERE_CONDITION.format(condition=condition)
+    #     return self.run_sql_statements(select_sql, where_condition)

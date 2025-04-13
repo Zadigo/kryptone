@@ -1,22 +1,21 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
-from math import log
-from collections import Counter
-import pandas as pd
-import numpy as np
 import asyncio
 import json
 import re
 import unicodedata
 from collections import Counter, defaultdict, deque
 from functools import cached_property
+from math import log
 
 import kagglehub
+import numpy as np
 import pandas
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from kagglehub import KaggleDatasetAdapter
 from matplotlib import pyplot
 from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from kryptone.conf import settings
 from kryptone.utils.date_functions import get_current_date
