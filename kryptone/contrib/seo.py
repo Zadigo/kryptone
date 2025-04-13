@@ -1,14 +1,22 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
+from math import log
+from collections import Counter
+import pandas as pd
+import numpy as np
 import asyncio
 import json
 import re
-import time
+import unicodedata
 from collections import Counter, defaultdict, deque
 from functools import cached_property
-from string import Template
 
+import kagglehub
+import pandas
 import requests
 from bs4 import BeautifulSoup
+from kagglehub import KaggleDatasetAdapter
 from matplotlib import pyplot
+from nltk.corpus import stopwords
 
 from kryptone.conf import settings
 from kryptone.utils.date_functions import get_current_date
@@ -28,64 +36,211 @@ def long_text_processor(tokens):
         return False
 
 
+class TFIDFProcessor:
+    """A class to calculate TF-IDF scores for documents and provide various
+    utilities for text processing based on these scores"""
+
+    def __init__(self, documents=None):
+        self.documents = documents or []
+        self.vocabulary = set()
+        self.idf_values = {}
+        self.tfidf_matrix = None
+        self.feature_names = []
+
+    def add_documents(self, documents):
+        """Add documents to the collection"""
+        if isinstance(documents, str):
+            self.documents.append(documents)
+        else:
+            self.documents.extend(documents)
+
+    def _calculate_tf(self, document):
+        """Calculate term frequencies for 
+        a single document"""
+        if isinstance(document, str):
+            tokens = document.lower().split()
+        else:
+            tokens = [t.lower() for t in document]
+
+        # Count the occurrences of each token
+        term_counts = Counter(tokens)
+        total_terms = len(tokens)
+
+        tf_dict = {
+            term: count/total_terms for term,
+                count in term_counts.items()
+        }
+        return tf_dict
+
+    def _calculate_idf(self):
+        """Calculate inverse document frequency for 
+        all terms in the vocabulary"""
+        # Count the number of documents 
+        # that contain each term
+        n_documents = len(self.documents)
+        document_frequency = Counter()
+
+        for document in self.documents:
+            if isinstance(document, str):
+                # If it's a string, tokenize and make
+                #  a set of unique tokens
+                unique_terms = set(document.lower().split())
+            else:
+                # If it's already tokenized, just make a set of unique tokens
+                unique_terms = set(t.lower() for t in document)
+
+            # Update the document frequency counter
+            for term in unique_terms:
+                document_frequency[term] += 1
+                self.vocabulary.add(term)
+
+        # Calculate IDF for each term
+        self.idf_values = {
+            term: log(n_documents / (1 + freq)) 
+                for term, freq in document_frequency.items()
+        }
+
+        return self.idf_values
+
+    def compute_tfidf(self):
+        """Compute TF-IDF scores for all documents"""
+        # Ensure IDF values are calculated
+        if not self.idf_values:
+            self._calculate_idf()
+
+        # Compute TF-IDF for each document
+        tfidf_documents = []
+
+        for document in self.documents:
+            tf_values = self._calculate_tf(document)
+            tfidf_dict = {
+                term: tf * self.idf_values.get(term, 0)
+                for term, tf in tf_values.items()
+            }
+            tfidf_documents.append(tfidf_dict)
+
+        return tfidf_documents
+
+    def compute_tfidf_matrix(self):
+        """Compute the TF-IDF matrix using scikit-learn"""
+        vectorizer = TfidfVectorizer()
+        self.tfidf_matrix = vectorizer.fit_transform(self.documents)
+        self.feature_names = vectorizer.get_feature_names_out()
+        return self.tfidf_matrix
+
+    def filter_tokens_by_tfidf(self, document_idx, top_n=None, threshold=None):
+        """
+        Filter tokens in a document based on their TF-IDF scores
+        
+        Args:
+            document_idx: Index of the document in the collection
+            top_n: Keep only the top N tokens by TF-IDF score
+            threshold: Keep only tokens with TF-IDF score above this threshold
+        """
+        # Ensure TF-IDF matrix is computed
+        if self.tfidf_matrix is None:
+            self.compute_tfidf_matrix()
+
+        # Get the TF-IDF scores for the specified document
+        tfidf_scores = self.tfidf_matrix[document_idx].toarray()[0]
+
+        # Create a dictionary mapping terms 
+        # to their TF-IDF scores
+        term_scores = {
+            self.feature_names[i]: score
+                for i, score in enumerate(tfidf_scores)
+                    if score > 0  # Only include terms that actually appear in the document
+        }
+
+        # Filter tokens based on parameters
+        if threshold is not None:
+            filtered_terms = {
+                term: score for term, score in term_scores.items()
+                if score >= threshold
+            }
+        elif top_n is not None:
+            filtered_terms = dict(
+                sorted(term_scores.items(),
+                       key=lambda x: x[1], reverse=True)[:top_n]
+            )
+        else:
+            # Default to returning all terms with their scores
+            filtered_terms = term_scores
+
+        # Return the document with only the filtered terms
+        if isinstance(self.documents[document_idx], str):
+            tokens = self.documents[document_idx].lower().split()
+        else:
+            tokens = [t.lower() for t in self.documents[document_idx]]
+
+        return [token for token in tokens if token in filtered_terms]
+
+    def get_top_terms(self, document_idx, n=10):
+        """
+        Get the top N terms for a document based on TF-IDF scores.
+        
+        Args:
+            document_idx: Index of the document in the collection
+            n: Number of top terms to return
+            
+        Returns:
+            A list of (term, score) tuples sorted by decreasing score
+        """
+        # Ensure TF-IDF matrix is computed
+        if self.tfidf_matrix is None:
+            self.compute_tfidf_matrix()
+
+        # Get the TF-IDF scores for the specified document
+        tfidf_scores = self.tfidf_matrix[document_idx].toarray()[0]
+
+        # Create a list of (term, score) tuples
+        term_scores = [
+            (self.feature_names[i], score)
+            for i, score in enumerate(tfidf_scores)
+            if score > 0  # Only include terms that actually appear in the document
+        ]
+
+        # Sort by decreasing score and return the top N
+        return sorted(term_scores, key=lambda x: x[1], reverse=True)[:n]
+
+    def preprocess_text_with_tfidf(self, keep_top_n=None, min_tfidf=None):
+        """
+        Process all documents by filtering tokens based on TF-IDF scores.
+        
+        Args:
+            keep_top_n: Keep only the top N tokens by TF-IDF score in each document
+            min_tfidf: Keep only tokens with TF-IDF score above this threshold
+            
+        Returns:
+            A list of processed documents (as lists of tokens)
+        """
+        processed_documents = []
+        for i in range(len(self.documents)):
+            filtered_tokens = self.filter_tokens_by_tfidf(
+                i, 
+                top_n=keep_top_n, 
+                threshold=min_tfidf
+            )
+            processed_documents.append(filtered_tokens)
+
+        return processed_documents
+
+
 class TextMixin:
-    page_documents = []
-    fitted_page_documents = []
-    text_processors = [long_text_processor]
-
-    @cached_property
-    def stop_words_html(self):
-        global_path = settings.GLOBAL_KRYPTONE_PATH
-        filename = global_path / 'data/html_tags.txt'
-        return read_document(filename, as_list=True)
-
-    @staticmethod
-    def tokenize(text):
-        return text.split(' ')
-
-    def stop_words(self, language='en'):
-        global_path = settings.GLOBAL_KRYPTONE_PATH
-        if language == 'en':
-            file_language = 'english'
-        elif language == 'fr':
-            file_language = 'french'
-        filename = global_path / f'data/stop_words_{file_language}.txt'
-        return read_document(filename, as_list=True)
-
-    def _common_words(self, tokens):
-        counter = Counter(tokens)
-        return counter.most_common()[1:5]
-
-    def _rare_words(self, tokens):
-        counter = Counter(tokens)
-        return counter.most_common()[:-5:-1]
-
-    def _remove_stop_words(self, tokens, language='en'):
-        """Removes all stop words from a given document"""
-        stop_words = self.stop_words(language=language)
-        return list((token for token in tokens if token not in stop_words))
-
-    def _remove_stop_words_multipass(self, tokens):
-        """Remove stop words from a given document
-        against both french and english language, and,
-        html tags that can pollute a document"""
-        english_stop_words = self.stop_words(language='en')
-        french_stop_words = self.stop_words(language='fr')
-        html_stop_words = self.stop_words_html
-
-        stop_words = english_stop_words + french_stop_words + html_stop_words
-        return list((token for token in tokens if token not in stop_words))
+    nltk_downloads = False
+    text_processsors = [long_text_processor]
 
     def get_page_text(self):
-        """Returns a raw extraction of 
+        """Returns a raw extraction of
         the document's text"""
-        script = """
-        return document.body.outerHTML
-        """
-        html = self.driver.execute_script(script)
-        soup = BeautifulSoup(html, 'html.parser')
-        script_tags = [tag.extract() for tag in soup.find_all('script')]
-        # return self.fit(soup.text)
+        script = """return document.body.outerHTML"""
+        html_content = self.driver.execute_script(script)
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Remove all script tags from the body
+        for tag in soup.find_all('script'):
+            tag.extract()
+
         return soup.text
 
     def run_processors(self, tokens):
@@ -99,55 +254,69 @@ class TextMixin:
                 result = list(filter(processor, tokens))
         return result
 
-    def fit_transform(self, text, language='en', email_exception=False):
-        text = self.fit(
-            text,
-            language=language,
-            email_exception=email_exception
-        )
+    def fit_transform(self, text, language='english', keep_emails=False):
+        """Fit transform tokenizes the text and removes all stop
+        words. This function does structural destrctive changes to 
+        the oringal text. The text is then run through the text processors"""
+        import nltk
+        from nltk.tokenize import word_tokenize
 
-        tokens = text.split(' ')
-        clean_tokens = list((
-            token for token in tokens
-            if token not in self.stop_words(language='fr'))
-        )
-        text = ' '.join(clean_tokens)
-        return text, clean_tokens
+        abbreviations = None
 
-    def fit(self, raw_text, email_exception=False, use_multipass=False, language='en'):
-        """Normalize the document by removing newlines,
-        useless spaces, special characters, punctuations 
-        and null values. The fit method fits the text 
-        before running in depth transformation"""
+        if not self.nltk_downloads:
+            nltk.download('punkt')
+            nltk.download('stopwords')
+            nltk.download('wordnet')
+            nltk.download('punkt_tab')
+            nltk.download('omw-1.4')
+
+            path = kagglehub.dataset_download('johnpendenque/french-abbreviations')
+            abbreviations = pandas.read_csv(path)
+
+            self.nltk_loaded = True
+
+        text = self.fit(text, language=language, keep_emails=keep_emails)
+        tokens = word_tokenize(text.lower(), language=language)
+
+        french_stop_words = set(stopwords.words('french'))
+        # The text might have english words so just in case
+        # remove them from the orginal text
+        english_stop_words = set(stopwords.words('english'))
+        stop_words = french_stop_words.union(english_stop_words)
+
+        # Final tokens
+        clean_tokens = [token for token in tokens if token not in stop_words]
+
+        common_words = self._get_common_words(clean_tokens, limit=10)
+
+        return ' '.join(clean_tokens)
+
+    def fit(self, raw_text, **kwargs):
+        """"Fit the text by removing unwanted tokens,
+        normalizing the text and removing punctuation"""
         if raw_text is None:
             return None
 
-        from nltk.tokenize import LineTokenizer, SpaceTokenizer
+        keep_emails = kwargs.get('keep_emails', False)
 
-        tokenizer = LineTokenizer()
-        tokens = tokenizer.tokenize(raw_text)
+        # Remove special formatting and markup
+        # Remove references like (en), (d), etc.
+        clean_text = re.sub(r'\([^)]*\)', '', raw_text)
 
-        text = ' '.join(tokens)
-        no_punctuation_text = remove_punctuation(
-            text, email_exception=email_exception)
+        # Remove square brackets and their contents
+        clean_text = re.sub(r'\[[^]]*\]', '', clean_text)
 
-        tokenizer = SpaceTokenizer()
-        tokens = tokenizer.tokenize(no_punctuation_text)
+        # Handle unicode characters and accents
+        clean_text = unicodedata.normalize('NFKD', clean_text)
+        clean_text = clean_text.encode('ASCII', 'ignore').decode('utf-8')
 
-        # If a text can contain both english
-        # and french, use the multipass to
-        # remove both fr/en stop words
-        if use_multipass:
-            tokens = self._remove_stop_words_multipass(tokens)
-        else:
-            tokens = self._remove_stop_words(tokens, language=language)
+        # Handle punctionation in the text - layer 1
+        clean_text = remove_punctuation(
+            clean_text, keep=['@'], email_exception=keep_emails)
 
-        lowered_tokens = list((token.lower() for token in tokens))
-        lowered_tokens = self.run_processors(lowered_tokens)
-
-        final_text = ' '.join(lowered_tokens).strip()
-        self.fitted_page_documents.extend([final_text])
-        return final_text
+        # Remove numbers and punctuation - layer 2
+        clean_text = re.sub(r'[^\w\s]', ' ', clean_text)
+        return clean_text
 
 
 class SEOMixin(TextMixin):
@@ -467,95 +636,3 @@ class EmailMixin(TextMixin):
         """Return emails present in links"""
         emails_from_urls = map(self.parse_url, elements)
         return set(emails_from_urls)
-
-
-class ScrollMixin:
-    """A mixin that implements special scrolling
-    functionnalities to the spider"""
-
-    def scroll_window(self, wait_time=5, increment=1000, stop_at=None):
-        """Scrolls the entire window by incremeting the current
-        scroll position by a given number of pixels"""
-        can_scroll = True
-        new_scroll_pixels = 1000
-
-        while can_scroll:
-            scroll_script = f"""window.scroll(0, {new_scroll_pixels})"""
-
-            self.driver.execute_script(scroll_script)
-            # Scrolls until we get a result that determines that we
-            # have actually scrolled to the bottom of the page
-            has_reached_bottom = self.driver.execute_script(
-                """return (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 100)"""
-            )
-            if has_reached_bottom:
-                can_scroll = False
-
-            current_position = self.driver.execute_script(
-                """return window.scrollY"""
-            )
-            if stop_at is not None and current_position > stop_at:
-                can_scroll = False
-
-            new_scroll_pixels = new_scroll_pixels + increment
-            time.sleep(wait_time)
-
-    def scroll_page_section(self, xpath=None, css_selector=None):
-        """Scrolls a specific portion on the page"""
-        if css_selector:
-            selector = """const mainWrapper = document.querySelector('{condition}')"""
-            selector = selector.format(condition=css_selector)
-        else:
-            # selector = self.evaluate_xpath(xpath)
-            # selector = """const element = document.evaluate("{condition}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null)"""
-            # selector = selector.format(condition=xpath)
-            pass
-
-        body = """
-        const elementToScroll = mainWrapper.querySelector('div[tabindex="-1"]')
-
-        const elementHeight = elementToScroll.scrollHeight
-        let currentPosition = elementToScroll.scrollTop
-
-        // Indicates the scrolling speed
-        const scrollStep = Math.ceil(elementHeight / {scroll_step})
-
-        currentPosition += scrollStep
-        elementToScroll.scroll(0, currentPosition)
-
-        return [ currentPosition, elementHeight ]
-        """.format(scroll_step=self.default_scroll_step)
-
-        script = css_selector + '\n' + body
-        return script
-
-    def scroll_into_view(self, css_selector):
-        """Scrolls directly into an element of the page"""
-        script = """
-        const el = document.querySelector('$css_selector')
-        el.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' })
-        """
-        template = Template(script)
-        script = template.substitute(**{'css_selector': css_selector})
-        self.driver.execute_script(script)
-
-# class TestClass(TextMixin):
-#     def __init__(self):
-#         self.driver = None
-
-#     def start(self):
-#         self.driver = get_selenium_browser_instance(browser_name='Edge')
-#         self.driver.get('https://www.noiise.com/agences/lille/')
-#         print(self.fit_transform())
-#         time.sleep(10)
-
-
-# c = TestClass()
-# # c.start()
-
-# response = requests.get('https://www.noiise.com/agences/lille/')
-# s = BeautifulSoup(response.content, 'html.parser')
-# r = [tag.extract() for tag in s.find_all('script')]
-# m = TextMixin()
-# text, tokens = m.fit_transform(text=s.text)
-# print(text)
