@@ -301,7 +301,7 @@ class BaseCrawler(metaclass=Crawler):
         return urlunparse((
             self.start_url.url_object.scheme,
             self.start_url.url_object.netloc,
-            None,
+            '',
             None,
             None,
             None
