@@ -426,6 +426,25 @@ class URL:
             return True
         return False
 
+    def multi_test_path(self, regexes, operator='and'):
+        """Test if the url's path passes test. Only the
+        path is used to perform the test
+
+        >>> instance = URL('http://example.com/a')
+        ... instance.multi_test_path([r'\/a', r'\/b'])
+        ... True
+        """
+        truth_array = []
+        for regex in regexes:
+            truth_array.append(self.test_path(regex))
+        
+        if operator == 'and':
+            return all(truth_array)
+        elif operator == 'or':
+            return any(truth_array)
+        else:
+            raise ValueError('Operator is not valid')
+
     def decompose_path(self, exclude=[]):
         """Decomposes an url's path
 
