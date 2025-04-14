@@ -152,6 +152,9 @@ class URL:
 
     @property
     def is_social_link(self):
+        if self.is_empty:
+            return False
+        
         return any([
             'facebook.com' in self.raw_url,
             'twitter.com' in self.raw_url,
@@ -164,14 +167,22 @@ class URL:
 
     @property
     def is_empty(self):
-        return self.raw_url == ''
+        return any([
+            self.raw_url == '',
+            self.raw_url is None
+        ])
 
     @property
     def is_path(self):
+        if self.is_empty:
+            return False
         return self.raw_url.startswith('/')
 
     @property
     def is_image(self):
+        if self.is_empty:
+            return False
+        
         if self.as_path.suffix != '':
             suffix = self.as_path.suffix.removeprefix('.')
             if suffix in constants.IMAGE_EXTENSIONS:
@@ -180,7 +191,7 @@ class URL:
 
     @property
     def is_valid(self):
-        if self.raw_url is None:
+        if self.is_empty:
             return False
 
         return any([
@@ -191,6 +202,9 @@ class URL:
 
     @property
     def has_fragment(self):
+        if self.is_empty:
+            return False
+        
         return any([
             self.url_object.fragment != '',
             self.raw_url.endswith('#')
@@ -198,6 +212,9 @@ class URL:
 
     @property
     def as_dict(self):
+        if self.is_empty:
+            return {}
+        
         return {
             'url': self.raw_url,
             'is_valid': self.is_valid
@@ -205,18 +222,30 @@ class URL:
 
     @property
     def has_path(self):
+        if self.is_empty:
+            return False
+        
         return self.url_object.path != ''
 
     @property
     def has_query(self):
+        if self.is_empty:
+            return False
+        
         return self.url_object.query != ''
 
     @property
     def is_image(self):
+        if self.is_empty:
+            return False
+        
         return self.as_path.suffix in load_image_extensions()
 
     @property
     def is_file(self):
+        if self.is_empty:
+            return False
+        
         extension = self.as_path.suffix
 
         if extension == '':
@@ -228,6 +257,9 @@ class URL:
 
     @property
     def as_path(self):
+        if self.is_empty:
+            return None
+        
         # Rebuild the url without the query
         # part since it's not important for
         # the path resolution
@@ -239,24 +271,39 @@ class URL:
 
     @property
     def url_path(self):
+        if self.is_empty:
+            return None
+        
         return unquote_plus(self.url_object.path)
 
     @property
     def get_extension(self):
+        if self.is_empty:
+            return None
+        
         if self.is_file:
             return self.as_path.suffix
         return None
 
     @property
     def url_stem(self):
+        if self.is_empty:
+            return None
+        
         return self.as_path.stem
 
     @property
     def is_secured(self):
+        if self.is_empty:
+            return False
+        
         return self.url_object.scheme == 'https'
 
     @property
     def query(self):
+        if self.is_empty:
+            return None
+        
         return parse_qs(self.url_object.query)
 
     @property
