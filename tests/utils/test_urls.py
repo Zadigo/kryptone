@@ -50,9 +50,40 @@ class TestUrl(unittest.TestCase):
         result = self.instance.capture(r'[a-z]+\-(\d+)')
         self.assertTrue(result.group(1) == '2836888')
 
-    def test_test_path(self):
+    def test_testing_path_regex(self):
         result = self.instance.test_path(r'[a-z]+\-(\d+)')
         self.assertTrue(result)
+
+        # Check that / and and /1 for example are matched
+        # differently by the function
+        url = URL('http://example.com/1')
+        result = url.test_path(r'\d+')
+        self.assertTrue(result, 'Path should be matched as a digit')
+
+        result = url.test_path(r'\/')
+        self.assertTrue(result, 'Path should not be matched as /')
+
+    def test_test_multiple_paths(self):
+        regexes = [r'\d+']
+
+        url = URL('http://example.com/1')
+        result = url.multi_test_path(regexes, operator='and')
+        self.assertTrue(result, 'Path should be a digit')
+
+        url = URL('http://example.com')
+        result = url.multi_test_path(regexes, operator='and')
+        self.assertFalse(result, 'Path should not be a digit')
+
+        regexes = [r'\d+', r'fast\-\d+']
+
+        url = URL('http://example.com/1')
+        result = url.multi_test_path(regexes, operator='and')
+        self.assertFalse(result, 'Path should be a digit and fast-1')
+
+        regexes = [r'\/$', r'\d+']
+        url = URL('http://example.com/1')
+        result = url.multi_test_path(regexes, operator='or')
+        self.assertTrue(result, 'Path should be either / or a digit')
 
     def test_is_path(self):
         self.assertFalse(self.instance.is_path)

@@ -236,12 +236,6 @@ INVALID_URLS = [
 ]
 
 
-# class MySpider(SiteCrawler):
-#     class Meta:
-#         debug_mode = True
-#         start_urls = ['https://example.com']
-
-
 class TestSpider(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -302,10 +296,55 @@ class TestSpider(unittest.TestCase):
         self.assertFalse(self.spider.start(self.start_urls))
         self.mocked_edge.get.assert_called_once_with(self.start_urls[0])
 
-    def test_collect_page_urls(self):
+    @patch.object(SiteCrawler, 'collect_page_urls')
+    @patch.object(URL, 'is_same_domain', return_value=True)
+    def test_collect_page_urls(self, mock_collect_page_urls, mock_is_same_domain):
+        mock_collect_page_urls.return_value = VALID_URLS + INVALID_URLS
         urls = self.spider.collect_page_urls()
+        self.spider.start_url = URL('http://example.com/')
+        self.spider.add_urls(urls)
+
+        for url in self.spider.urls_to_visit:
+            with self.subTest(url=url):
+                self.assertNotIn(url, INVALID_URLS)
+
+    def test_url_collection_with_different_domains(self):
+        urls = [
+            URL('http://example.com/product-1'),
+            URL('http://ecommerce.com/product-1')
+        ]
+
+        self.spider.start_url = URL('http://example.com/')
+        self.spider.add_urls(urls)
+        self.assertIn(urls[0], self.spider.urls_to_visit)
+
+    def test_collect_page_urls_with_url_gather_ignore_tests(self):
+        collected_urls = [
+            URL('http://example.com/product-1'),
+            URL('http://example.com/product-2'),
+            URL('http://example.com/2')
+        ]
+
+        self.spider.start_url = URL('http://example.com/')
+        self.spider._meta.url_gather_ignore_tests.append(r'/product-\d+')
+
+        self.spider.add_urls(collected_urls)
+
+        for url in self.spider.urls_to_visit:
+            with self.subTest(url=url):
+                self.assertIn(
+                    url,
+                    [URL('http://example.com/2')],
+                    'Url should not have been selected'
+                )
+
+    def test_collectct_page_urls_with_url_ignore_tests(self):
+        pass
 
     def test_collect_page_urls_with_limit_to(self):
+        pass
+
+    def test_collect_page_urls_with_url_rule_tests(self):
         pass
 
     @patch('requests.get')

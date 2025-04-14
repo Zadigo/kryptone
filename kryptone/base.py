@@ -590,7 +590,15 @@ class BaseCrawler(metaclass=Crawler):
 
         # rename to: ignore_page_tests
         if self._meta.url_gather_ignore_tests:
-            pass
+            raw_urls_objs = list(
+                filter(
+                    lambda x: not x.multi_test_path(
+                        self._meta.url_gather_ignore_tests, 
+                        operator='or'
+                    ),
+                    raw_urls_objs
+                )
+            )
 
         valid_urls = set()
         invalid_urls = set()

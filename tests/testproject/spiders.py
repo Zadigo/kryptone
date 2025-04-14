@@ -1,6 +1,6 @@
 from kryptone.base import SiteCrawler
 from kryptone import logger
-
+from kryptone.utils.urls import LoadStartUrls
 
 class ExampleSpider(SiteCrawler):
     class Meta:
