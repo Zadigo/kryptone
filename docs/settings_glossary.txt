@@ -1,0 +1,83 @@
+## Settings
+
+You can specify a wait time for which the web scrapper is supposed to wait until going to the next page.
+
+__PROJECT_PATH__
+
+Determines the absolute path to the local project directory
+
+__WEBDRIVER__
+
+The browser's name to use for crawling pages. Default is `Chrome`
+
+__MEDIA_FOLDER__
+
+The name of the media folder to use for storing images, screenshots or other data files
+
+__WAIT_TIME__
+
+Specifies the amount of time (in seconds) the web scraper should wait before navigating to the next page.
+
+__WAIT_TIME_RANGE__
+
+Specifies a random amount of time (in seconds) within a range that the web scraper should wait before navigating to the next page.
+
+__CACHE_FILE_NAME__
+
+The name of the cache file to use for storing visited urls and urls to visit
+
+__ACTIVE_STORAGE_BACKENDS__
+
+A list of backend settings used to establish connections to storage systems.
+
+__STORAGE_BACKENDS__
+
+List of backends settings to establish connections
+
+__EMAIL_HOST__
+
+Specifies the host name or IP address of the email server for sending emails.
+
+__EMAIL_PORT__
+
+Specifies the port number of the email server.
+
+__EMAIL_HOST_USER__
+
+Specifies the username for authenticating with the email server.
+
+__EMAIL_HOST_PASSWORD__
+
+Specifies the password for authenticating with the email server.
+
+__EMAIL_USE_TLS__
+
+Specifies whether to use TLS (Transport Layer Security) when connecting to the email server.
+
+__DEFAULT_FROM_EMAIL__
+
+Specifies the default sender email address used when sending emails.
+
+__WEBSITE_LANGUAGE__
+
+Specifies the language of the visited website.
+
+__HEADLESS__
+
+Whether to launch the browser in headless mode
+
+__LOAD_IMAGES__
+
+Specifies whether to launch the browser in headless mode (without a graphical interface).
+
+__LOAD_JS__
+
+Specifies whether to load JavaScript scripts on web pages.
+
+__USE_PROXY_ADDRESS__
+
+Specifies whether Selenium should use a proxy address for browsing.
+
+__PROXY_IP_ADDRESS__
+
+Specifies the IP address of the proxy server to use.

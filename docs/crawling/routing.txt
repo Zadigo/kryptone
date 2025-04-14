@@ -1,0 +1,25 @@
+Based on certain identified paths of a website, you might want to direct to a specific logic contained in a definition of the crawler. Using a `Router` allows these specific kinds of actions.
+
+## Defining a Router
+
+```python
+from kryptone.base import SiteCrawler
+from kryptone.routing import Router
+
+class EcommerceCrawler(SiteCrawler):
+    start_url = 'https://www.examplecom/'
+
+    class Meta:
+        router = Router([
+            route('route1', regex=r'femme\_\d+$'),
+            route('route2', regex=r'[a-z\-]+\_[A-Z\d+]+$')
+        ])
+
+    def route1(self, current_url, **kwargs):
+        pass
+
+    def route2(self, current_url, **kwargs):
+        pass
+```
+
+Using the example above, we would like to route to a specific logic depending whether we are dealing with a products page or a product page. We can identify these routes either by using the `regex` or the `path` parameter depending on whether the url path is complex or not.

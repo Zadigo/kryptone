@@ -1,0 +1,53 @@
+Your project can be managed through different commands that we will be discussing below.
+
+## Filter cache
+
+This command will filter and irreversibly exclude the urls that match the filter from the `urls_to_visit`
+
+```python
+> python manage.py filter_cache .jpeg
+```
+
+This will remove all the urls that contain ``.jpeg`
+
+## Reorder
+
+This command will reorder the `urls_to_visit` based on the specicified regex. The urls that match will be on top the list
+
+```python
+> python manage.py reorder \/products\/d+
+```
+
+## Reset
+
+This command will reset all the files of your project.
+
+## Runserver
+
+## Send webhooks
+
+This command will send the collected data to the webhooks specified in your `settings.py` file
+
+## Start json
+
+This command will start a `JSONCrawler` spider.
+
+## Start project
+
+This command will start a new Kryptone project in the current folder
+
+## Start
+
+This command will start the spider specified within the project
+
+```python
+> python manage.py start MySpider
+```
+
+## Test project
+
+This command will test the integrity of a project by running all the specified checks
+
+## Test run
+
+This command will both test the integrity of a project by running all the specified checks and all validity of the user actions specified in `run_actions`
