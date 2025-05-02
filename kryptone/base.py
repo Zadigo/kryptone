@@ -465,6 +465,8 @@ class BaseCrawler(metaclass=Crawler):
             data = [data]
 
         instance_fields = dataclasses.fields(self.model)
+        # TODO: Try catch to raise error detail when user
+        # is trying to save with non-model keys
         instances = map(lambda x: self.model(**x), data)
 
         for instance in instances:
