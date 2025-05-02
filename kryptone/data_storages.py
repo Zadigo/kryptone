@@ -169,6 +169,10 @@ class FileStorage(BaseStorage):
     async def get_file(self, filename):
         """Return a file from the storage. The extension
         of the filename should be specified"""
+        # TODO: Instead of raising a dry error if the
+        # file does not exist, create the file, reload
+        # the storage and return the newly created item -;
+        # we can also create the file in memory 
         return self.storage[filename]
 
     async def save_or_create(self, filename, data, **kwargs):
