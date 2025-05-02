@@ -29,6 +29,10 @@ class Logger:
         # log files since they are not correctly parsed
         
         def remove_ansi(text):
+            # FIXME: Text could be an exception and that
+            # case we have to return the object directly
+            if not isinstance(text, str):
+                return text
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             return ansi_escape.sub('', text)
 
