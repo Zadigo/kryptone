@@ -60,11 +60,9 @@ class BaseStorage:
         return data
 
     def initialize(self):
-        """A hook function that can be used to
+        """A hook function that used to
         preload data (for example files) in the
-        storage container. This hook should be
-        called also when creating new files in
-        the storage in order to keep track"""
+        storage container"""
         return NotImplemented
 
     async def has(self, key):
@@ -146,6 +144,11 @@ class FileStorage(BaseStorage):
         return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
 
     def initialize(self):
+        """A hook function that used to
+        preload data (for example files) in the
+        storage container. This hook should be
+        called also when creating new files in
+        the storage in order to keep track"""
         items = self.storage_path.glob('**/*')
         for item in items:
             if not item.is_file():
@@ -592,10 +595,10 @@ class PostGresStorage(BaseStorage):
         connection.commit()
         cursor.close()
 
-    def select_sql(self, table):
+    def select_sql(self, table: str):
         return self.SELECT.format_map(**{'table': table})
 
-    def insert_sql(self, table, *values):
+    def insert_sql(self, table: str, *values: str | URL):
         d = str(datetime.datetime.now().date())
         data = [(str(value), False, d) for value in values]
 

@@ -1,7 +1,7 @@
-from kryptone import logger
 from unittest import TestCase
 
-from utils.text import LogStyle, color_text
+from kryptone import logger
+from kryptone.utils.text import LogStyle, color_text
 
 
 class TestLogging(TestCase):

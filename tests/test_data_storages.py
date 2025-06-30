@@ -1,14 +1,17 @@
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 from urllib.parse import urljoin
 from uuid import uuid4
+import pathlib
+
+import csv
+from selenium.webdriver import Edge
 
 from kryptone.base import SiteCrawler
 from kryptone.conf import settings
 from kryptone.data_storages import (ApiStorage, BaseStorage, File, FileStorage,
                                     PostGresStorage, RedisStorage)
 from kryptone.utils.urls import URL
-from selenium.webdriver import Edge
 
 
 class TestBaseStorage(IsolatedAsyncioTestCase):
@@ -22,20 +25,44 @@ class TestBaseStorage(IsolatedAsyncioTestCase):
 class TestFileStorage(IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        cls.media_path = settings.GLOBAL_KRYPTONE_PATH.parent.joinpath(
+        cls.media_path: pathlib.Path = settings.GLOBAL_KRYPTONE_PATH.parent.joinpath(
             'tests',
             'testproject',
             'media'
         )
-        cls.instance = FileStorage(storage_path=cls.media_path)
+
+        cls.seen_urls_path = cls.media_path.joinpath('seen_urls.csv')
+        cls.performance_path = cls.media_path.joinpath('performance.json')
+
+        mock_spider = MagicMock(spec=SiteCrawler)
+        type(mock_spider).spider_uuid = PropertyMock(return_result='123')
+        cls.mock_spider = mock_spider
+
+        if not cls.media_path.exists():
+            cls.media_path.mkdir()
+
+            with open(cls.seen_urls_path, mode='w') as f:
+                writer = csv.writer(f)
+                writer.writerow(['urls'])
+
+        cls.instance = FileStorage(
+            spider=mock_spider, 
+            storage_path=cls.media_path
+        )
         cls.instance.initialize()
 
-    def test_object(self):
-        file = File(self.media_path.joinpath('seen_urls.csv'))
+    async def asyncTearDown(self):
+        files = self.media_path.glob('**/*')
+        for file in files:
+            file.unlink()
+        self.media_path.rmdir()
+
+    async def test_object(self):
+        file = File(self.seen_urls_path)
         self.assertTrue(file.is_csv)
         self.assertTrue(file == 'seen_urls.csv')
 
-    def test_global_function(self):
+    async def test_global_function(self):
         self.assertIn('performance.json', self.instance.storage)
 
     async def test_get_file(self):
@@ -56,11 +83,14 @@ class TestFileStorage(IsolatedAsyncioTestCase):
 
 class TestRedisStorage(IsolatedAsyncioTestCase):
     @classmethod
-    def setUpClass(cls, spider):
+    def setUpClass(cls):
         settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
-        cls.spider = spider
-        connection = RedisStorage(spider=spider)
-        cls.connection = connection
+        
+        mock_spider = MagicMock(spec=SiteCrawler)
+        type(mock_spider).spider_uuid = PropertyMock(return_result='123')
+        cls.spider = mock_spider
+
+        cls.connection = RedisStorage(spider=cls.spider)
 
     # def setUp(self):
     #     self.spider = None

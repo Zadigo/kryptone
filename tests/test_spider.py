@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
 from kryptone.base import SiteCrawler
 from kryptone.conf import settings
-from kryptone.utils.urls import URL
+from kryptone.utils.urls import URL, URLIgnoreTest
 
 VALID_URLS = [
     "http://www.example.com/",
@@ -336,8 +336,18 @@ class TestSpider(unittest.TestCase):
                     'Url should not have been selected'
                 )
 
-    def test_collectct_page_urls_with_url_ignore_tests(self):
-        pass
+    def test_collect_page_urls_with_url_ignore_tests(self):
+        collected_urls = [
+            URL('http://example.com/product-1'),
+            URL('http://example.com/product-2'),
+            URL('http://example.com/2')
+        ]
+        self.spider._meta.url_ignore_tests.append(URLIgnoreTest('base', paths=['/2']))
+        self.spider.add_urls(collected_urls)
+
+        for url in self.spider.urls_to_visit:
+            with self.subTest(url=url):
+                self.assertNotIn(collected_urls[-1], self.spider.urls_to_visit)
 
     def test_collect_page_urls_with_limit_to(self):
         pass

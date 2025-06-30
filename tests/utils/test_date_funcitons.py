@@ -1,7 +1,7 @@
 import datetime
 from unittest import TestCase
 
-from utils.date_functions import get_current_date, is_expired
+from kryptone.utils.date_functions import get_current_date, is_expired
 
 
 class TestDataFunctions(TestCase):
