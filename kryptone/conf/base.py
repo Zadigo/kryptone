@@ -102,7 +102,7 @@ PROXY_IP_ADDRESS = None
 # Example:
 
 # 'default': 'kryptone.data_storages.FileStorage',
-# 'backends': ['kryptone.data_storages.RedisStorage', 'kryptone.data_storages.AirtableStorage']
+# 'backends': [{'name': 'redis', 'storage': ''kryptone.data_storages.RedisStorage''}]
 STORAGES = {
     'default': 'kryptone.data_storages.FileStorage',
     'backends': []
@@ -144,3 +144,15 @@ STORAGE_MEMCACHE_HOST = '127.0.0.1'
 STORAGE_MEMCACHE_PORT = 11211
 
 STORAGE_MEMCACHE_LOAD_BALANCER = []
+
+# Storage settings for PG Admin
+
+STORAGE_POSTGRESQL_DB_NAME = None
+
+STORAGE_POSTGRESQL_USER = None
+
+STORAGE_POSTGRESQL_PASSWORD = None
+
+STORAGE_POSTGRESQL_HOST = None
+
+STORAGE_POSTGRESQL_PORT = 5432

@@ -33,13 +33,6 @@ class BaseModel:
     def set_collection_id(self, regex):
         return NotImplemented
 
-    def as_json(self):
-        """Return the object as dictionnary"""
-        item = {}
-        for field in self.fields:
-            item[field] = getattr(self, field)
-        return item
-
     def as_csv(self):
         def convert_values(field):
             value = getattr(self, field)
@@ -124,46 +117,3 @@ class Product(BaseModel):
         if self.id_or_reference is not None:
             return f'{name}_{self.id_or_reference}'
         return name
-
-
-@dataclasses.dataclass
-class GoogleBusiness(BaseModel):
-    name: str = None
-    url: str = None
-    feed_url: str = None
-    address: str = None
-    rating: str = None
-    latitude: int = None
-    longitude: int = None
-    number_of_reviews: int = None
-    additional_information: list = field(default_factory=list)
-    comments: str = field(default_factory=list)
-
-    def as_csv(self):
-        rows = []
-        for comment in self.comments:
-            row = [
-                self.name, self.url, self.address, self.rating,
-                self.number_of_reviews, comment['period'],
-                comment['text']
-            ]
-            rows.append(row)
-        header = [*self.fields, 'comment_period', 'comment_text']
-        return rows.insert(0, header)
-
-    def get_gps_coordinates_from_url(self, substitute_url=None):
-        result = re.search(
-            r'\@(\d+\.?\d+)\,?(\d+\.?\d+)',
-            substitute_url or self.feed_url
-        )
-        if result:
-            self.latitude = result.group(1)
-            self.longitude = result.group(2)
-            return result.groups()
-        return False
-
-
-@dataclasses.dataclass
-class GoogleSearch:
-    title: str
-    url: str

@@ -1,0 +1,108 @@
+Before URLs are added to the urls_to_visit container, they can undergo a filtering process based on user-defined criteria. This step allows users to selectively exclude certain pages deemed irrelevant for crawling or disregard specific sections of a page from which URLs should not be gathered.
+
+URL filtering, facilitated by classes such as `URLIgnoreTest` and `URLIgnoreRegexTest`, offers a means to refine the scope of a web crawl, ensuring that only pertinent URLs are considered for traversal.
+
+__Gathering__
+
+Urls are gathered and filtered in the following order:
+
+1. `restrict_search_to`: If specified, the urls the urls are gathered on this specific section of the page. When no urls are found in the specific section, all the urls of the page a returned by default
+2. `url_gather_ignore_tests`: Once the urls are collected, the regex ignore tests are applied
+3. Natural filtering is applied on invalid urls, fragments, queries if `ignore_queries` and/or images if `ignore_images` are specified
+4. Finally, `url_rule_tests` which only keeps the urls that match a specific regex pattern
+
+__Implementation__
+
+The filtering mechanism is integrated into the spider's configuration via the `Meta` option `url_ignore_tests`, which accepts a list of filtering rules. These rules, defined using instances of `URLIgnoreTest` or `URLIgnoreRegexTest`, specify criteria for URLs to be excluded from further traversal.
+
+```python
+from kryptone.base import SiteCrawler
+from kryptone.utils.urls import URLIgnoreTest, URLIgnoreRegexTest
+
+class MyWebScraper(SiteCrawler):
+    class Meta:
+        url_ignore_tests = [
+            URLIgnoreTest(name="Ignore Example Pages", paths=["/example"]),
+            URLIgnoreRegexTest(name="Ignore Numbers", regex=r"\/\d+")
+        ]
+```
+
+In this example, URLs containing "/example" in their path or numeric segments are filtered out, as specified by the defined rules.
+
+URL filtering enhances the precision and efficiency of web crawls, empowering you to extract targeted data while minimizing extraneous traversal by:
+
+* Focusing you crawling session on relevant content
+* Improving efficiency by excluding unnecessary pages
+* Providing flexibility to tailor crawling behavior based on specific requirements
+
+## URLIgnoreTest
+
+The URLIgnoreTest class provides a straightforward means to filter out URLs based on specific path criteria. For example, suppose we wish to avoid any URL containing `/shirts/`. We can achieve this by utilizing the paths parameter:
+
+```python
+from kryptone.base import SiteCrawler
+from kryptone.utils.urls import URLIgnoreTest
+
+class MyScrapper(SiteCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        url_ignore_tests = [
+            URLIgnoreTest('base_pages', paths=[
+                '/shirts/'
+            ])
+        ]
+```
+
+In the above example, any URL with `/shirts/` in its path will be excluded from further traversal. The paths parameter accepts a list of strings representing sections of a URL path to be matched for exclusion.
+
+## URLIgnoreRegexTest
+
+For more complex path matching requirements, the `URLIgnoreRegexTest` class offers a flexible solution. Suppose we need to exclude URLs matching a specific regex pattern, such as those starting with `/shirts/`. We can achieve this using the regex parameter:
+
+```python
+from kryptone.base import SiteCrawler
+from kryptone.utils.urls import URLIgnoreRegexTest
+
+class MyScrapper(SiteCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        url_ignore_tests = [
+            URLIgnoreRegexTest('base_pages', regex=r'^\/shirts\/')
+        ]
+```
+
+In this example, any URL matching the regex pattern `^\/shirts\/` will be excluded from the crawl. The regex parameter allows you to define custom regular expressions to precisely target URLs for exclusion.
+
+## Targeted URL Exclusion with URL Ignore Tests
+
+In addition to filtering URLs for traversal, you can instruct the spider to refrain from gathering URLs on specific pages.
+
+This capability allows for targeted exclusion of URLs from the crawling process. For instance, suppose we aim to prevent URL gathering on pages such as `http://example.com/product-1`. By implementing a regex pattern, the spider will disregard URL gathering on pages ending with `product-1` or `product-2`:
+
+```python
+class MyScrapper(SiteCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        url_gather_ignore_tests = [
+            'product\-\d+'
+        ]
+```
+
+## Selective URL inclusion with URL Rule Tests
+
+In scenarios where identifying specific URLs to exclude is impractical, the url_rule_tests feature provides a more flexible approach. By specifying regex patterns, users can instruct the spider to include only URLs that match these patterns in the list of URLs to visit. This method is particularly useful on websites with extensive page counts where manual exclusion of URLs is challenging.
+
+```python
+class MyScrapper(SiteCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        url_rule_tests = [
+            'product\-\d+'
+        ]
+```
+
+In the above example, only URLs matching the patterns specified in the `url_rule_tests` list, such as those ending with `product-1` or `product-2`, will be added to the list of URLs to visit. This approach streamlines the URL selection process, focusing the spider's efforts on relevant pages based on user-defined criteria.

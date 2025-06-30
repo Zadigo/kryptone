@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import pytz
 import requests
+from asgiref.sync import async_to_sync
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -32,6 +33,7 @@ from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL
 
 DEFAULT_META_OPTIONS = {
@@ -257,10 +259,15 @@ class BaseCrawler(metaclass=Crawler):
     additional_storages = []
 
     def __init__(self, browser_name=None):
+        # The start url which corresponds
+        # to the first url of "Meta.start_urls"
+        # allows us to track the domain to which
+        # crawling needs to be limited to
         self.start_url = None
+
         self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
-
+        
         if not self._meta.debug_mode:
             self.driver = get_selenium_browser_instance(
                 browser_name=browser_name or self.browser_name,
@@ -294,7 +301,7 @@ class BaseCrawler(metaclass=Crawler):
         return urlunparse((
             self.start_url.url_object.scheme,
             self.start_url.url_object.netloc,
-            None,
+            '',
             None,
             None,
             None
@@ -339,7 +346,12 @@ class BaseCrawler(metaclass=Crawler):
             inferred_filename = url.get_filename
             if inferred_filename is None:
                 logger.warning(
-                    "File name could not be infered from url. Using random characters")
+                    color_text(
+                        'yellow',
+                        "File name could not be infered "
+                        "from url. Using random characters"
+                    )
+                )
                 filename_attrs.update(suffix_with_date=True)
                 inferred_filename = create_filename(**filename_attrs)
             else:
@@ -386,7 +398,7 @@ class BaseCrawler(metaclass=Crawler):
             try:
                 response = requests.get(url)
             except:
-                logger.warning(f"Could not download image: {url}")
+                logger.warning(f"Could not download image: {color_text('red', url)}")
                 return False
             else:
                 if response.status_code == 200:
@@ -453,6 +465,8 @@ class BaseCrawler(metaclass=Crawler):
             data = [data]
 
         instance_fields = dataclasses.fields(self.model)
+        # TODO: Try catch to raise error detail when user
+        # is trying to save with non-model keys
         instances = map(lambda x: self.model(**x), data)
 
         for instance in instances:
@@ -467,24 +481,24 @@ class BaseCrawler(metaclass=Crawler):
             for check_field in check_fields_null:
                 if getattr(instance, check_field) is None:
                     continue
-            
+
             logger.info(f'Saving: {instance}')
             self.DATA_CONTAINER.append(instance)
 
     def backup_urls(self):
         if self.storage is None:
             self.storage = FileStorage(
-                spider=self, 
+                spider=self,
                 storage_path=settings.MEDIA_FOLDER
             )
 
         async def run_additional_storages(key, value):
-            for storage in self.additional_storages:
+            for name, storage in self.additional_storages:
                 # Only use storages that are connected.
                 # This is a none block loop
                 if not storage.is_connected:
                     logger.warning(
-                        f"Could not use {storage}. "
+                        f"Could not use {name}. "
                         "Connection broken"
                     )
                     continue
@@ -578,7 +592,15 @@ class BaseCrawler(metaclass=Crawler):
 
         # rename to: ignore_page_tests
         if self._meta.url_gather_ignore_tests:
-            pass
+            raw_urls_objs = list(
+                filter(
+                    lambda x: not x.multi_test_path(
+                        self._meta.url_gather_ignore_tests, 
+                        operator='or'
+                    ),
+                    raw_urls_objs
+                )
+            )
 
         valid_urls = set()
         invalid_urls = set()
@@ -633,6 +655,15 @@ class BaseCrawler(metaclass=Crawler):
             if url in self.list_of_seen_urls:
                 invalid_urls.add(url)
                 continue
+
+            # If the user provided rule testing
+            # check that the url is validates
+            # the regex tests
+            # if self._meta.url_rule_tests:
+            #     truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
+            #     if not all(truth_array):
+            #         invalid_urls.add(url)
+            #         continue
 
             valid_urls.add(url)
 
@@ -807,45 +838,91 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         return klass
 
+    def non_default_storage_by_name(self, name):
+        candidates = list(filter(lambda x: x[0] == name, self.additional_storages))
+        if len(candidates) == 0:
+            return False
+        return candidates[-1]
+
     def setup_class(self):
         """A function that sets up the final elements of the
         class before actually running the spider e.g. storages"""
         default_storage_path = settings.STORAGES.get('default')
         klass = self.load_storage(default_storage_path)
 
+        params = {'spider': self}
         if getattr(klass, 'file_based'):
-            self.storage = klass(
-                spider=self,
-                storage_path=settings.MEDIA_FOLDER
+            params['storage_path'] = settings.MEDIA_FOLDER
+
+        self.storage = klass(**params)
+
+        if self.storage.is_connected:
+            logger.info(f"Default storage: {color_text('blue', default_storage_path)}")
+        
+        # Even though the user swapped out the file based storage
+        # for a cloud one, we will still need the file based one
+        # for simple local operations. So reimplement it.
+        is_swapped = default_storage_path != 'kryptone.data_storages.FileStorage'
+        if is_swapped:
+            settings.STORAGES['backends'].append(
+                {
+                    'name': 'basic',
+                    'storage': 'kryptone.data_storages.FileStorage'
+                }
             )
 
-        logger.info(f"Using default storage: {default_storage_path}")
-
         other_storages_path = settings.STORAGES.get('backends', [])
-        for path in other_storages_path:
-            other = self.load_storage(path)
-            if getattr(other, 'file_based'):
-                instance = other(
-                    spider=self,
-                    storage_path=settings.MEDIA_FOLDER
-                )
-                self.additional_storages.append(instance)
-                continue
+        for storage_info in other_storages_path:
+            other = self.load_storage(storage_info['storage'])
 
-            instance = other(spider=self)
-            self.additional_storages.append(instance)
+            params = {'spider': self}
+            if getattr(other, 'file_based'):
+                params['storage_path'] = settings.MEDIA_FOLDER
+            
+            instance = other(**params)
+            custom_name = storage_info['name']
+            self.additional_storages.append((custom_name, instance))
 
         if other_storages_path:
             logger.info(f"Attached additional storages: {other_storages_path}")
+
+        # Here we are going to check the file that allows
+        # us to keep track of the uuid constant which will
+        # allow other backends to be able to consistently
+        # track the state for the given spider -; storages
+        # like Redis rely on this conssitent uuuid ortherwise
+        # a new key will always be created preventing us from
+        # updating the data consistently
+        if is_swapped:
+            _, storage = self.non_default_storage_by_name('basic')
+        else:
+            storage = self.storage
+
+        file_exists = async_to_sync(storage.has)('uuid_map.json')
+        if file_exists:
+            file = async_to_sync(storage.get_file)('uuid_map.json')
+            existing_data = async_to_sync(file.read)()
+
+            # Re-use an existing uuid so that other backends can
+            # track the state of the spider
+            exisiting_uuid = existing_data.get(self.__class__.__name__)
+            if exisiting_uuid is not None:
+                self.spider_uuid = exisiting_uuid
+            logger.warning(f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
+        else:            
+            data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
+            async_to_sync(storage.save_or_create)('uuid_map.json', data)
+            file = async_to_sync(storage.get)('uuid_map.json')
+            logger.warning(f'Created uuid file @ {color_text('blue', file.path)}')
 
     def before_start(self, start_urls, *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
         # "setup_class" funcitons into one single function
         # "setup_class"
         if self._meta.debug_mode:
-            logger.debug('Starting Kryptone in debug mode')
+            logger.debug(color_text('blue', 'Starting Kryptone in debug mode', background=True))
         else:
-            logger.info('Starting Kryptone')
+            logger.info(color_text('green', 'Starting Kryptone', background=True))
 
         start_urls = start_urls or self._meta.start_urls
         if (hasattr(start_urls, 'resolve_generator') or
@@ -861,7 +938,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 "in spider.Meta to start crawling a list of urls"
             )
 
-        logger.info(f'{self.__class__.__name__} ready to crawl website')
+        logger.info(f'{color_text('blue', self.__class__.__name__)} ready to crawl website')
 
         if self.start_url is None:
             self.start_url = URL(start_urls[-1])
@@ -873,7 +950,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.setup_class()
 
         self.before_start(start_urls, **kwargs)
-        logger.info(f'Spider ID is: {str(self.spider_uuid)}')
+        logger.info(f'Spider ID is: {color_text('green', str(self.spider_uuid))}')
 
         if self._meta.debug_mode:
             # TODO: Create a simplified version of the start funciton in
@@ -894,7 +971,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     continue
 
             current_url = URL(self.urls_to_visit.pop())
-            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
+            logger.info(f"{color_text('green', len(self.urls_to_visit))} urls left to visit")
 
             if current_url.is_empty:
                 continue
@@ -906,12 +983,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             # from 859:935 so that it can be used by both start and
             # bootstart without having to write two codes
 
-            logger.info(f'Going to url: {current_url}')
+            logger.info(f'Going to url: {color_text('green', current_url)}')
 
             try:
                 self.driver.get(str(current_url))
             except Exception as e:
-                logger.critical(f'Failed to go to: {current_url}: {e.args}')
+                logger.critical(f'Failed to go to: {color_text('red', current_url)}: {e.args}')
                 continue
 
             try:
@@ -1003,7 +1080,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             )
             self.performance_audit.count_visited_urls = len(self.visited_urls)
 
-            logger.info(f"Next execution time: {next_execution_date}")
+            logger.info(f"Next execution time: {color_text('blue', next_execution_date)}")
 
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break
@@ -1019,7 +1096,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         - Finally, the file cache is used as a final resort if none exists
         """
         self.setup_class()
-        # The spider will use the default storage by
+        # The spider will use the default storage
         # in order to resume its previous state. This
         # can be altered by providing a "source" that
         # indicates the index of the alternative storage

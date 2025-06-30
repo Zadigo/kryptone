@@ -1,0 +1,130 @@
+Kryptone is a web scraping framework designed for marketers, leveraging the Selenium library for efficient web crawling and data extraction.
+
+## Getting started
+
+To begin using Kryptone, initialize a new project with the following command:
+
+```python
+python -m kryptone start_project my_project_name
+```
+This command generates the following project structure:
+
+```bash
+├── project
+│   ├── media
+│   │   ├── /**/*.json
+│   │   ├── /**/*.jpeg
+│   ├── cache.json
+│   ├── kryptone.log
+│   ├── manage.py
+│   ├── models.py
+│   ├── settings.py
+│   └── spiders.py
+```
+
+Projects are self-contained, allowing for the organization of spiders and data collection methods.
+
+## Crawling a website
+
+To initiate a crawl, define an entry point URL from which the spider will begin gathering data. There are several methods for providing this URL:
+
+__Using `start_url`:__
+
+```python
+from kryptone.base import SiteCrawler
+
+class MyWebscrapper(SiteCrawler):
+    start_url = 'http://example.com'
+```
+
+__Using `Meta.start_urls` without a file:__
+
+```python
+from kryptone.base import SiteCrawler
+
+class MyWebscrapper(SiteCrawler):
+    class Meta:
+        start_urls = ['http://example.com']
+```
+
+__Using a file loader:__
+
+```python
+from kryptone.base import SiteCrawler
+from kryptone.utils.file_readers import LoadStartUrls
+
+class MyWebscrapper(SiteCrawler):
+    class Meta:
+        start_urls = LoadStartUrls() # Defaults to loading `start_urls.csv`
+```
+
+By default, `LoadStartUrls` expects a file named `start_urls.csv`.
+
+## Pre-Crawl Setup (`before_start` hook)
+
+The before_start method is a hook provided by the SiteCrawler class in the Kryptone framework. It is designed to execute preparatory steps just before the spider begins visiting a URL. Users can override this method in their custom spider classes to add their own preprocessing steps or to extend the functionality provided by the base class.
+
+To ensure that any necessary setup defined in the SiteCrawler base class is executed along with any additional logic added in the subclass, it's recommended to call super().before_start() within the overridden before_start method.
+
+Here's an example of how to override the before_start method in a custom spider class:
+
+```python
+from kryptone.base import SiteCrawler
+
+class MyWebScraper(SiteCrawler):
+    start_url = 'http://example.com'
+
+    def before_start(self):
+        # Custom setup before crawling starts
+        super().before_start() # Ensures base class logic is executed
+```
+
+The before_start method is executed just before the spider initiates a request to visit a URL. It provides a convenient opportunity for users to perform any necessary setup or preprocessing tasks before the spider starts its crawling process.
+
+__Example Use Cases__
+* Logging: Initialize logging configuration before starting the crawl.
+* Custom Headers: Set custom HTTP headers for requests.
+* Authentication: Perform authentication or login actions before accessing restricted pages.
+* Environment Setup: Configure the environment or load necessary resources before crawling begins.
+
+## On-page actions
+
+Once the spider lands on a page, it can perform various actions.
+
+### Post navigation actions
+
+These actions occur immediately after loading a page (e.g., clicking a cookie consent button).
+
+```python
+from kryptone.base import BaseCrawler
+
+class MyWebscrapper(BaseCrawler):
+    start_url = 'http://example.com'
+
+    def post_navigation_actions(self, **kwargs):
+        self.click_consent_button(element_id='button')
+```
+
+### Before Next Page Actions
+
+Executed just **before** navigating to the next page.
+
+
+### Current page actions
+
+Actions that execute on every visited page.
+
+```python
+from kryptone.base import SiteCrawler
+
+class MyWebscrapper(BaseCrawler):
+    start_url = 'http://example.com'
+
+    def current_page_actions(self, current_url, **kwargs):
+        # Do something here
+        pass
+```
+
+### Conditional page actions
+
+You can define actions that depend on the current URL, leveraging `kryptone.utils.URL`. See [utilities](https://github.com/Zadigo/kryptone/wiki/Utilities#url).

@@ -74,7 +74,8 @@ dependencies = [
   "autometrics",
   "psycopg[binary,pool]",
   "celery",
-  "asgiref"
+  "asgiref",
+  "kagglehub"
 ]
 authors = [
   {name = "John Pendenque", email = "pendenquejohn@gmail.com"},
@@ -105,3 +106,8 @@ Homepage = "https://github.com/Zadigo/kryptone"
 Documentation = "https://github.com/Zadigo/kryptone/wiki"
 Repository = "https://github.com/Zadigo/kryptone.git"
 Changelog = "https://github.com/Zadigo/kryptone/blob/main/CHANGELOG.md"
+
+[tool.pyright]
+typeCheckingMode = "off"
+extraPaths = ["./kryptone"]
+reportMissingImports = true

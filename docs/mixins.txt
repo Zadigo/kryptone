@@ -1,0 +1,76 @@
+## SEO mixin
+
+## Ecommerce mixin
+
+The `EcommerceCrawlerMixin` enhances the capabilities of the base SpiderCrawler by providing specialized functionalities tailored for crawling ecommerce websites. This mixin equips your spider with efficient tools for gathering product data, managing product pages, and saving relevant information for further analysis or processing.
+
+__Functionality Overview:__
+
+* __Product Data Management:__ Easily add, save, and bulk-handle product data obtained during crawling. Manage individual products, handle duplicates, and efficiently process product images.
+* __Product Page Identification:__ Identify and capture product pages using specific HTML element IDs or classes. This feature allows for targeted analysis and screenshot capture of product-related content.
+
+### How to use
+
+The mixin requires the implementation of a default model to structure and store product data obtained during web crawling. This default model, which is a Python dataclass, serves as the blueprint for organizing essential product attributes and facilitating efficient data handling within the mixin.
+
+When using the Product model with the EcommerceMixin, ensure that your model subclasses the BaseModel class. This base class provides essential functionality for your models, such as field access, URL parsing, and serialization to JSON or CSV formats. Here's how to define your Product model:
+
+```python
+from kryptone.db.models import BaseModel
+
+@dataclasses.dataclass
+class Product(BaseModel):
+    name: str
+    id_or_reference: str
+    price: float
+    url: str
+    date: str
+    images: list = dataclasses.field(default_factory=list)
+
+```
+The default fields for your model should be:
+
+* __name:__ Represents the name or title of the product.
+* __id_or_reference:__ Specifies a unique identifier or reference code associated with the product.
+* __price:__ Indicates the price of the product, typically in a numerical format (e.g., float).
+* __url:__ Stores the URL of the product page for reference and easy navigation.
+* __date:__ Records the date and time when the product data was retrieved or processed.
+* __images:__ Stores a list of image URLs associated with the product, facilitating image retrieval and display.
+
+### Function description
+
+```python
+add_product(data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference')
+````
+
+Add products to the internal list of product containers, facilitating easy management and processing of product data.
+
+```python
+save_product(data, collection_id_regex=None, avoid_duplicates=False, duplicate_key='id_or_reference')
+```
+
+Save single product data to a JSON file in the project's media folder for data persistence and future retrieval
+
+```python
+bulk_add_products(data, collection_id_regex=None)
+```
+
+Add multiple products to the internal list of product containers in bulk, streamlining the handling of large datasets
+
+```python
+bulk_save_products(data=None, collection_id_regex=None)
+```
+
+Save multiple products at once to the underlying container or a specified JSON file, enhancing efficiency in data storage and management
+
+```python
+save_images(product, path, filename=None, download_first=False)
+```
+
+Asynchronously save product images to the project's media folder for efficient image management and retrieval
+
+```python
+capture_product_page(current_url, , product=None, element_class=None, element_id=None, prefix=None, force=False)
+```
+
+Identify and capture product pages based on specified HTML element IDs or classes, facilitating focused analysis and screenshot capture for further review.
