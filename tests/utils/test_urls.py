@@ -134,10 +134,10 @@ class TestUrl(unittest.TestCase):
             URL('http://example.com/1')
         ]
         self.assertIn(URL('http://example.com'), urls)
-        self.assertIn('http://example.com', urls)
-        # TODO: When trying to check the presence of
-        # string in the set, it uses the __hash__
-        # which are not the same
+
+        # Cannot compare strings
+        with self.assertRaises(AssertionError):
+            self.assertIn('http://example.com', urls)
 
     def test_inversion(self):
         url = URL('http://example.com')

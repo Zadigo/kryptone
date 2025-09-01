@@ -92,6 +92,79 @@ class TestMultipleURLManager(unittest.TestCase):
             'https://example.com/bershka'
         ]
 
+    def populate(self, instance):
+        instance.populate(self.start_urls)
+        self.assertFalse(instance.empty, msg='Array is empty')
+
+        for item in instance.urls_to_visit:
+            with self.subTest(item=item):
+                self.assertIsInstance(item, URL)
+
+        urls_count = len(self.start_urls)
+        self.assertEqual(instance.urls_to_visit_count, urls_count)
+
+        # expected = URL('https://example.com/2')
+        # self.assertEqual(self.instance.next_url, expected)
+
+        # expected_start_url = URL('https://example.com')
+        # self.assertEqual(self.instance.s, expected_start_url)
+
+    def test_add_urls(self):
+        instance = MultipleURLManager()
+        instance.populate(self.start_urls)
+        instance.add_urls(self.other_urls)
+
+        # 5
+        urls_count = len(self.start_urls) + len(self.other_urls)
+        message = f'Instance had: {instance.list_of_seen_urls}'
+        self.assertEqual(len(instance.list_of_seen_urls), urls_count, message)
+        self.assertTrue(len(instance._urls_to_visit) > 0)
+        self.assertTrue(
+            len(instance._urls_to_visit) == urls_count,
+            msg=f'urls to visit: {len(instance._urls_to_visit)}'
+        )
+
+        for item in instance._urls_to_visit:
+            with self.subTest(item=item):
+                self.assertIsInstance(item, URL)
+
+    @patch('kryptone.utils.urls.URLIgnoreTest')
+    def test_with_custom_filter(self, mock_ignore_test: Mock):
+        instance = MultipleURLManager()
+        instance.populate(self.start_urls)
+        mock_ignore_test.side_effect = lambda url: False
+
+        instance.custom_url_filters = [mock_ignore_test]
+        urls = instance.run_url_filters(self.start_urls[:1])
+
+        mock_ignore_test.assert_called_once()
+        mock_ignore_test.assert_called_once_with('https://example.com')
+        self.assertTrue(len(urls) > 0)
+
+    def test_get(self):
+        instance = MultipleURLManager()
+        instance.populate(self.start_urls)
+        url = instance.get()
+
+        self.assertIsNotNone(url)
+        self.assertIsInstance(url, URL)
+        self.assertEqual(url, instance._current_url)
+        self.assertEqual(instance.urls_to_visit_count, 3)
+        self.assertEqual(instance.current_iteration, 1)
+        self.assertIsInstance(instance._current_url, URL)
+
+
+class TestInvalidMultipleURLManager(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.start_urls = [
+            'https://example.com'
+        ]
+
+        cls.other_urls = [
+            'https://example.com/bershka'
+        ]
+
     def setUp(self):
         self.instance = MultipleURLManager()
         self.populate()
@@ -107,48 +180,8 @@ class TestMultipleURLManager(unittest.TestCase):
         urls_count = len(self.start_urls)
         self.assertEqual(self.instance.urls_to_visit_count, urls_count)
 
-        # expected = URL('https://example.com/2')
-        # self.assertEqual(self.instance.next_url, expected)
-
-        # expected_start_url = URL('https://example.com')
-        # self.assertEqual(self.instance.s, expected_start_url)
-
-    def test_add_urls(self):
-        self.instance.add_urls(self.other_urls)
-
-        # 5
-        urls_count = len(self.start_urls) + len(self.other_urls)
-        self.assertEqual(len(self.instance.list_of_seen_urls), urls_count)
-        self.assertTrue(len(self.instance._urls_to_visit) > 0)
-        self.assertTrue(
-            len(self.instance._urls_to_visit) == urls_count,
-            msg=f'urls to visit: {len(self.instance._urls_to_visit)}'
-        )
-
-        for item in self.instance._urls_to_visit:
-            with self.subTest(item=item):
-                self.assertIsInstance(item, URL)
-
     def test_add_urls_not_in_domain(self):
         none_valid_url = URL('http://bershka.com')
         self.instance.add_urls([none_valid_url])
-        self.assertNotIn(none_valid_url, self.instance._urls_to_visit)
-
-    @patch('kryptone.utils.urls.URLIgnoreTest')
-    def test_with_custom_filter(self, mock_ignore_test: Mock):
-        mock_ignore_test.side_effect = lambda url: False
-
-        self.instance.custom_url_filters = [mock_ignore_test]
-        urls = self.instance.run_url_filters(self.start_urls[:1])
-
-        mock_ignore_test.assert_called_once()
-        mock_ignore_test.assert_called_once_with('https://example.com')
-        self.assertTrue(len(urls) > 0)
-
-    def test_get(self):
-        url = self.instance.get()
-        self.assertIsInstance(url, URL)
-        self.assertEqual(url, self.instance._current_url)
-        self.assertEqual(self.instance.urls_to_visit_count, 3)
-        self.assertEqual(self.instance.current_iteration, 1)
-        self.assertIsInstance(self.instance._current_url, URL)
+        message = f'Instance has {self.instance._urls_to_visit}'
+        self.assertNotIn(none_valid_url, self.instance._urls_to_visit, message)

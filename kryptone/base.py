@@ -912,7 +912,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         else:            
             data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
             async_to_sync(storage.save_or_create)('uuid_map.json', data)
-            file = async_to_sync(storage.get)('uuid_map.json')
+            file = async_to_sync(storage.get_file)('uuid_map.json')
             logger.warning(f'Created uuid file @ {color_text('blue', file.path)}')
 
     def before_start(self, start_urls, *args, **kwargs):

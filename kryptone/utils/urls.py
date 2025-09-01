@@ -1014,16 +1014,21 @@ class MultipleURLManager:
         This is a destructive function, in other words,
         when the function is called, it removed from the
         list of urls to visit"""
+        if not self._urls_to_visit:
+            return None
+
         url = self._urls_to_visit.pop()
         self._current_url = URL(url)
         self._visited_urls.add(url)
 
-        found_urls = self.dataframe[self.dataframe.urls == url]
-        for item in found_urls.itertuples():
-            self.dataframe.loc[item.Index, 'visited'] = True
-            self.dataframe.loc[item.Index, 'visited_on'] = get_current_date()
-        self.current_iteration += 1
-        return url
+        if self.dataframe is not None:
+            found_urls = self.dataframe[self.dataframe.urls == url]
+            for item in found_urls.itertuples():
+                self.dataframe.loc[item.Index, 'visited'] = True
+                self.dataframe.loc[item.Index, 'visited_on'] = get_current_date()
+            self.current_iteration += 1
+            return url
+        return None
 
     def populate(self, start_urls):
         """Function that populates the `urls_to_visit` and

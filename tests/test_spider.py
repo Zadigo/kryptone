@@ -1,8 +1,10 @@
 import dataclasses
 import pathlib
 import unittest
+import pathlib
 from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
+from kryptone.data_storages import FileStorage
 from kryptone.base import SiteCrawler
 from kryptone.conf import settings
 from kryptone.utils.urls import URL, URLIgnoreTest
@@ -232,7 +234,7 @@ INVALID_URLS = [
 ]
 
 
-class TestSpider(unittest.TestCase):
+class SpiderMixin:
     @classmethod
     def setUpClass(cls):
         test_project_path = pathlib.Path('./tests/testproject').absolute()
@@ -280,19 +282,28 @@ class TestSpider(unittest.TestCase):
         # # into one single efficient one
         # cls.spider.setup_class()
         # cls.spider.before_start([])
+    
 
+
+class TestSpider(SpiderMixin, unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.p1.stop()
         cls.p2.stop()
 
+    # @patch('data_storages.FileStorage', autospec=FileStorage, new_callable=AsyncMock)
     def test_structure(self):
-        # In debug mode makes no sense to run
-        # the spider since Selenium is not started
-        self.assertFalse(self.spider.start(self.start_urls))
+        self.spider.start(self.start_urls)
         self.mocked_edge.get.assert_called_once_with(self.start_urls[0])
 
         self.assertTrue(hasattr(self.spider, '_meta'))
+
+        start_urls = getattr(self.spider._meta, 'start_urls', [])
+        self.assertListEqual(start_urls, self.start_urls)
+        self.assertTrue(self.spider.has_start_urls)
+
+        crawl = getattr(self.spider._meta, 'crawl')
+        self.assertTrue(crawl)
 
     @patch.object(SiteCrawler, 'collect_page_urls')
     @patch.object(URL, 'is_same_domain', return_value=True)
@@ -312,7 +323,6 @@ class TestSpider(unittest.TestCase):
             URL('http://ecommerce.com/product-1')
         ]
 
-        self.spider.start_url = URL('http://example.com/')
         self.spider.add_urls(urls)
         self.assertIn(urls[0], self.spider.urls_to_visit)
 
@@ -336,19 +346,6 @@ class TestSpider(unittest.TestCase):
                     'Url should not have been selected'
                 )
 
-    def test_collect_page_urls_with_url_ignore_tests(self):
-        collected_urls = [
-            URL('http://example.com/product-1'),
-            URL('http://example.com/product-2'),
-            URL('http://example.com/2')
-        ]
-        self.spider._meta.url_ignore_tests.append(URLIgnoreTest('base', paths=['/2']))
-        self.spider.add_urls(collected_urls)
-
-        for url in self.spider.urls_to_visit:
-            with self.subTest(url=url):
-                self.assertNotIn(collected_urls[-1], self.spider.urls_to_visit)
-
     def test_collect_page_urls_with_limit_to(self):
         pass
 
@@ -357,17 +354,19 @@ class TestSpider(unittest.TestCase):
 
     @patch('requests.get')
     def test_download_images(self, mock_get_request: Mock):
-        test_urls = ['http://example.com/logos/faveicon.ico']
+        test_urls = ['http://example.com/logos/img1.jpg']
         page_url = 'http://example.com'
 
         mock_response = MagicMock()
 
-        type(mock_response).content = PropertyMock(return_value=b'x')
+        with open(pathlib.Path('.').absolute().joinpath('tests/data/img1.jpg'), 'rb') as f:
+            type(mock_response).content = PropertyMock(return_value=f.read())
         type(mock_response).status_code = PropertyMock(return_value=200)
 
         mock_get_request.return_value = mock_response
 
-        self.spider.download_images(test_urls, page_url)
+        path = pathlib.Path('.').absolute().joinpath('tests/data')
+        self.spider.download_images(test_urls, page_url, directory=path)
         # mock_get_request.assert_called_with()
 
     def test_save_object(self):
@@ -381,3 +380,23 @@ class TestSpider(unittest.TestCase):
 
     def test_backup_urls(self):
         self.spider.backup_urls()
+
+
+
+class TestWithIgnores(SpiderMixin, unittest.TestCase):
+    def test_collect_page_urls_with_url_ignore_tests(self):
+        collected_urls = [
+            URL('http://example.com/product-1'),
+            URL('http://example.com/product-2'),
+            URL('http://example.com/2')
+        ]
+
+        self.spider._meta.url_ignore_tests.append(
+            URLIgnoreTest('base', paths=['/2'])
+        )
+        
+        self.spider.add_urls(collected_urls)
+
+        for url in self.spider.urls_to_visit:
+            with self.subTest(url=url):
+                self.assertNotIn(collected_urls[-1], self.spider.urls_to_visit)
