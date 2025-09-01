@@ -4,9 +4,9 @@
 # from kryptone.base import SiteCrawler
 
 
-# class TestSpider(SiteCrawler):
-#     class Meta:
-#         debug_mode = True
+class TestSpider(SiteCrawler):
+    class Meta:
+        debug_mode = True
 
 #     def handle_1(self, current_url, **kwargs):
 #         pass
