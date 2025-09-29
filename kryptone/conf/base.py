@@ -159,6 +159,12 @@ STORAGE_POSTGRESQL_HOST = None
 
 STORAGE_POSTGRESQL_PORT = 5432
 
+# Storage settings for Google Sheet
+
+STORAGE_GOOGLE_SHEET_CREDENTIALS = None
+
+STORAGE_GOOGLE_SHEET_ID = None
+
 
 # RabbitMQ settings for task queueing
 

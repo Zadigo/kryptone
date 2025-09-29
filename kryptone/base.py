@@ -11,7 +11,8 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from urllib.parse import unquote, urljoin, urlunparse
+from typing import Any, Optional, Union
+from urllib.parse import ParseResult, unquote, urljoin, urlunparse
 from uuid import uuid4
 
 import pytz
@@ -247,10 +248,10 @@ class BaseCrawler(metaclass=Crawler):
     DATA_CONTAINER = []
     model = None
 
-    urls_to_visit = set()
-    visited_urls = set()
+    urls_to_visit: set[URL] = set()
+    visited_urls: set[URL] = set()
     visited_pages_count = 0
-    list_of_seen_urls = set()
+    list_of_seen_urls: set[URL] = set()
     browser_name = None
     timezone = 'UTC'
     default_scroll_step = 80
@@ -258,16 +259,16 @@ class BaseCrawler(metaclass=Crawler):
     storage = None
     additional_storages = []
 
-    def __init__(self, browser_name=None):
+    def __init__(self, browser_name: Optional[str] = None):
         # The start url which corresponds
         # to the first url of "Meta.start_urls"
         # allows us to track the domain to which
         # crawling needs to be limited to
-        self.start_url = None
+        self.start_url: Optional[URL] = None
 
         self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
-        
+
         if not self._meta.debug_mode:
             self.driver = get_selenium_browser_instance(
                 browser_name=browser_name or self.browser_name,
@@ -294,7 +295,7 @@ class BaseCrawler(metaclass=Crawler):
         return datetime.datetime.now(tz=timezone)
 
     @property
-    def get_origin(self):
+    def get_origin(self) -> ParseResult:
         if self.start_url is None:
             return ''
 
@@ -398,7 +399,8 @@ class BaseCrawler(metaclass=Crawler):
             try:
                 response = requests.get(url)
             except:
-                logger.warning(f"Could not download image: {color_text('red', url)}")
+                logger.warning(
+                    f"Could not download image: {color_text('red', url)}")
                 return False
             else:
                 if response.status_code == 200:
@@ -420,7 +422,7 @@ class BaseCrawler(metaclass=Crawler):
     def collect_page_urls(self):
         """Returns all the links present on the
         currently visited page"""
-        found_urls = []
+        found_urls: list[str] = []
         # Restrict the url collection to specific
         # section the page -; by default gets all
         # the urls on the page
@@ -447,7 +449,7 @@ class BaseCrawler(metaclass=Crawler):
             )
         return found_urls
 
-    def save_object(self, data, check_fields_null=[]):
+    def save_object(self, data: Union[dict[str, Any], list[dict[str, Any]]], check_fields_null: list[str] = []):
         """Saves a new object in the container"""
         if self.model is None:
             raise ValueError(
@@ -548,22 +550,22 @@ class BaseCrawler(metaclass=Crawler):
         result = urljoin(self.get_origin, path)
         return URL(unquote(result))
 
-    def run_url_filters(self, valid_urls):
+    def run_url_filters(self, valid_urls: set[URL]):
         """Excludes urls in the list of collected
         urls based on the value of the functions in
         `url_filters`. All conditions should be true
         in order for the url be considered valid to
         be visited"""
         if self._meta.url_ignore_tests:
-            results = defaultdict(list)
+            results: dict[URL, list[bool]] = defaultdict(list)
             for url in valid_urls:
                 truth_array = results[url]
                 for instance in self._meta.url_ignore_tests:
                     truth_array.append(instance(url))
 
-            urls_kept = set()
-            urls_removed = set()
-            final_urls_filtering_audit = OrderedDict()
+            urls_kept: set[URL] = set()
+            urls_removed: set[URL] = set()
+            final_urls_filtering_audit: dict[URL, bool] = OrderedDict()
 
             for url, truth_array in results.items():
                 final_urls_filtering_audit[url] = any(truth_array)
@@ -582,7 +584,7 @@ class BaseCrawler(metaclass=Crawler):
             return urls_kept
         return valid_urls
 
-    def check_urls(self, urls, refresh=False):
+    def check_urls(self, urls: list[str], refresh: bool = False):
         raw_urls = set(urls)
 
         if self.performance_audit.iteration_count > 0:
@@ -595,15 +597,15 @@ class BaseCrawler(metaclass=Crawler):
             raw_urls_objs = list(
                 filter(
                     lambda x: not x.multi_test_path(
-                        self._meta.url_gather_ignore_tests, 
+                        self._meta.url_gather_ignore_tests,
                         operator='or'
                     ),
                     raw_urls_objs
                 )
             )
 
-        valid_urls = set()
-        invalid_urls = set()
+        valid_urls: set[URL] = set()
+        invalid_urls: set[URL] = set()
 
         for url in raw_urls_objs:
             if url.is_path:
@@ -685,7 +687,7 @@ class BaseCrawler(metaclass=Crawler):
             )
         return valid_urls
 
-    def add_urls(self, urls, refresh=False):
+    def add_urls(self, urls: list[str], refresh: bool = False):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
         nested in other elements than links and that
@@ -802,7 +804,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         logger.info('Project stopped')
 
     @staticmethod
-    def transform_string_urls(urls):
+    def transform_string_urls(urls: list[str]):
         for url in urls:
             yield URL(url)
 
@@ -839,7 +841,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         return klass
 
     def non_default_storage_by_name(self, name):
-        candidates = list(filter(lambda x: x[0] == name, self.additional_storages))
+        candidates = list(
+            filter(lambda x: x[0] == name, self.additional_storages))
         if len(candidates) == 0:
             return False
         return candidates[-1]
@@ -857,8 +860,9 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         self.storage = klass(**params)
 
         if self.storage.is_connected:
-            logger.info(f"Default storage: {color_text('blue', default_storage_path)}")
-        
+            logger.info(
+                f"Default storage: {color_text('blue', default_storage_path)}")
+
         # Even though the user swapped out the file based storage
         # for a cloud one, we will still need the file based one
         # for simple local operations. So reimplement it.
@@ -878,7 +882,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             params = {'spider': self}
             if getattr(other, 'file_based'):
                 params['storage_path'] = settings.MEDIA_FOLDER
-            
+
             instance = other(**params)
             custom_name = storage_info['name']
             self.additional_storages.append((custom_name, instance))
@@ -908,21 +912,25 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             exisiting_uuid = existing_data.get(self.__class__.__name__)
             if exisiting_uuid is not None:
                 self.spider_uuid = exisiting_uuid
-            logger.warning(f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
-        else:            
+            logger.warning(
+                f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
+        else:
             data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
             async_to_sync(storage.save_or_create)('uuid_map.json', data)
             file = async_to_sync(storage.get_file)('uuid_map.json')
-            logger.warning(f'Created uuid file @ {color_text('blue', file.path)}')
+            logger.warning(
+                f'Created uuid file @ {color_text('blue', file.path)}')
 
-    def before_start(self, start_urls, *args, **kwargs):
+    def before_start(self, start_urls: list[str], *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
         # "setup_class" funcitons into one single function
         # "setup_class"
         if self._meta.debug_mode:
-            logger.debug(color_text('blue', 'Starting Kryptone in debug mode', background=True))
+            logger.debug(color_text(
+                'blue', 'Starting Kryptone in debug mode', background=True))
         else:
-            logger.info(color_text('green', 'Starting Kryptone', background=True))
+            logger.info(color_text(
+                'green', 'Starting Kryptone', background=True))
 
         start_urls = start_urls or self._meta.start_urls
         if (hasattr(start_urls, 'resolve_generator') or
@@ -938,7 +946,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 "in spider.Meta to start crawling a list of urls"
             )
 
-        logger.info(f'{color_text('blue', self.__class__.__name__)} ready to crawl website')
+        logger.info(
+            f'{color_text('blue', self.__class__.__name__)} ready to crawl website')
 
         if self.start_url is None:
             self.start_url = URL(start_urls[-1])
@@ -950,7 +959,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.setup_class()
 
         self.before_start(start_urls, **kwargs)
-        logger.info(f'Spider ID is: {color_text('green', str(self.spider_uuid))}')
+        logger.info(
+            f'Spider ID is: {color_text('green', str(self.spider_uuid))}')
 
         if self._meta.debug_mode:
             # TODO: Create a simplified version of the start funciton in
@@ -971,7 +981,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     continue
 
             current_url = URL(self.urls_to_visit.pop())
-            logger.info(f"{color_text('green', len(self.urls_to_visit))} urls left to visit")
+            logger.info(
+                f"{color_text('green', len(self.urls_to_visit))} urls left to visit")
 
             if current_url.is_empty:
                 continue
@@ -988,7 +999,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             try:
                 self.driver.get(str(current_url))
             except Exception as e:
-                logger.critical(f'Failed to go to: {color_text('red', current_url)}: {e.args}')
+                logger.critical(
+                    f'Failed to go to: {color_text('red', current_url)}: {e.args}')
                 continue
 
             try:
@@ -1080,7 +1092,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             )
             self.performance_audit.count_visited_urls = len(self.visited_urls)
 
-            logger.info(f"Next execution time: {color_text('blue', next_execution_date)}")
+            logger.info(
+                f"Next execution time: {color_text('blue', next_execution_date)}")
 
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break

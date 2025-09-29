@@ -1,16 +1,17 @@
 import csv
 import dataclasses
+import datetime
+import io
 import json
 import pathlib
 from collections import OrderedDict
-import datetime
 from urllib.parse import urlencode
 
 import pyairtable
 import pymemcache
 import redis
 import requests
-import io
+import gspread
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -176,7 +177,7 @@ class FileStorage(BaseStorage):
         # TODO: Instead of raising a dry error if the
         # file does not exist, create the file, reload
         # the storage and return the newly created item -;
-        # we can also create the file in memory 
+        # we can also create the file in memory
         return self.storage[filename]
 
     async def save_or_create(self, filename, data, **kwargs):
@@ -306,158 +307,158 @@ class AirtableStorag(BaseStorage):
             settings.STORAGE_AIRTABLE_API_KEY)
 
 
-class ApiStorage(BaseStorage):
-    """A storage that uses GET/POST requests in order
-    to save data that was processed by the Spider to
-    HTTP endpoints"""
+# class ApiStorage(BaseStorage):
+#     """A storage that uses GET/POST requests in order
+#     to save data that was processed by the Spider to
+#     HTTP endpoints"""
 
-    def __init__(self, *, spider=None):
-        super().__init__(spider=spider)
-        self.session = requests.Session()
-        self.get_endpoint = getattr(settings, 'STORAGE_API_GET_ENDPOINT')
-        self.save_endpoint = getattr(settings, 'STORAGE_API_SAVE_ENDPOINT')
+#     def __init__(self, *, spider=None):
+#         super().__init__(spider=spider)
+#         self.session = requests.Session()
+#         self.get_endpoint = getattr(settings, 'STORAGE_API_GET_ENDPOINT')
+#         self.save_endpoint = getattr(settings, 'STORAGE_API_SAVE_ENDPOINT')
 
-    @property
-    def default_headers(self):
-        return {
-            'Content-Type': 'application/json'
-        }
+#     @property
+#     def default_headers(self):
+#         return {
+#             'Content-Type': 'application/json'
+#         }
 
-    async def check(self, key, data):
-        """Checks that the data that is returned is formatted
-        to be understood and used by the spider. This is
-        only for system type data like the cache"""
-        names = ['cache']
+#     async def check(self, key, data):
+#         """Checks that the data that is returned is formatted
+#         to be understood and used by the spider. This is
+#         only for system type data like the cache"""
+#         names = ['cache']
 
-        if key not in names:
-            return False
+#         if key not in names:
+#             return False
 
-        if not isinstance(data, dict):
-            raise TypeError('Data should be a dictionnary')
+#         if not isinstance(data, dict):
+#             raise TypeError('Data should be a dictionnary')
 
-        keys = data.keys()
+#         keys = data.keys()
 
-        if key == 'cache':
-            required_keys = [
-                'spider', 'spider_uuid',
-                'timestamp', 'urls_to_visit',
-                'visited_urls'
-            ]
-            if list(keys) != required_keys:
-                return False
-        return True
+#         if key == 'cache':
+#             required_keys = [
+#                 'spider', 'spider_uuid',
+#                 'timestamp', 'urls_to_visit',
+#                 'visited_urls'
+#             ]
+#             if list(keys) != required_keys:
+#                 return False
+#         return True
 
-    def create_request(self, url, method='post', data=None):
-        if method == 'post':
-            params = {'json': data}
-        else:
-            params = {'data': data}
+#     def create_request(self, url, method='post', data=None):
+#         if method == 'post':
+#             params = {'json': data}
+#         else:
+#             params = {'data': data}
 
-        request = requests.Request(
-            method=method,
-            url=url,
-            headers=self.default_headers,
-            **params
-        )
-        return self.session.prepare_request(request)
+#         request = requests.Request(
+#             method=method,
+#             url=url,
+#             headers=self.default_headers,
+#             **params
+#         )
+#         return self.session.prepare_request(request)
 
-    async def has(self, key):
-        # Assume the user ensures that the key that
-        # he is trying to get exists on the enpoint
-        return True
+#     async def has(self, key):
+#         # Assume the user ensures that the key that
+#         # he is trying to get exists on the enpoint
+#         return True
 
-    async def get(self, key):
-        """Endpoint that gets data by name on the
-        given endpoint. For example returning the
-        cache or the seen_urls"""
-        query = urlencode({
-            'q': key,
-            'id': self.spider_uuid
-        })
+#     async def get(self, key):
+#         """Endpoint that gets data by name on the
+#         given endpoint. For example returning the
+#         cache or the seen_urls"""
+#         query = urlencode({
+#             'q': key,
+#             'id': self.spider_uuid
+#         })
 
-        url = self.get_endpoint + f'?{query}'
-        request = self.create_request(url, method='get')
+#         url = self.get_endpoint + f'?{query}'
+#         request = self.create_request(url, method='get')
 
-        try:
-            response = self.session.send(request)
-        except requests.ConnectionError:
-            raise
-        except Exception:
-            raise
-        else:
-            if response.status_code == 200:
-                state = await self.check(key, response.json())
-                return response.json()
-            raise requests.ConnectionError("Could not save data to endpoint")
+#         try:
+#             response = self.session.send(request)
+#         except requests.ConnectionError:
+#             raise
+#         except Exception:
+#             raise
+#         else:
+#             if response.status_code == 200:
+#                 state = await self.check(key, response.json())
+#                 return response.json()
+#             raise requests.ConnectionError("Could not save data to endpoint")
 
-    async def save(self, key, data, **kwargs):
-        """Endpoint that creates new data to the
-        given endpoint. The endpoint sends the results
-        under a given key which allows the endpoint to
-        dispatch the data correctly on its backend. This
-        process is important because it allows us thereafter
-        to retrieve the given data with the given key once
-        the user implements the logic to return it correctly"""
-        data = self.before_save(data)
+#     async def save(self, key, data, **kwargs):
+#         """Endpoint that creates new data to the
+#         given endpoint. The endpoint sends the results
+#         under a given key which allows the endpoint to
+#         dispatch the data correctly on its backend. This
+#         process is important because it allows us thereafter
+#         to retrieve the given data with the given key once
+#         the user implements the logic to return it correctly"""
+#         data = self.before_save(data)
 
-        template = {
-            'q': key,
-            'id': self.spider_uuid,
-            'items': data
-        }
-        request = self.create_request(self.save_endpoint, data=template)
+#         template = {
+#             'q': key,
+#             'id': self.spider_uuid,
+#             'items': data
+#         }
+#         request = self.create_request(self.save_endpoint, data=template)
 
-        try:
-            response = self.session.send(request)
-        except requests.ConnectionError:
-            raise
-        except Exception as e:
-            raise
-        else:
-            if response.status_code == 200:
-                return response.json()
-            raise requests.ConnectionError("Could not save data to endpoint")
-
-
-class MemCacheSerializer:
-    def serialize(self, key, value):
-        if isinstance(value, str):
-            return (value.encode('utf-8'), 1)
-        return (json.dumps(value).encode('utf-8'), 2)
-
-    def deserialize(self, key, value, flags):
-        if flags == 1:
-            return value.decode('utf-8')
-        if flags == 2:
-            return json.loads(value.decode('utf-8'), cls=DefaultJsonEncoder)
-        raise Exception("Unknown serialization format")
+#         try:
+#             response = self.session.send(request)
+#         except requests.ConnectionError:
+#             raise
+#         except Exception as e:
+#             raise
+#         else:
+#             if response.status_code == 200:
+#                 return response.json()
+#             raise requests.ConnectionError("Could not save data to endpoint")
 
 
-class MemCacheStorage(BaseStorage):
-    storage_class = pymemcache.Client
+# class MemCacheSerializer:
+#     def serialize(self, key, value):
+#         if isinstance(value, str):
+#             return (value.encode('utf-8'), 1)
+#         return (json.dumps(value).encode('utf-8'), 2)
 
-    def __init__(self):
-        super().__init__()
+#     def deserialize(self, key, value, flags):
+#         if flags == 1:
+#             return value.decode('utf-8')
+#         if flags == 2:
+#             return json.loads(value.decode('utf-8'), cls=DefaultJsonEncoder)
+#         raise Exception("Unknown serialization format")
 
-        default_params = {
-            'connect_timeout': 30,
-            'timeout': 60,
-            'no_delay': True
-        }
 
-        if settings.STORAGE_MEMCACHE_LOAD_BALANCER:
-            self.storage_connection = pymemcache.HashClient(
-                settings.STORAGE_MEMCACHE_LOAD_BALANCER,
-                **default_params
-            )
-        else:
-            self.storage_connection = self.storage_class(
-                (
-                    settings.STORAGE_MEMCACHE_HOST,
-                    settings.STORAGE_MEMCACHE_PORT,
-                ),
-                **default_params
-            )
+# class MemCacheStorage(BaseStorage):
+#     storage_class = pymemcache.Client
+
+#     def __init__(self):
+#         super().__init__()
+
+#         default_params = {
+#             'connect_timeout': 30,
+#             'timeout': 60,
+#             'no_delay': True
+#         }
+
+#         if settings.STORAGE_MEMCACHE_LOAD_BALANCER:
+#             self.storage_connection = pymemcache.HashClient(
+#                 settings.STORAGE_MEMCACHE_LOAD_BALANCER,
+#                 **default_params
+#             )
+#         else:
+#             self.storage_connection = self.storage_class(
+#                 (
+#                     settings.STORAGE_MEMCACHE_HOST,
+#                     settings.STORAGE_MEMCACHE_PORT,
+#                 ),
+#                 **default_params
+#             )
 
 
 class PostGresStorage(BaseStorage):
@@ -642,3 +643,17 @@ class PostGresStorage(BaseStorage):
     #     condition = self.build_condition(visited=state)
     #     where_condition = self.WHERE_CONDITION.format(condition=condition)
     #     return self.run_sql_statements(select_sql, where_condition)
+
+
+class GoogleSheetStorage(BaseStorage):
+    storage_class = None
+
+    def __init__(self, spider=None):
+        super().__init__(spider=spider)
+
+        path = pathlib.Path(settings.STORAGE_GOOGLE_SHEET_CREDENTIALS)
+        with open(path, mode='r', encoding='utf-8') as f:
+            credentials = json.load(f)
+            self.storage_connection = gspread.service_account_from_dict(credentials)
+            self.spreadsheet = self.storage_connection.open_by_key(
+                settings.STORAGE_GOOGLE_SHEET_ID)
