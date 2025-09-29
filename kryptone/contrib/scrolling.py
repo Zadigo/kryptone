@@ -1,3 +1,6 @@
+import time
+from string import Template
+
 class ScrollMixin:
     """A mixin that implements special scrolling
     functionnalities to the spider"""
