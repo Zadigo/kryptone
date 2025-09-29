@@ -10,6 +10,7 @@ from pathlib import Path
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.exceptions import SpiderExistsError
+from kryptone.core.servers import create_celery_server
 
 SPIDERS_MODULE = 'spiders'
 
@@ -82,6 +83,7 @@ class SpiderConfig:
         try:
             settings['ACTIVE_SPIDER'] = spider_instance
 
+            # create_celery_server()
             # This will tell the driver to open
             # one more window in additin to the
             # one that is opened
@@ -103,6 +105,7 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
+            # create_celery_server()
             spider_instance.resume(windows=windows, **spider_params)
         except KeyboardInterrupt:
             spider_instance.after_fail()
@@ -184,6 +187,7 @@ class MasterRegistry:
         setattr(settings, 'WEBHOOK_INTERVAL', delta)
 
         self.is_ready = True
+        setattr(settings, '_PYTHON_PATH', dotted_path)
 
     def populate(self):
         dotted_path = os.environ.get(ENVIRONMENT_VARIABLE, None)
