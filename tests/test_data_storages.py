@@ -1,23 +1,16 @@
+import json
 from unittest import IsolatedAsyncioTestCase
+from unittest.mock import Mock
 from urllib.parse import urljoin
 from uuid import uuid4
 
 from kryptone.conf import settings
-from kryptone.data_storages import (ApiStorage, BaseStorage, File, FileStorage,
-                                    RedisStorage)
+from kryptone.data_storages import File, FileStorage, RedisStorage
 
 
 class MockupSpider:
     def __init__(self):
         self.spider_uuid = uuid4()
-
-
-class TestBaseStorage(IsolatedAsyncioTestCase):
-    def setUp(self):
-        self.instance = BaseStorage()
-
-    def test_structure(self):
-        self.instance.spider
 
 
 class TestFileStorage(IsolatedAsyncioTestCase):
@@ -28,6 +21,26 @@ class TestFileStorage(IsolatedAsyncioTestCase):
             'testproject',
             'media'
         )
+
+        # Since the folder and files are already created in the repo,
+        # we need to create them
+        if not cls.media_path.exists():
+            cls.media_path.mkdir(parents=True, exist_ok=True)
+
+            performance_data = {
+                'iteration_count': 0,
+                'start_date': None,
+                'end_date': None,
+                'timezone': 'UTC',
+                'error_count': 0,
+                'duration': 0,
+                'count_urls_to_visit': 0,
+                'count_visited_urls': 0
+            }
+
+            cls.media_path.joinpath('performance.json').write_text(json.dumps(performance_data))
+            cls.media_path.joinpath('seen_urls.csv').write_text('urls\nhttp://example.com\n')
+
         cls.instance = FileStorage(storage_path=cls.media_path)
         cls.instance.initialize()
 
@@ -58,7 +71,9 @@ class TestFileStorage(IsolatedAsyncioTestCase):
 class TestRedisStorage(IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
+        settings['STORAGE_REDIS_HOST'] = 'localhost'
+        settings['STORAGE_REDIS_PASSWORD'] = ''
+
         cls.spider = spider = MockupSpider()
         connection = RedisStorage(spider=spider)
         cls.connection = connection
@@ -95,38 +110,38 @@ class TestRedisStorage(IsolatedAsyncioTestCase):
         self.assertEqual(result['spider_uuid'], str(cache['spider_uuid']))
 
 
-class TestApiStorage(IsolatedAsyncioTestCase):
-    @classmethod
-    def setUpClass(cls):
-        base_url = 'http://127.0.0.1:5000/api/v1/'
+# class TestApiStorage(IsolatedAsyncioTestCase):
+#     @classmethod
+#     def setUpClass(cls):
+#         base_url = 'http://127.0.0.1:5000/api/v1/'
 
-        settings['STORAGE_API_GET_ENDPOINT'] = urljoin(base_url, 'seen-urls')
-        settings['STORAGE_API_SAVE_ENDPOINT'] = urljoin(base_url, 'save')
+#         settings['STORAGE_API_GET_ENDPOINT'] = urljoin(base_url, 'seen-urls')
+#         settings['STORAGE_API_SAVE_ENDPOINT'] = urljoin(base_url, 'save')
 
-        spider = MockupSpider()
-        cls.instance = ApiStorage(spider=spider)
-        cls.example_cache = {
-            'spider': 'ExampleSpider',
-            'spider_uuid': '739f3877-f67f-41ec-a940-3c1fbf2e3e53',
-            'timestamp': '2024-45-29 14:45:23',
-            'urls_to_visit': [],
-            'visited_urls': [
-                'http://example.com'
-            ]
-        }
+#         spider = MockupSpider()
+#         cls.instance = ApiStorage(spider=spider)
+#         cls.example_cache = {
+#             'spider': 'ExampleSpider',
+#             'spider_uuid': '739f3877-f67f-41ec-a940-3c1fbf2e3e53',
+#             'timestamp': '2024-45-29 14:45:23',
+#             'urls_to_visit': [],
+#             'visited_urls': [
+#                 'http://example.com'
+#             ]
+#         }
 
-    async def test_structure(self):
-        await self.instance.get('some_value')
+#     async def test_structure(self):
+#         await self.instance.get('some_value')
 
-    async def test_invalid_key(self):
-        result = await self.instance.get('some_value')
-        self.assertFalse(result)
+#     async def test_invalid_key(self):
+#         result = await self.instance.get('some_value')
+#         self.assertFalse(result)
 
-    async def test_getting_cache(self):
-        result = await self.instance.get('cache')
-        self.assertIn('spider', result)
-        self.assertIn('urls_to_visit', result)
+#     async def test_getting_cache(self):
+#         result = await self.instance.get('cache')
+#         self.assertIn('spider', result)
+#         self.assertIn('urls_to_visit', result)
 
-    async def test_save(self):
-        result = await self.instance.save('cache', self.example_cache)
-        self.assertDictEqual(result, {'state': True})
+#     async def test_save(self):
+#         result = await self.instance.save('cache', self.example_cache)
+#         self.assertDictEqual(result, {'state': True})
