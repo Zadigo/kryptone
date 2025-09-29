@@ -7,7 +7,7 @@ from kryptone.utils.text import (normalize_spaces, remove_accents,
 from kryptone.utils.urls import URL
 
 
-def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]):
+def directory_from_breadcrumbs(text: str, separator: str = '>', remove_last: bool = True, exclude: list = []) -> pathlib.Path:
     """Get the path the local directory for the breadcrumb
     provided on the current page
 

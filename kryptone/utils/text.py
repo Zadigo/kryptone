@@ -17,7 +17,7 @@ PRICE = re.compile(r'(\d+\,?\d+)')
 PRICE_EURO = re.compile(r'\d+\€\d+')
 
 
-def parse_price(text):
+def parse_price(text: str | int | float | None):
     """From an incoming value, return
     it's float representation
 
@@ -45,7 +45,7 @@ def parse_price(text):
     return float(price)
 
 
-def clean_text(text, encoding='utf-8'):
+def clean_text(text: str, encoding: str = 'utf-8'):
     if not isinstance(text, str):
         return text
 
@@ -93,7 +93,7 @@ class Text:
         return self.__str__().split(' ')
 
 
-def remove_punctuation(text, keep=[], email_exception=False):
+def remove_punctuation(text: str, keep: list[str] = [], email_exception: bool = False):
     """Remove the punctation from a given text. If the text
     is an email, consider using the email_exception so that the
     '@' symbol does not get removed"""
@@ -108,7 +108,7 @@ def remove_punctuation(text, keep=[], email_exception=False):
     return text.translate(str.maketrans('', '', punctuation))
 
 
-def remove_accents(text):
+def remove_accents(text: str):
     """Remove accents from a given text"""
     return unidecode.unidecode(text)
 
@@ -142,7 +142,7 @@ def clean_dictionnary(item, accents=False, punctation=False):
     return new_item
 
 
-def normalize_spaces(text_or_tokens):
+def normalize_spaces(text_or_tokens: str | list[str]):
     """Remove excess spaces from a given text"""
     if isinstance(text_or_tokens, str):
         tokens = text_or_tokens.split(' ')
@@ -151,7 +151,7 @@ def normalize_spaces(text_or_tokens):
     return ' '.join(drop_null(tokens))
 
 
-def slugify(text):
+def slugify(text: str):
     """Transforms a normal text into a slug
 
     >>> result = slugify('my text')

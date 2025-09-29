@@ -43,7 +43,7 @@ class URL:
     >>> url = URL('http://example.com')
     """
 
-    def __init__(self, url, *, domain=None):
+    def __init__(self, url: str | 'URL', *, domain=None):
         self.invalid_initial_check = False
 
         if isinstance(url, URL):
@@ -350,7 +350,7 @@ class URL:
         ))
         return URL(url)
 
-    def is_same_domain(self, url):
+    def is_same_domain(self, url: str | 'URL'):
         """Checks that an incoming url is the same
         domain as the current one
 
@@ -387,20 +387,20 @@ class URL:
         ]
         return any(logic)
 
-    def capture(self, regex):
+    def capture(self, regex: str):
         """Captures a value in the given url
 
         >>> instance = URL('http://example.com/a')
         ... result = instance.capture(r'\/a')
         ... result.group(1)
-        ... "/a'
+        ... "/a"
         """
         result = re.search(regex, self.raw_url)
         if result:
             return result
         return False
 
-    def test_url(self, regex):
+    def test_url(self, regex: str):
         """Test if an element in the url passes test. The
         whole url is used to perform the test
 
@@ -413,7 +413,7 @@ class URL:
             return True
         return False
 
-    def test_path(self, regex):
+    def test_path(self, regex: str):
         """Test if the url's path passes test. Only the
         path is used to perform the test
 
@@ -457,8 +457,10 @@ class URL:
         def clean_values(value):
             if value == '':
                 return True
+            
             if exclude and value in exclude:
                 return True
+            
             return False
         return list(drop_while(clean_values, result))
 

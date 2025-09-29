@@ -2,12 +2,13 @@ import csv
 import itertools
 import json
 from functools import lru_cache
+from typing import Callable
 
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
 
 
-def tokenize(func):
+def tokenize(func: Callable[[str], str]):
     @lru_cache(maxsize=100)
     def reader(filename, *, as_list=False):
         data = func(filename)
@@ -22,7 +23,7 @@ def get_media_folder(filename):
 
 
 @tokenize
-def read_document(filename):
+def read_document(filename: str):
     """Reads a document of some sort"""
     path = get_media_folder(filename)
     with open(path, mode='r', encoding='utf-8') as f:
@@ -30,7 +31,7 @@ def read_document(filename):
     return data
 
 
-def read_documents(*filenames):
+def read_documents(*filenames: str):
     """Reads and combines multiple documents at once"""
     items = []
     for filename in filenames:
@@ -46,7 +47,7 @@ def read_json_document(filename):
         return data
 
 
-def write_json_document(filename, data):
+def write_json_document(filename: str, data: dict):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
     with open(path, mode='w+', encoding='utf-8') as f:
