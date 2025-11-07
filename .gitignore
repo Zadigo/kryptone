@@ -166,3 +166,5 @@ node_modules
 
 *.sqlite
 credentials.json
+
+.DS_Store

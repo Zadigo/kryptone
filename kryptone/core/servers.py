@@ -26,7 +26,7 @@ app = celery.Celery(
     log=None
 )
 
-print(vars(settings))
+# print(vars(settings))
 
 app.autodiscover_tasks(
     [

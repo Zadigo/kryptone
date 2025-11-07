@@ -7,6 +7,7 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property, lru_cache
 from string import Template
+from typing import Union
 from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus, urlencode, urljoin,
                           urlparse, urlunparse)
 
@@ -43,7 +44,7 @@ class URL:
     >>> url = URL('http://example.com')
     """
 
-    def __init__(self, url: str | 'URL', *, domain=None):
+    def __init__(self, url: Union[str, 'URL'], *, domain=None):
         self.invalid_initial_check = False
 
         if isinstance(url, URL):
@@ -350,7 +351,7 @@ class URL:
         ))
         return URL(url)
 
-    def is_same_domain(self, url: str | 'URL'):
+    def is_same_domain(self, url: Union[str, 'URL']):
         """Checks that an incoming url is the same
         domain as the current one
 
