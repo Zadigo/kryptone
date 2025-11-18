@@ -1,7 +1,7 @@
 import itertools
 from collections import defaultdict
 from functools import cached_property
-from typing import Callable
+from typing import Any, Callable
 
 
 def drop_null(items: list[str | None], remove_empty_strings: bool = True):
@@ -38,7 +38,7 @@ def group_by(predicate: Callable[[str], bool], items: list[str]):
     return lhvs, rhvs
 
 
-def iterate_chunks(items, n):
+def iterate_chunks(items: list[Any], n: int):
     """Function that creates and iterates over
     chunks of data
 
