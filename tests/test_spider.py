@@ -282,7 +282,6 @@ class SpiderMixin:
         # # into one single efficient one
         # cls.spider.setup_class()
         # cls.spider.before_start([])
-    
 
 
 class TestSpider(SpiderMixin, unittest.TestCase):
@@ -296,14 +295,21 @@ class TestSpider(SpiderMixin, unittest.TestCase):
         self.spider.start(self.start_urls)
         self.mocked_edge.get.assert_called_once_with(self.start_urls[0])
 
-        self.assertTrue(hasattr(self.spider, '_meta'))
+        self.assertTrue(
+            hasattr(self.spider, '_meta'),
+            'Spider has no _meta attribute'
+        )
 
         start_urls = getattr(self.spider._meta, 'start_urls', [])
-        self.assertListEqual(start_urls, self.start_urls)
-        self.assertTrue(self.spider.has_start_urls)
+        self.assertListEqual(
+            start_urls, 
+            self.start_urls,
+            'Start URLs do not match'
+        )
+        self.assertTrue(self.spider.has_start_urls, 'Spider has no start URLs')
 
         crawl = getattr(self.spider._meta, 'crawl')
-        self.assertTrue(crawl)
+        self.assertTrue(crawl, 'Spider has no crawl attribute set to True')
 
     @patch.object(SiteCrawler, 'collect_page_urls')
     @patch.object(URL, 'is_same_domain', return_value=True)
@@ -323,8 +329,12 @@ class TestSpider(SpiderMixin, unittest.TestCase):
             URL('http://ecommerce.com/product-1')
         ]
 
+        self.spider.start_url = urls[0]
         self.spider.add_urls(urls)
-        self.assertIn(urls[0], self.spider.urls_to_visit)
+        self.assertTrue(len(self.spider.urls_to_visit)
+                        > 0, 'No URLs were collected')
+        self.assertIn(urls[0], self.spider.urls_to_visit,
+                      'URL from same domain was not collected')
 
     def test_collect_page_urls_with_url_gather_ignore_tests(self):
         collected_urls = [
@@ -382,7 +392,6 @@ class TestSpider(SpiderMixin, unittest.TestCase):
         self.spider.backup_urls()
 
 
-
 class TestWithIgnores(SpiderMixin, unittest.TestCase):
     def test_collect_page_urls_with_url_ignore_tests(self):
         collected_urls = [
@@ -394,7 +403,7 @@ class TestWithIgnores(SpiderMixin, unittest.TestCase):
         self.spider._meta.url_ignore_tests.append(
             URLIgnoreTest('base', paths=['/2'])
         )
-        
+
         self.spider.add_urls(collected_urls)
 
         for url in self.spider.urls_to_visit:
