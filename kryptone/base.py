@@ -245,19 +245,19 @@ class Crawler(type):
 
 
 class BaseCrawler(metaclass=Crawler):
-    DATA_CONTAINER = []
+    DATA_CONTAINER: list = []
     model = None
 
     urls_to_visit: set[URL] = set()
     visited_urls: set[URL] = set()
-    visited_pages_count = 0
+    visited_pages_count: int = 0
     list_of_seen_urls: set[URL] = set()
-    browser_name = None
+    browser_name: Optional[str] = None
     timezone = 'UTC'
     default_scroll_step = 80
 
     storage = None
-    additional_storages = []
+    additional_storages: list[dict[str, str]] = []
 
     def __init__(self, browser_name: Optional[str] = None):
         # The start url which corresponds
@@ -285,12 +285,12 @@ class BaseCrawler(metaclass=Crawler):
         return hash((self.spider_uuid))
 
     @property
-    def get_page_title(self):
+    def get_page_title(self) -> str:
         element = self.driver.find_element(By.TAG_NAME, 'title')
         return element.text
 
     @property
-    def get_current_date(self):
+    def get_current_date(self) -> datetime.datetime:
         timezone = pytz.timezone(self.timezone)
         return datetime.datetime.now(tz=timezone)
 
@@ -309,10 +309,10 @@ class BaseCrawler(metaclass=Crawler):
         ))
 
     @cached_property
-    def calculate_completion_percentage(self):
+    def calculate_completion_percentage(self) -> float:
         return len(self.visited_urls) / len(self.urls_to_visit)
 
-    def download_images(self, urls, page_url, directory=None, exclude_paths=[], filename_attrs={}):
+    def download_images(self, urls: list[str], page_url: Union[str, URL], directory: Optional[Union[str, pathlib.Path]] = None, exclude_paths=[], filename_attrs={}):
         """A method that can be called with a list of image urls to download. The
         images will be stored the indicated media folder"""
         if not isinstance(urls, list):
@@ -320,10 +320,10 @@ class BaseCrawler(metaclass=Crawler):
 
         try:
             from PIL import Image
-        except:
+        except ImportError:
             return False
 
-        async def save_image(url, img):
+        async def save_image(url: URL, img: Any):
             qualified_directory = None
             if directory is None:
                 # Use the default url structure to determine
@@ -338,7 +338,7 @@ class BaseCrawler(metaclass=Crawler):
                 else:
                     qualified_directory = directory
 
-            qualified_directory = settings.MEDIA_FOLDER.joinpath(
+            qualified_directory: pathlib.Path = settings.MEDIA_FOLDER.joinpath(
                 qualified_directory
             )
             if not qualified_directory.exists():
@@ -375,10 +375,10 @@ class BaseCrawler(metaclass=Crawler):
             else:
                 logger.info(f"Downloaded image: {url}")
 
-        async def image_reader(url, buffer):
+        async def image_reader(url: URL, buffer: io.BytesIO):
             img = Image.open(buffer)
-            refactored_img = None
 
+            refactored_img = None
             # image_data = img.getdata()
             resize = getattr(settings, 'IMAGE_DOWNLOAD_RESIZE', ())
             if resize:
@@ -395,7 +395,7 @@ class BaseCrawler(metaclass=Crawler):
             await save_image(url, refactored_img)
             return refactored_img
 
-        async def downloader(task_group, url):
+        async def downloader(task_group: asyncio.TaskGroup, url: str):
             try:
                 response = requests.get(url)
             except:
@@ -408,12 +408,13 @@ class BaseCrawler(metaclass=Crawler):
                     await task_group.create_task(image_reader(URL(url), buffer))
 
         async def main():
-            tasks = []
+            tasks: list[asyncio.Task] = []
 
             async with asyncio.TaskGroup() as tg:
                 for url in urls:
                     task = tg.create_task(downloader(tg, url))
-                    tasks.append(task)
+                    task.add_done_callback(lambda t: tasks.append(t))
+
                 await asyncio.gather(*tasks)
 
         asyncio.run(main())
@@ -494,7 +495,7 @@ class BaseCrawler(metaclass=Crawler):
                 storage_path=settings.MEDIA_FOLDER
             )
 
-        async def run_additional_storages(key, value):
+        async def run_additional_storages(key: str, value: dict[str, Any]):
             for name, storage in self.additional_storages:
                 # Only use storages that are connected.
                 # This is a none block loop
@@ -751,15 +752,15 @@ class BaseCrawler(metaclass=Crawler):
         """
         return NotImplemented
 
-    def after_data_save(self, data):
+    def after_data_save(self, data: Any):
         return NotImplemented
 
-    def before_start(self, start_urls, *args, **kwargs):
+    def before_start(self, start_urls: list[Union[str, URL]], *args, **kwargs):
         return NotImplemented
 
 
 class OnPageActionsMixin:
-    def click_consent_button(self, element_id=None, element_class=None, before_click_wait_time=2, wait_time=None):
+    def click_consent_button(self, element_id: Optional[str] = None, element_class: Optional[str] = None, before_click_wait_time: int = 2, wait_time: Optional[int] = None):
         """Click the consent to cookies button which often
         tends to appear on websites"""
         try:
@@ -822,7 +823,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     #             data, address = server.recvfrom(1024)
     #             executor.submit(handle_client, data, address, server)
 
-    def load_storage(self, python_path):
+    def load_storage(self, python_path: str):
         """Use this function to load a storage on the class
         using a pyton path e.g. storages.FileStorage. The storage
         should be a subclass of `BaseStorage`"""
@@ -835,18 +836,21 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             )
 
         if not issubclass(klass, BaseStorage):
-            raise ValueError(
-                f"{klass} should be an instance "
-                "of BaseStorage"
-            )
+            raise ValueError(f"{klass} should be an instance of BaseStorage")
 
         return klass
 
-    def non_default_storage_by_name(self, name):
+    def non_default_storage_by_name(self, name: str):
         candidates = list(
-            filter(lambda x: x[0] == name, self.additional_storages))
+            filter(
+                lambda x: x[0] == name,
+                self.additional_storages
+            )
+        )
+
         if len(candidates) == 0:
             return False
+
         return candidates[-1]
 
     def setup_class(self):
@@ -901,6 +905,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         # a new key will always be created preventing us from
         # updating the data consistently
         if is_swapped:
+            # FIXME: This could maybe lead to issues because storage
+            # here is a string path and not an actual storage instance
             _, storage = self.non_default_storage_by_name('basic')
         else:
             storage = self.storage
@@ -1131,7 +1137,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break
 
-    def resume(self, windows=1, **kwargs):
+    def resume(self, windows: Optional[int] = 1, **kwargs):
         """Resume a previous crawling sessiong by reloading
         data from the urls to visit and visited urls json files
         if present. The presence of previous data is checked 
@@ -1193,13 +1199,13 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         else:
             self.start(skip_setup=True, **kwargs)
 
-    def start_from_sitemap_xml(self, url, windows=1, **kwargs):
+    def start_from_sitemap_xml(self, url: Union[str, URL], windows: Optional[int] = 1, **kwargs):
         return NotImplemented
 
-    def start_from_json(self, windows=1, **kwargs):
+    def start_from_json(self, windows: Optional[int] = 1, **kwargs):
         return NotImplemented
 
-    def boost_start(self, start_urls=[], *, windows=1, **kwargs):
+    def boost_start(self, start_urls: Optional[list[Union[str, URL]]] = [], *, windows: Optional[int] = 1, **kwargs):
         """Calling this method will make selenium open either
         multiple windows or multiple tabs for the project.$
         Selenium will open an url in each window or tab and

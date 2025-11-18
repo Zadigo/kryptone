@@ -6,6 +6,7 @@ from typing import Callable
 
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
+from kryptone.utils.deprecation import deprecated
 
 
 def tokenize(func: Callable[[str], str]):
@@ -40,13 +41,15 @@ def read_documents(*filenames: str):
     return items
 
 
-def read_json_document(filename):
+@deprecated
+def read_json_document(filename: str):
     path = get_media_folder(filename)
     with open(path, mode='r', encoding='utf-8') as f:
         data = json.load(f)
         return data
 
 
+@deprecated
 def write_json_document(filename: str, data: dict):
     """Writes data to a JSON file"""
     path = get_media_folder(filename)
@@ -60,7 +63,8 @@ def write_json_document(filename: str, data: dict):
         )
 
 
-def read_csv_document(filename, flatten=False):
+@deprecated
+def read_csv_document(filename: str, flatten: bool = False):
     """Reads and returns the data of a csv document"""
     path = get_media_folder(filename)
     with open(path, mode='r', encoding='utf-8') as f:
@@ -70,7 +74,8 @@ def read_csv_document(filename, flatten=False):
         return data
 
 
-def write_csv_document(filename, data, adapt_data=False):
+@deprecated
+def write_csv_document(filename: str, data: list, adapt_data: bool = False):
     """Writes data to a CSV file
 
     >>> write_csv_document('example.csv', [[1], [2]])
@@ -97,7 +102,8 @@ def write_csv_document(filename, data, adapt_data=False):
         writer.writerows(data)
 
 
-def write_text_document(filename, data, encoding='utf-8'):
+@deprecated
+def write_text_document(filename: str, data: str, encoding: str = 'utf-8'):
     """Writes text to a txt file
 
     >>> write_csv_document('example.txt', 'some text')
@@ -105,3 +111,11 @@ def write_text_document(filename, data, encoding='utf-8'):
     path = get_media_folder(filename)
     with open(path, mode='w', encoding=encoding) as f:
         f.write(data)
+
+
+@deprecated
+def something(x):
+    pass
+
+
+something('access.log')

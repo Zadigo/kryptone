@@ -5,13 +5,14 @@ import io
 import json
 import pathlib
 from collections import OrderedDict
+from typing import Any, TYPE_CHECKING, Optional, override
 from urllib.parse import urlencode
 
+import gspread
 import pyairtable
 import pymemcache
 import redis
 import requests
-import gspread
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -19,8 +20,11 @@ from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL, load_image_extensions
 
+if TYPE_CHECKING:
+    from kryptone.base import SiteCrawler
 
-def simple_list_adapter(data):
+
+def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
     """This is useful in cases where we send
     a simple list [1, 2] which needs to be
     adapted to a csv array [[1], [2]]
@@ -50,7 +54,7 @@ class BaseStorage:
         'keep running without a storage backend. Data might be lost!'
     )
 
-    def __init__(self, spider=None):
+    def __init__(self, spider: Optional['SiteCrawler'] = None):
         self.spider = spider
         self.is_connected = False
         self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
@@ -66,16 +70,16 @@ class BaseStorage:
         storage container"""
         return NotImplemented
 
-    async def has(self, key):
+    async def has(self, key: str) -> bool:
         return NotImplemented
 
-    async def get(self, key):
+    async def get(self, key: str) -> Any:
         return NotImplemented
 
-    async def save(self, key, data, adapt_list=False, **kwargs):
+    async def save(self, key: str, data: Any, adapt_list: bool = False, **kwargs) -> Any:
         return NotImplemented
 
-    async def save_or_create(self, key, data, **kwargs):
+    async def save_or_create(self, key: str, data: Any, **kwargs) -> Any:
         """Alternate save function that can be used to either
         save existing data or create a new record if the element
         does not exist. The logic needs to be implemented by the
@@ -654,7 +658,8 @@ class GoogleSheetStorage(BaseStorage):
         path = pathlib.Path(settings.STORAGE_GOOGLE_SHEET_CREDENTIALS)
         with open(path, mode='r', encoding='utf-8') as f:
             credentials = json.load(f)
-            self.storage_connection = gspread.service_account_from_dict(credentials)
+            self.storage_connection = gspread.service_account_from_dict(
+                credentials)
             self.spreadsheet = self.storage_connection.open_by_key(
                 settings.STORAGE_GOOGLE_SHEET_ID
             )

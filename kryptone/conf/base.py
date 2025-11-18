@@ -1,7 +1,5 @@
 import pathlib
 
-from regex import R
-
 
 # Absolute path to the Kryptone project.
 # This represents the root directory of the framework,

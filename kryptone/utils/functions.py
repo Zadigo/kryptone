@@ -1,8 +1,7 @@
-from ctypes import Union
 import pathlib
 import random
 import string
-from typing import Optional
+from typing import Optional, Union
 
 from kryptone.utils.text import (normalize_spaces, remove_accents,
                                  remove_punctuation)
