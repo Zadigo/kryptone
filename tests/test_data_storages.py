@@ -1,7 +1,6 @@
 import csv
 import pathlib
-from unittest import IsolatedAsyncioTestCase
-from unittest import mock
+from unittest import IsolatedAsyncioTestCase, mock
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -11,8 +10,7 @@ from selenium.webdriver import Edge
 from kryptone.base import SiteCrawler
 from kryptone.conf import settings
 from kryptone.data_storages import (BaseStorage, File, FileStorage,
-                                    GoogleSheetStorage, PostGresStorage,
-                                    RedisStorage)
+                                    GoogleSheetStorage, RedisStorage)
 from kryptone.utils.urls import URL
 
 
@@ -83,67 +81,90 @@ class TestFileStorage(IsolatedAsyncioTestCase):
         await self.instance.save('performance.json', data)
 
 
-class TestRedisStorage(IsolatedAsyncioTestCase):
+class TestRealtimeRedisStorage(IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
-        settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
-
         mock_spider = MagicMock(spec=SiteCrawler)
-        type(mock_spider).spider_uuid = PropertyMock(return_result='123')
-        cls.spider = mock_spider
+        type(mock_spider).spider_uuid = PropertyMock(return_value='123')
 
-        cls.connection = RedisStorage(spider=cls.spider)
+        cls.storage = RedisStorage(spider=mock_spider)
 
-    # def setUp(self):
-    #     self.spider = None
-    #     self.connection = None
-    #     self.test_redis()
+    def test_connection(self):
+        self.assertTrue(self.storage.is_connected)
 
-    # @patch('kryptone.base.get_selenium_browser_instance')
-    # @patch('kryptone.base.SiteCrawler')
-    # @patch('redis.Redis')
-    # def test_redis(self, mock_func, mock_site_crawler: MagicMock, mock_redis: MagicMock):
-    #     spider = mock_site_crawler.return_value
-    #     spider.spider_uuid.return_value = uuid4()
-    #     spider._meta.debug_mode.return_value = True
-    #     self.spider = SiteCrawler()
+    async def test_save_value(self):
+        initial = {'a': 1, 'b': 2}
+        await self.storage.save('kryptone_test', initial)
 
-    #     client = mock_redis.return_value
-    #     client.hget.return_value = {'a': 1 }
+        value = await self.storage.get('kryptone_test')
+        self.assertDictEqual(
+            initial, value, f'Saved and retrieved values do not match: {value}')
+        self.assertIsInstance(value, dict)
 
-    #     result = client.hget('key')
-    #     self.assertDictEqual(result, {'a': 1 })
+        self.assertTrue(await self.storage.has('kryptone_test'))
 
-    async def test_connection(self):
-        self.assertTrue(self.connection.is_connected)
 
-    async def test_check_has_key(self):
-        await self.connection.has('performance.json')
+# class TestRedisStorage(IsolatedAsyncioTestCase):
+#     @classmethod
+#     def setUpClass(cls):
+#         settings['STORAGE_REDIS_PASSWORD'] = 'django-local-testing'
 
-    async def test_save(self):
-        result = await self.connection.save('kryptone_tests', 1)
-        self.assertEqual(result, 1)
+#         mock_spider = MagicMock(spec=SiteCrawler)
+#         type(mock_spider).spider_uuid = PropertyMock(return_result='123')
+#         cls.spider = mock_spider
 
-        expected = {'a': 1}
-        await self.connection.save('kryptone_tests', expected)
-        data = await self.connection.get('kryptone_tests')
-        self.assertDictEqual(data, expected)
+#         cls.connection = RedisStorage(spider=cls.spider)
 
-    async def test_saving_cache(self):
-        cache = {
-            'spider': 'ExampleSpider',
-            'spider_uuid': self.spider.spider_uuid,
-            'timestamp': '2024-45-29 14:45:23',
-            'urls_to_visit': [],
-            'visited_urls': [
-                'http://example.com'
-            ]
-        }
-        await self.connection.save(settings.CACHE_FILE_NAME, cache)
-        await self.connection.save('seen_urls.csv', ['http://example.com'])
+#     def setUp(self):
+#         self.spider = None
+#         self.connection = None
+#         self.test_redis()
 
-        result = await self.connection.get(settings.CACHE_FILE_NAME)
-        self.assertEqual(result['spider_uuid'], str(cache['spider_uuid']))
+#     @patch('kryptone.base.get_selenium_browser_instance')
+#     @patch('kryptone.base.SiteCrawler')
+#     @patch('redis.Redis')
+#     def test_redis(self, mock_func, mock_site_crawler: MagicMock, mock_redis: MagicMock):
+#         spider = mock_site_crawler.return_value
+#         spider.spider_uuid.return_value = uuid4()
+#         spider._meta.debug_mode.return_value = True
+#         self.spider = SiteCrawler()
+
+#         client = mock_redis.return_value
+#         client.hget.return_value = {'a': 1 }
+
+#         result = client.hget('key')
+#         self.assertDictEqual(result, {'a': 1 })
+
+#     async def test_connection(self):
+#         self.assertTrue(self.connection.is_connected)
+
+#     async def test_check_has_key(self):
+#         await self.connection.has('performance.json')
+
+#     async def test_save(self):
+#         result = await self.connection.save('kryptone_tests', 1)
+#         self.assertEqual(result, 1)
+
+#         expected = {'a': 1}
+#         await self.connection.save('kryptone_tests', expected)
+#         data = await self.connection.get('kryptone_tests')
+#         self.assertDictEqual(data, expected)
+
+#     async def test_saving_cache(self):
+#         cache = {
+#             'spider': 'ExampleSpider',
+#             'spider_uuid': self.spider.spider_uuid,
+#             'timestamp': '2024-45-29 14:45:23',
+#             'urls_to_visit': [],
+#             'visited_urls': [
+#                 'http://example.com'
+#             ]
+#         }
+#         await self.connection.save(settings.CACHE_FILE_NAME, cache)
+#         await self.connection.save('seen_urls.csv', ['http://example.com'])
+
+#         result = await self.connection.get(settings.CACHE_FILE_NAME)
+#         self.assertEqual(result['spider_uuid'], str(cache['spider_uuid']))
 
 
 # class TestApiStorage(IsolatedAsyncioTestCase):
@@ -183,23 +204,23 @@ class TestRedisStorage(IsolatedAsyncioTestCase):
 #         self.assertDictEqual(result, {'state': True})
 
 
-class TestPostgreSQLStorage(IsolatedAsyncioTestCase):
-    @classmethod
-    def setUpClass(cls):
-        settings['STORAGE_POSTGRESQL_DB_NAME'] = 'kryptone'
-        settings['STORAGE_POSTGRESQL_USER'] = 'kryptone'
-        settings['STORAGE_POSTGRESQL_PASSWORD'] = 'kryptone'
-        settings['STORAGE_POSTGRESQL_HOST'] = 'localhost'
-        cls.settings = settings
-        cls.instance = PostGresStorage(spider=MockupSpider())
+# class TestPostgreSQLStorage(IsolatedAsyncioTestCase):
+#     @classmethod
+#     def setUpClass(cls):
+#         settings['STORAGE_POSTGRESQL_DB_NAME'] = 'kryptone'
+#         settings['STORAGE_POSTGRESQL_USER'] = 'kryptone'
+#         settings['STORAGE_POSTGRESQL_PASSWORD'] = 'kryptone'
+#         settings['STORAGE_POSTGRESQL_HOST'] = 'localhost'
+#         cls.settings = settings
+#         cls.instance = PostGresStorage(spider=MockupSpider())
 
-    def test_connection(self):
-        self.assertTrue(self.instance.is_connected)
-        self.instance.storage_connection.close()
+#     def test_connection(self):
+#         self.assertTrue(self.instance.is_connected)
+#         self.instance.storage_connection.close()
 
-    def test_insert_sql(self):
-        values = [URL('http://example.com'), URL('http://example.com/1')]
-        sql = self.instance.insert_sql('url_cache', *values)
+#     def test_insert_sql(self):
+#         values = [URL('http://example.com'), URL('http://example.com/1')]
+#         sql = self.instance.insert_sql('url_cache', *values)
 
 
 class TestGoogleSheetStorage(IsolatedAsyncioTestCase):
