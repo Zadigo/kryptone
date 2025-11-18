@@ -57,7 +57,10 @@ class BaseStorage:
     def __init__(self, spider: Optional['SiteCrawler'] = None):
         self.spider = spider
         self.is_connected = False
-        self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
+        self.spider_uuid = None
+        
+        if self.spider is not None:
+            self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
 
     def before_save(self, data):
         """A hook that is execute before data
@@ -302,7 +305,7 @@ class RedisStorage(BaseStorage):
         return None
 
 
-class AirtableStorag(BaseStorage):
+class AirtableStorage(BaseStorage):
     storage_class = pyairtable.Api
 
     def __init__(self):

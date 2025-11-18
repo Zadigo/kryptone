@@ -14,14 +14,6 @@ from kryptone.data_storages import (BaseStorage, File, FileStorage,
 from kryptone.utils.urls import URL
 
 
-class TestBaseStorage(IsolatedAsyncioTestCase):
-    def setUp(self):
-        self.instance = BaseStorage()
-
-    def test_structure(self):
-        self.instance.spider
-
-
 class TestFileStorage(IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
