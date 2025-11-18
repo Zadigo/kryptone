@@ -116,22 +116,22 @@ class SpiderConfig:
             raise Exception(e)
 
     # TODO: Add enrichment to spider process
-    def enrich(self,  windows=1, **spider_params):
-        """Runs the spider by calling the spider class
-        which in return calls "start_from_json" method on the
-        spider via the __init__ method"""
-        spider_instance = self.get_spider_instance()
+    # def enrich(self,  windows=1, **spider_params):
+    #     """Runs the spider by calling the spider class
+    #     which in return calls "start_from_json" method on the
+    #     spider via the __init__ method"""
+    #     spider_instance = self.get_spider_instance()
 
-        try:
-            settings['ACTIVE_SPIDER'] = spider_instance
-            spider_instance.start_from_json(windows=windows, **spider_params)
-        except KeyboardInterrupt:
-            spider_instance.after_fail()
-            sys.exit(0)
-        except Exception as e:
-            spider_instance.after_fail()
-            logger.error(e)
-            raise Exception(e)
+    #     try:
+    #         settings['ACTIVE_SPIDER'] = spider_instance
+    #         spider_instance.start_from_json(windows=windows, **spider_params)
+    #     except KeyboardInterrupt:
+    #         spider_instance.after_fail()
+    #         sys.exit(0)
+    #     except Exception as e:
+    #         spider_instance.after_fail()
+    #         logger.error(e)
+    #         raise Exception(e)
 
 
 class MasterRegistry:

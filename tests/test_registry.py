@@ -65,10 +65,13 @@ class TestSpiderConfig(unittest.TestCase):
     def test_structure(self):
         self.assertIsNotNone(self.config.spider_class)
         self.assertIsNotNone(self.config.path)
+        self.assertIsNone(self.config.check_ready())
+        self.assertTrue(self.config.is_ready)
 
         mocked_spider = MagicMock()
         mocked_spider.boost_start.return_value = mock.Mock()
         mocked_spider.start.return_value = mock.Mock()
+        mocked_spider.resume.return_value = mock.Mock()
 
         with patch.object(SpiderConfig, 'get_spider_instance') as mock_method:
             mock_method.return_value = mocked_spider
@@ -78,3 +81,6 @@ class TestSpiderConfig(unittest.TestCase):
 
             self.config.run()
             mocked_spider.start.assert_called()
+
+            self.config.resume()
+            mocked_spider.resume.assert_called()
