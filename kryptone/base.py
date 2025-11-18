@@ -690,11 +690,13 @@ class BaseCrawler(metaclass=Crawler):
     def add_urls(self, urls: list[str], refresh: bool = False):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
-        nested in other elements than links and that
-        cannot actually be retrieved by the spider
+        nested in other elements than links cannot actually be 
+        retrieved by the spider
 
-        * Check that the url was not already seen and therefore
-          invalid be navigated to"""
+        * Checks that the url was not already seen and therefore invalid be navigated to
+        * Checks that the url belongs to the same domain as the start url
+        * Runs filtering tests on the url before adding it to the list of urls to visit
+        """
         checked_urls = self.check_urls(urls, refresh=refresh)
         filtered_urls = self.run_url_filters(checked_urls)
         self.urls_to_visit.update(filtered_urls)
@@ -932,10 +934,24 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             logger.info(color_text(
                 'green', 'Starting Kryptone', background=True))
 
+        # It's either the spider is used inline and the urls
+        # are provided directly to the start function
+        # or the urls are provided in the Meta class
         start_urls = start_urls or self._meta.start_urls
-        if (hasattr(start_urls, 'resolve_generator') or
-                inspect.isgenerator(start_urls)):
+
+        is_generator = any([
+            hasattr(start_urls, 'resolve_generator'),
+            inspect.isgenerator(start_urls)
+        ])
+
+        if is_generator:
             start_urls = list(start_urls)
+
+        # Merge the provided start urls with the ones present
+        # in the Meta class
+        if self._meta.has_start_urls:
+            self._meta.start_urls.extend(start_urls)
+
         start_urls = list(self.transform_string_urls(start_urls))
 
         # If we have absolutely no start_url and at the
@@ -951,9 +967,10 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         if self.start_url is None:
             self.start_url = URL(start_urls[-1])
+
         self.add_urls(start_urls)
 
-    def start(self, start_urls=[], **kwargs):
+    def start(self, start_urls: list[str] = [], **kwargs):
         skip_setup = kwargs.get('skip_setup', False)
         if not skip_setup:
             self.setup_class()
