@@ -8,6 +8,7 @@ from kryptone.data_storages import FileStorage
 from kryptone.base import SiteCrawler
 from kryptone.conf import settings
 from kryptone.utils.urls import URL, URLIgnoreTest
+from management.commands import start
 
 VALID_URLS = [
     "http://www.example.com/",
@@ -284,6 +285,10 @@ class SpiderMixin:
         # cls.spider.before_start([])
 
 
+async def post_navigation_actions(self, current_url: URL, **kwargs):
+    print('Called async post navigation actions')
+
+
 class TestSpider(SpiderMixin, unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
@@ -323,14 +328,14 @@ class TestSpider(SpiderMixin, unittest.TestCase):
 
         self.spider.start_url = urls[0]
         self.spider.add_urls(urls)
-        
+
         self.assertTrue(
-            len(self.spider.urls_to_visit) > 0, 
+            len(self.spider.urls_to_visit) > 0,
             'No URLs were collected'
         )
-        
+
         self.assertIn(
-            urls[0], 
+            urls[0],
             self.spider.urls_to_visit,
             'URL from same domain was not collected'
         )
@@ -376,7 +381,6 @@ class TestSpider(SpiderMixin, unittest.TestCase):
 
         path = pathlib.Path('.').absolute().joinpath('tests/data')
         self.spider.download_images(test_urls, page_url, directory=path)
-        # mock_get_request.assert_called_with()
 
     def test_save_object(self):
         @dataclasses.dataclass
@@ -386,6 +390,17 @@ class TestSpider(SpiderMixin, unittest.TestCase):
         self.spider.model = TestModel
         self.spider.save_object({'name': 'Kendall Jenner'})
         self.assertTrue(len(self.spider.DATA_CONTAINER) > 0)
+
+    def test_async_post_navigation_actions(self):
+        spider = self.spider
+
+        setattr(
+            spider, 
+            'post_navigation_actions',
+            post_navigation_actions.__get__(self.spider)
+        )
+        
+        spider.start(start_urls=self.start_urls)
 
     def test_backup_urls(self):
         self.spider.backup_urls()

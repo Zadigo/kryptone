@@ -6,5 +6,8 @@ class ExampleSpider(SiteCrawler):
     class Meta:
         start_urls = ['http://example.com']
 
-    def current_page_actions(self, current_url, **kwargs):
-        logger.info('Executing current page actions')
+    # def current_page_actions(self, current_url, **kwargs):
+    #     logger.info('Executing current page actions')
+
+    async def post_navigation_actions(self, current_url, **kwargs):
+        logger.info('Executing async post navigation actions')

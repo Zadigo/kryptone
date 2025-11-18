@@ -14,7 +14,7 @@ PROJECT_PATH = pathlib.Path(__file__).parent.absolute()
 
 # Specifies the Selenium WebDriver to use for browser automation.
 # Example values: 'Chrome', 'Firefox', 'Edge', etc.
-WEBDRIVER = 'Edge'
+WEBDRIVER = 'Chrome'
 
 
 # Name of the media folder, used for storing
@@ -52,7 +52,10 @@ CACHE_FILE_NAME = 'cache'
 STORAGES = {
     'default': 'kryptone.data_storages.FileStorage',
     'backends': [
-        'kryptone.data_storages.RedisStorage'
+        {
+            'name': 'redis',
+            'storage': 'kryptone.data_storages.RedisStorage'
+        }
     ]
 }
 
