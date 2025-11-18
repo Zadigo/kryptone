@@ -10,7 +10,6 @@ from pathlib import Path
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.exceptions import SpiderExistsError
-from kryptone.core.servers import create_celery_server
 
 SPIDERS_MODULE = 'spiders'
 
