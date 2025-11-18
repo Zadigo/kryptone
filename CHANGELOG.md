@@ -1,3 +1,5 @@
+## v7.0.0 - (2024-08-08)
+
 ## v6.1.0 - (2024-08-08)
 
 - Allow `async` functions on `post_navigation_actions`, `current_page_actions` and `before_next_page_actions`
