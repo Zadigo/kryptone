@@ -890,7 +890,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.additional_storages.append((custom_name, instance))
 
         if other_storages_path:
-            logger.info(f"Attached additional storages: {other_storages_path}")
+            logger.info(
+                f"Attached additional storages: {storage_info['storage']}")
 
         # Here we are going to check the file that allows
         # us to keep track of the uuid constant which will
