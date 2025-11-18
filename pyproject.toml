@@ -56,8 +56,6 @@ dependencies = [
   "selenium",
   "requests",
   "beautifulsoup4",
-  "quart",
-  "quart-cors",
   "webdriver-manager",
   "gspread",
   "unidecode",
