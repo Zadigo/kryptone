@@ -131,6 +131,26 @@ def check_storages():
     except KeyError:
         errors.append(['STORAGES should have a default key'])
 
+    backends = settings.STORAGES.get('backends', [])
+    if not isinstance(backends, list):
+        errors.append(['STORAGES backends should be a list'])
+
+    for item in backends:
+        if not isinstance(item, dict):
+            errors.append(['Each STORAGE.backend should be a dictionary'])
+            continue
+
+        if 'name' not in item and 'storage' not in item:
+            errors.append(
+                ['Each STORAGE backend should have name and storage keys']
+            )
+
+        if not isinstance(item['name'], str):
+            errors.append(['STORAGE backend name should be a string'])
+
+        if not isinstance(item['storage'], str):
+            errors.append(['STORAGE backend storage should be a string'])
+
     for key in settings.keys():
         if key.startswith('STORAGE_'):
             if key == 'STORAGE_REDIS_PORT':
