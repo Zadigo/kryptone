@@ -461,166 +461,166 @@ class AirtableStorag(BaseStorage):
 #             )
 
 
-class PostGresStorage(BaseStorage):
-    TRANSACTION = 'begin; {sql} commit'
+# class PostGresStorage(BaseStorage):
+#     TRANSACTION = 'begin; {sql} commit'
 
-    CREATE_TABLE = 'create table if not exists {table} ({columns})'
+#     CREATE_TABLE = 'create table if not exists {table} ({columns})'
 
-    SELECT = 'select {columns} from {table}'
-    WHERE_CONDITION = 'where {condition}'
+#     SELECT = 'select {columns} from {table}'
+#     WHERE_CONDITION = 'where {condition}'
 
-    INSERT = 'insert into {table} ({columns}) values ({values})'
+#     INSERT = 'insert into {table} ({columns}) values ({values})'
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.initialize()
-        self.schema = 'spider'
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.initialize()
+#         self.schema = 'spider'
 
-    def __quit__(self):
-        if self.is_connected:
-            self.storage_connection.close()
+#     def __quit__(self):
+#         if self.is_connected:
+#             self.storage_connection.close()
 
-    @staticmethod
-    def comma_join(fields):
-        return ', '.join(fields)
+#     @staticmethod
+#     def comma_join(fields):
+#         return ', '.join(fields)
 
-    @staticmethod
-    def quote_value(value):
-        if isinstance(value, (int, float)):
-            return value
+#     @staticmethod
+#     def quote_value(value):
+#         if isinstance(value, (int, float)):
+#             return value
 
-        if isinstance(value, bool):
-            return 1 if value else 0
+#         if isinstance(value, bool):
+#             return 1 if value else 0
 
-        value = str(value)
+#         value = str(value)
 
-        if value.startswith("'"):
-            return value
-        return f"'{value}'"
+#         if value.startswith("'"):
+#             return value
+#         return f"'{value}'"
 
-    @staticmethod
-    def finalize(value):
-        if value.endswith(';'):
-            return value
-        return f"{value};"
+#     @staticmethod
+#     def finalize(value):
+#         if value.endswith(';'):
+#             return value
+#         return f"{value};"
 
-    def quote_values(self, *values):
-        for value in values:
-            yield self.quote_value(value)
+#     def quote_values(self, *values):
+#         for value in values:
+#             yield self.quote_value(value)
 
-    def build_condition(self, **params):
-        column = params.get('column')
-        condition_value = params.get('condition', '=')
-        quoted_value = self.quote_value(params.get('value'))
-        return f"{column}{condition_value}{quoted_value}"
+#     def build_condition(self, **params):
+#         column = params.get('column')
+#         condition_value = params.get('condition', '=')
+#         quoted_value = self.quote_value(params.get('value'))
+#         return f"{column}{condition_value}{quoted_value}"
 
-    def join_tokens(self, *tokens, separator=' ', finalize_each=False):
-        if finalize_each:
-            return separator.join(self.finalize(x) for x in tokens)
-        return separator.join(tokens)
+#     def join_tokens(self, *tokens, separator=' ', finalize_each=False):
+#         if finalize_each:
+#             return separator.join(self.finalize(x) for x in tokens)
+#         return separator.join(tokens)
 
-    def get_cursor(self):
-        if self.is_connected:
-            return self.storage_connection.cursor()
-        return None
+#     def get_cursor(self):
+#         if self.is_connected:
+#             return self.storage_connection.cursor()
+#         return None
 
-    def run_cursor(self, sql):
-        """Get a cursor and execute an initial
-        sql statement returns both the result and
-        the cursor for more operations"""
-        cursor = self.get_cursor()
-        if cursor is not None:
-            try:
-                sql = self.finalize(sql)
-                result = cursor.execute(sql)
-            except Exception as e:
-                print(e)
-            else:
-                return result, cursor
+#     def run_cursor(self, sql):
+#         """Get a cursor and execute an initial
+#         sql statement returns both the result and
+#         the cursor for more operations"""
+#         cursor = self.get_cursor()
+#         if cursor is not None:
+#             try:
+#                 sql = self.finalize(sql)
+#                 result = cursor.execute(sql)
+#             except Exception as e:
+#                 print(e)
+#             else:
+#                 return result, cursor
 
-    def initialize(self):
-        import psycopg
+#     def initialize(self):
+#         import psycopg
 
-        try:
-            template = 'dbname={db} user={user} password={password} host={host} port={port}'
-            conn_information = template.format(**{
-                'db': settings.STORAGE_POSTGRESQL_DB_NAME,
-                'user': settings.STORAGE_POSTGRESQL_USER,
-                'password': settings.STORAGE_POSTGRESQL_PASSWORD,
-                'host': settings.STORAGE_POSTGRESQL_HOST,
-                'port': settings.STORAGE_POSTGRESQL_PORT,
-            })
-            self.storage_connection = connection = psycopg.connect(
-                conninfo=conn_information
-            )
-        except Exception as e:
-            message = self.connection_error.format(
-                storage_name=self.__class__.__name__)
-            logger.critical(color_text('red', message))
-            logger.critical(str(e))
-            return
-        else:
-            self.is_connected = True
+#         try:
+#             template = 'dbname={db} user={user} password={password} host={host} port={port}'
+#             conn_information = template.format(**{
+#                 'db': settings.STORAGE_POSTGRESQL_DB_NAME,
+#                 'user': settings.STORAGE_POSTGRESQL_USER,
+#                 'password': settings.STORAGE_POSTGRESQL_PASSWORD,
+#                 'host': settings.STORAGE_POSTGRESQL_HOST,
+#                 'port': settings.STORAGE_POSTGRESQL_PORT,
+#             })
+#             self.storage_connection = connection = psycopg.connect(
+#                 conninfo=conn_information
+#             )
+#         except Exception as e:
+#             message = self.connection_error.format(
+#                 storage_name=self.__class__.__name__)
+#             logger.critical(color_text('red', message))
+#             logger.critical(str(e))
+#             return
+#         else:
+#             self.is_connected = True
 
-        sql = 'create schema if not exists spider'
-        result, cursor = self.run_cursor(sql)
+#         sql = 'create schema if not exists spider'
+#         result, cursor = self.run_cursor(sql)
 
-        # Tables
-        table1 = self.CREATE_TABLE.format(**{
-            'table': 'spider.seen_urls',
-            'columns': self.comma_join(
-                [
-                    'id bigserial primary key',
-                    "url varchar(1500) unique not null check(url <> '')",
-                    'created_on timestamp'
-                ]
-            )
-        })
+#         # Tables
+#         table1 = self.CREATE_TABLE.format(**{
+#             'table': 'spider.seen_urls',
+#             'columns': self.comma_join(
+#                 [
+#                     'id bigserial primary key',
+#                     "url varchar(1500) unique not null check(url <> '')",
+#                     'created_on timestamp'
+#                 ]
+#             )
+#         })
 
-        table2 = self.CREATE_TABLE.format(**{
-            'table': 'spider.url_cache',
-            'columns': self.comma_join(
-                [
-                    'id bigserial primary key',
-                    "url varchar(1500) unique not null check(url <> '')",
-                    'visited boolean default false',
-                    'created_on timestamp'
-                ]
-            )
-        })
+#         table2 = self.CREATE_TABLE.format(**{
+#             'table': 'spider.url_cache',
+#             'columns': self.comma_join(
+#                 [
+#                     'id bigserial primary key',
+#                     "url varchar(1500) unique not null check(url <> '')",
+#                     'visited boolean default false',
+#                     'created_on timestamp'
+#                 ]
+#             )
+#         })
 
-        transaction = self.TRANSACTION.format(**{
-            'sql': self.join_tokens(table1, table2, finalize_each=True)
-        })
+#         transaction = self.TRANSACTION.format(**{
+#             'sql': self.join_tokens(table1, table2, finalize_each=True)
+#         })
 
-        cursor.execute(transaction)
-        connection.commit()
-        cursor.close()
+#         cursor.execute(transaction)
+#         connection.commit()
+#         cursor.close()
 
-    def select_sql(self, table: str):
-        return self.SELECT.format_map(**{'table': table})
+#     def select_sql(self, table: str):
+#         return self.SELECT.format_map(**{'table': table})
 
-    def insert_sql(self, table: str, *values: str | URL):
-        d = str(datetime.datetime.now().date())
-        data = [(str(value), False, d) for value in values]
+#     def insert_sql(self, table: str, *values: str | URL):
+#         d = str(datetime.datetime.now().date())
+#         data = [(str(value), False, d) for value in values]
 
-        with self.get_cursor() as c:
-            sql = self.INSERT.format(**{
-                'table': f'{self.schema}.{table}',
-                'columns': self.join_tokens('url', 'visited', 'created_on', separator=', '),
-                'values': '%s, %s, %s'
-            })
-            on_conlict_sql = f'{sql} on conflict (url) do nothing'
-            c.executemany(on_conlict_sql, data)
-            self.storage_connection.commit()
+#         with self.get_cursor() as c:
+#             sql = self.INSERT.format(**{
+#                 'table': f'{self.schema}.{table}',
+#                 'columns': self.join_tokens('url', 'visited', 'created_on', separator=', '),
+#                 'values': '%s, %s, %s'
+#             })
+#             on_conlict_sql = f'{sql} on conflict (url) do nothing'
+#             c.executemany(on_conlict_sql, data)
+#             self.storage_connection.commit()
 
-    async def save(self, key, data, adapt_list=False, **kwargs):
-        if key == f'{settings.CACHE_FILE_NAME}.json':
-            urls_to_visit = data['urls_to_visit']
-            visited_urls = data['visited_urls']
-            self.insert_sql('url_cache', urls_to_visit)
-        elif key == 'seen_urls.csv':
-            self.insert_sql('url_cache', data)
+#     async def save(self, key, data, adapt_list=False, **kwargs):
+#         if key == f'{settings.CACHE_FILE_NAME}.json':
+#             urls_to_visit = data['urls_to_visit']
+#             visited_urls = data['visited_urls']
+#             self.insert_sql('url_cache', urls_to_visit)
+#         elif key == 'seen_urls.csv':
+#             self.insert_sql('url_cache', data)
 
     # def create_sql(self, table, column, value):
     #     return
@@ -656,4 +656,5 @@ class GoogleSheetStorage(BaseStorage):
             credentials = json.load(f)
             self.storage_connection = gspread.service_account_from_dict(credentials)
             self.spreadsheet = self.storage_connection.open_by_key(
-                settings.STORAGE_GOOGLE_SHEET_ID)
+                settings.STORAGE_GOOGLE_SHEET_ID
+            )
