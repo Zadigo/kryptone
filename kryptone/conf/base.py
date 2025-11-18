@@ -139,11 +139,11 @@ STORAGE_GSHEET_SCOPE = [
 # Storage settings for memcache
 # https://pymemcache.readthedocs.io/en/latest/getting_started.html
 
-STORAGE_MEMCACHE_HOST = '127.0.0.1'
+# STORAGE_MEMCACHE_HOST = '127.0.0.1'
 
-STORAGE_MEMCACHE_PORT = 11211
+# STORAGE_MEMCACHE_PORT = 11211
 
-STORAGE_MEMCACHE_LOAD_BALANCER = []
+# STORAGE_MEMCACHE_LOAD_BALANCER = []
 
 # Storage settings for PG Admin
 

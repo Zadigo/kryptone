@@ -370,8 +370,14 @@ class SEOMixin(TextMixin):
         return content
 
     def create_word_cloud(self, frequency):
-        from wordcloud import WordCloud
-
+        try:
+            from wordcloud import WordCloud
+        except ImportError:
+            raise ImportError(
+                "wordcloud library is required to create word clouds. "
+                "Please install it via 'pip install wordcloud'"
+            )
+        
         page_title = self.get_page_title
         wordcloud = WordCloud()
         wordcloud.generate_from_frequencies(frequency)
