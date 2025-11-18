@@ -1,42 +1,53 @@
 import unittest
+import pathlib
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from kryptone.routing import Router, route
 from kryptone.base import SiteCrawler
+from kryptone.conf import settings
+from kryptone.routing import Router, route
 
 
 class TestSpider(SiteCrawler):
     class Meta:
-        debug_mode = True
+        router = Router([
+            route('/my_function', path='/'),
+            route('other_function', regex='/1234')
+        ])
 
-    def handle_1(self, current_url, **kwargs):
+    def my_function(self):
         pass
 
-    def handle_2(self, current_url, **kwargs):
+    def other_function(self):
         pass
 
 
-class TestRouter(unittest.TestCase):
+class TestRouting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        test_project_path = pathlib.Path('./tests/testproject').absolute()
+
+        settings['PROJECT_PATH'] = test_project_path
+        settings['MEDIA_FOLDER'] = test_project_path / 'media'
+
         cls.spider = TestSpider()
 
-    def setUp(self):
-        routes = [
-            route('handle_1', regex=r'\/1', name='func1'),
-            route('handle_2', path='/2', name='func2')
-        ]
-        self.router = Router(routes)
+        cls.p1 = patch('selenium.webdriver.Edge')
+        cls.p2 = patch('kryptone.base.get_selenium_browser_instance')
 
-    def test_can_resolve(self):
-        urls = [
-            'http://example.com/1',
-            'http://example.com/2'
-        ]
-        states = []
-        for url in urls:
-            with self.subTest(url=url):
-                resolution_states = self.router.resolve(url, self.spider)
-                states.append(resolution_states)
+        mocked_edge = cls.p1.start()
+        mocked_selenium_instance = cls.p2.start()
+        mocked_selenium_instance.return_value = mocked_edge
 
-        for state in states:
-            self.assertTrue(any(state))
+        mocked_storage = MagicMock()
+        mocked_storage.initialize.return_value = None
+        mocked_storage.save_or_create = AsyncMock()
+
+        cls.spider.storage = mocked_storage
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.p1.stop()
+        cls.p2.stop()
+
+    def test_structure(self):
+        self.spider.start()

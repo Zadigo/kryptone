@@ -1,0 +1,13 @@
+The web spider can be used in two different ways using the `crawl` option in the `Meta` option class.
+
+### Web crawling
+
+The spider starts from an initial page using the value provided in `start_url` and gathers all the urls. Each url is added to the `urls_to_visit` container and then processed on each iteration. When a page is successfully visited, the url is added to the `visited_urls` container.
+
+Finally every url that was seen on the website will be saved in `list_of_seen_urls`.
+
+If `start_url` was not provided, the first url given in `Meta.start_urls` will be be used.
+
+### Page automation
+
+If you want to automate certain steps on a single page or a group or different pages, use the `SinglePageAutomater`. The code written under the `run_actions` functions will be executed on each specified url.

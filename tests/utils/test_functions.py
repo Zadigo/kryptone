@@ -9,13 +9,14 @@ from kryptone.utils.urls import URL
 
 class TestFunctions(unittest.TestCase):
     def test_create_filename(self):
-        self.assertIsInstance(create_filename(), str)
+        result = create_filename()
+        self.assertIsInstance(result, str)
 
-        self.assertTrue(
-            create_filename(
-                extension='google'
-            ).startswith('google-')
-        )
+        result = create_filename(suffix='google')
+        self.assertTrue(result.endswith('_google'))
+
+        result = create_filename(extension='json')
+        self.assertTrue(result.endswith('.json'))
 
     def test_directory_from_breadcrumb(self):
         result = directory_from_breadcrumbs('a > b > c', separator='>')

@@ -1,0 +1,18 @@
+You can instruct the spider to only select URLs from specific sections of a webpage, defined by HTML tags specified using a CSS selector. This can be achieved using the restrict_search_to option in the spider's Meta settings.
+
+```python
+from kryptone.base import SiteCrawler
+
+class MyScrapper(SiteCrawler):
+    start_url = 'http://example.com'
+    
+    class Meta:
+        restrict_search_to = [
+            '[class="row products-list"]'
+        ]
+
+```
+
+In this example, only URLs within HTML tags with the class row products-list will be considered by the spider.
+
+__Note:__ If the specified section is not found on the page, the spider will default to gathering URLs from the entire page.

@@ -82,10 +82,11 @@ class SpiderConfig:
         try:
             settings['ACTIVE_SPIDER'] = spider_instance
 
+            # create_celery_server()
             # This will tell the driver to open
             # one more window in additin to the
             # one that is opened
-            if windows >= 1:
+            if windows > 1:
                 spider_instance.boost_start(windows=windows, **params)
             else:
                 spider_instance.start(**params)
@@ -103,6 +104,7 @@ class SpiderConfig:
         spider_instance = self.get_spider_instance()
 
         try:
+            # create_celery_server()
             spider_instance.resume(windows=windows, **spider_params)
         except KeyboardInterrupt:
             spider_instance.after_fail()
@@ -113,22 +115,22 @@ class SpiderConfig:
             raise Exception(e)
 
     # TODO: Add enrichment to spider process
-    def enrich(self,  windows=1, **spider_params):
-        """Runs the spider by calling the spider class
-        which in return calls "start_from_json" method on the
-        spider via the __init__ method"""
-        spider_instance = self.get_spider_instance()
+    # def enrich(self,  windows=1, **spider_params):
+    #     """Runs the spider by calling the spider class
+    #     which in return calls "start_from_json" method on the
+    #     spider via the __init__ method"""
+    #     spider_instance = self.get_spider_instance()
 
-        try:
-            settings['ACTIVE_SPIDER'] = spider_instance
-            spider_instance.start_from_json(windows=windows, **spider_params)
-        except KeyboardInterrupt:
-            spider_instance.after_fail()
-            sys.exit(0)
-        except Exception as e:
-            spider_instance.after_fail()
-            logger.error(e)
-            raise Exception(e)
+    #     try:
+    #         settings['ACTIVE_SPIDER'] = spider_instance
+    #         spider_instance.start_from_json(windows=windows, **spider_params)
+    #     except KeyboardInterrupt:
+    #         spider_instance.after_fail()
+    #         sys.exit(0)
+    #     except Exception as e:
+    #         spider_instance.after_fail()
+    #         logger.error(e)
+    #         raise Exception(e)
 
 
 class MasterRegistry:
@@ -184,6 +186,7 @@ class MasterRegistry:
         setattr(settings, 'WEBHOOK_INTERVAL', delta)
 
         self.is_ready = True
+        setattr(settings, '_PYTHON_PATH', dotted_path)
 
     def populate(self):
         dotted_path = os.environ.get(ENVIRONMENT_VARIABLE, None)

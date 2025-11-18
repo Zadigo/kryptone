@@ -1,13 +1,14 @@
+import pathlib
 import random
 import string
-import pathlib
+from typing import Optional, Union
 
 from kryptone.utils.text import (normalize_spaces, remove_accents,
                                  remove_punctuation)
 from kryptone.utils.urls import URL
 
 
-def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]):
+def directory_from_breadcrumbs(text: str, separator: Optional[str] = '>', remove_last: bool = True, exclude: Optional[list[str]] = []) -> pathlib.Path:
     """Get the path the local directory for the breadcrumb
     provided on the current page
 
@@ -37,7 +38,7 @@ def directory_from_breadcrumbs(text, separator='>', remove_last=True, exclude=[]
     return pathlib.Path('/'.join(tokens))
 
 
-def directory_from_url(url_or_path, exclude=[]):
+def directory_from_url(url_or_path: Union[str, URL], exclude: Optional[list[str]] = []):
     """Build the logical local directory in the local project
     using the natural structure of the product url
 
@@ -51,7 +52,7 @@ def directory_from_url(url_or_path, exclude=[]):
     tokens = url_or_path.split('/')
     tokens = filter(lambda x: x not in exclude and x != '', tokens)
 
-    def clean_token(token):
+    def clean_token(token: str) -> str:
         result = token.replace('-', '_')
         return remove_accents(remove_punctuation(result.lower(), keep=['_']))
     tokens = list(map(clean_token, tokens))
@@ -60,7 +61,7 @@ def directory_from_url(url_or_path, exclude=[]):
     return pathlib.Path('/'.join(tokens))
 
 
-def create_filename(length=5, extension=None, suffix=None, suffix_with_date=False):
+def create_filename(length: Optional[int] = 5, extension: Optional[str] = None, suffix: Optional[str] = None, suffix_with_date: bool = False) -> str:
     characters = string.ascii_lowercase + string.digits
     name = ''.join(random.choice(characters) for _ in range(length))
 

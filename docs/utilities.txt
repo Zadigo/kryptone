@@ -1,0 +1,104 @@
+This page will discuss all the scraping utilities that Kryptone offers.
+
+# URL
+
+The `URL` class transforms a simple url string in order to add various attributes to facilitate web scraping.
+
+## Is path
+
+Checks if the url is a path e.g.g starts with `/`
+
+## Is valid
+
+Checks if the url is valid e.g. starts with _http_ or _https_
+
+## Has fragment
+
+Checks if the url has a fragment e.g. _http://example.com#fashion_
+
+## Is file
+
+Checks if the url points to a file
+
+## As path
+
+Returns the url as `pathlib.Path`
+
+## Get extension
+
+Return the extension part of the url e.g. _.jpeg_ of _http://example.com/image.jpeg_
+
+## Url stem
+
+Return the stem of the url e.g.  _image.jpeg_ of _http://example.com/image.jpeg_
+
+## Url stem
+
+Cheks if the url uses _https_
+
+## Create
+
+Creates a new url instance
+
+## Is same domain
+
+Check if two url instances uses the same domain
+
+## Get status
+
+Sends a request to the url (using `requests.Request`) and returns the status
+
+## Compare
+
+Compares two url instances e.g. `URL('http://example.com').compare(URL('http://example.com/1')`
+
+## Capture
+
+Capture a specific section of an url
+
+```python
+url = URL('http://example.com/1')
+url.capture(r'\d+')
+```
+
+## Test url
+
+Test if a section of the whole url passes the given test
+
+```python
+url = URL('http://example.com/1')
+url.capture(r'\d+')
+
+> True
+```
+
+## Test url
+
+Test if a section of the url path __alone__ passes the given test
+
+```python
+url = URL('http://example.com/1')
+url.capture(r'\d+')
+
+> True
+```
+
+## Decompose path
+
+Decompose the url path
+
+```python
+url = URL('http://example.com/products/1')
+url.decompose()
+
+> ['products', '1']
+```
+
+Certain elements can also be excluded:
+
+```python
+url = URL('http://example.com/products/1')
+url.decompose(exclude=['products'])
+
+> ['1']
+```

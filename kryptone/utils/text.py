@@ -1,4 +1,5 @@
-import random
+import sys
+import os
 import re
 import string
 import unicodedata
@@ -8,13 +9,15 @@ import unidecode
 
 from kryptone.utils.iterators import drop_null
 
+os.system("")
+
 # ^(\d+[,.]?\d+)
 PRICE = re.compile(r'(\d+\,?\d+)')
 
 PRICE_EURO = re.compile(r'\d+\€\d+')
 
 
-def parse_price(text):
+def parse_price(text: str | int | float | None):
     """From an incoming value, return
     it's float representation
 
@@ -42,7 +45,7 @@ def parse_price(text):
     return float(price)
 
 
-def clean_text(text, encoding='utf-8'):
+def clean_text(text: str, encoding: str = 'utf-8'):
     if not isinstance(text, str):
         return text
 
@@ -90,7 +93,7 @@ class Text:
         return self.__str__().split(' ')
 
 
-def remove_punctuation(text, keep=[], email_exception=False):
+def remove_punctuation(text: str, keep: list[str] = [], email_exception: bool = False):
     """Remove the punctation from a given text. If the text
     is an email, consider using the email_exception so that the
     '@' symbol does not get removed"""
@@ -105,7 +108,7 @@ def remove_punctuation(text, keep=[], email_exception=False):
     return text.translate(str.maketrans('', '', punctuation))
 
 
-def remove_accents(text):
+def remove_accents(text: str):
     """Remove accents from a given text"""
     return unidecode.unidecode(text)
 
@@ -139,7 +142,7 @@ def clean_dictionnary(item, accents=False, punctation=False):
     return new_item
 
 
-def normalize_spaces(text_or_tokens):
+def normalize_spaces(text_or_tokens: str | list[str]):
     """Remove excess spaces from a given text"""
     if isinstance(text_or_tokens, str):
         tokens = text_or_tokens.split(' ')
@@ -148,7 +151,7 @@ def normalize_spaces(text_or_tokens):
     return ' '.join(drop_null(tokens))
 
 
-def slugify(text):
+def slugify(text: str):
     """Transforms a normal text into a slug
 
     >>> result = slugify('my text')
@@ -158,3 +161,50 @@ def slugify(text):
         raise ValueError(f'Value should be a text. Got: {type(text)}')
     text = text.replace(' ', '-').lower()
     return remove_accents(text)
+
+
+class LogStyle():
+    # See: https://stackoverflow.com/questions/287871/how-do-i-print-colored-text-to-the-terminal
+
+    CHECK_MARK = '[✓]'
+    CROSS_MARK = '[X]'
+    EXCLAMATION_MARK = '!'
+    PLUS = '+'
+
+    def __init__(self, text, background=False):
+        self.foreground_color_code = 38
+        self.background_color_code = 48
+        self.background = background
+        self.text = str(text)
+
+    def get_text(self, red, green, blue):
+        if self.background:
+            # return f"\033[48;2;{red};{green};{blue}m{self.text}\033[0m"
+            text_color_r, text_color_g, text_color_b = (149, 165, 166)
+            return f"\033[38;2;{text_color_r};{text_color_g};{text_color_b}m\033[48;2;{red};{green};{blue}m{self.text}\033[0m"
+        return f"\033[38;2;{red};{green};{blue}m{self.text}\033[0m"
+
+    def red_text(self):
+        return self.get_text(192, 57, 43)
+
+    def yellow_text(self):
+        return self.get_text(241, 196, 15)
+
+    def green_text(self):
+        return self.get_text(39, 174, 96)
+
+    def gray_text(self):
+        return self.get_text(149, 165, 166)
+
+    def blue_text(self):
+        return self.get_text(41, 128, 185)
+
+
+def color_text(color, text, background=False):
+    """Shortcut method used to color a given text. If the
+    color exists on LogStyle, the method will be inferred and used"""
+    instance = LogStyle(text, background=background)
+    method = getattr(instance, f'{color}_text', None)
+    if method is not None:
+        return method()
+    return text

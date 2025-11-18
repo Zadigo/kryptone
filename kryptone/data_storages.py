@@ -1,10 +1,14 @@
 import csv
 import dataclasses
+import datetime
+import io
 import json
 import pathlib
 from collections import OrderedDict
+from typing import Any, TYPE_CHECKING, Optional, override
 from urllib.parse import urlencode
 
+import gspread
 import pyairtable
 import pymemcache
 import redis
@@ -13,10 +17,14 @@ import requests
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.utils.encoders import DefaultJsonEncoder
+from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL, load_image_extensions
 
+if TYPE_CHECKING:
+    from kryptone.base import SiteCrawler
 
-def simple_list_adapter(data):
+
+def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
     """This is useful in cases where we send
     a simple list [1, 2] which needs to be
     adapted to a csv array [[1], [2]]
@@ -41,8 +49,12 @@ class BaseStorage:
     storage_class = None
     storage_connection = None
     file_based = False
+    connection_error = (
+        'Failed connection to {storage_name}. The spider will '
+        'keep running without a storage backend. Data might be lost!'
+    )
 
-    def __init__(self, spider=None):
+    def __init__(self, spider: Optional['SiteCrawler'] = None):
         self.spider = spider
         self.is_connected = False
         self.spider_uuid = None
@@ -56,23 +68,21 @@ class BaseStorage:
         return data
 
     def initialize(self):
-        """A hook function that can be used to
+        """A hook function that used to
         preload data (for example files) in the
-        storage container. This hook should be
-        called also when creating new files in
-        the storage in order to keep track"""
+        storage container"""
         return NotImplemented
 
-    async def has(self, key):
+    async def has(self, key: str) -> bool:
         return NotImplemented
 
-    async def get(self, key):
+    async def get(self, key: str) -> Any:
         return NotImplemented
 
-    async def save(self, key, data, adapt_list=False, **kwargs):
+    async def save(self, key: str, data: Any, adapt_list: bool = False, **kwargs) -> Any:
         return NotImplemented
 
-    async def save_or_create(self, key, data, **kwargs):
+    async def save_or_create(self, key: str, data: Any, **kwargs) -> Any:
         """Alternate save function that can be used to either
         save existing data or create a new record if the element
         does not exist. The logic needs to be implemented by the
@@ -134,7 +144,7 @@ class FileStorage(BaseStorage):
         self.storage_path = storage_path or settings.MEDIA_PATH
         self.ignore_images = ignore_images
         # Since it's a file, the connection to the
-        # local path is always considered active
+        # local file is always considered to be True
         self.is_connected = True
         self.initialize()
 
@@ -142,6 +152,11 @@ class FileStorage(BaseStorage):
         return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
 
     def initialize(self):
+        """A hook function that used to
+        preload data (for example files) in the
+        storage container. This hook should be
+        called also when creating new files in
+        the storage in order to keep track"""
         items = self.storage_path.glob('**/*')
         for item in items:
             if not item.is_file():
@@ -159,12 +174,17 @@ class FileStorage(BaseStorage):
         return key in self.storage
 
     async def get(self, filename):
+        """Reads the file and returns its content"""
         file = await self.get_file(filename)
-        return file.read()
+        return await file.read()
 
     async def get_file(self, filename):
         """Return a file from the storage. The extension
         of the filename should be specified"""
+        # TODO: Instead of raising a dry error if the
+        # file does not exist, create the file, reload
+        # the storage and return the newly created item -;
+        # we can also create the file in memory
         return self.storage[filename]
 
     async def save_or_create(self, filename, data, **kwargs):
@@ -222,9 +242,11 @@ class RedisStorage(BaseStorage):
         try:
             self.storage_connection.ping()
         except:
-            return False
-        self.is_connected = True
-        return self.is_connected
+            message = self.connection_error.format(
+                storage_name=self.__class__.__name__)
+            logger.critical(color_text('red', message))
+        else:
+            self.is_connected = True
 
     def before_save(self, data):
         if isinstance(data, URL):
@@ -446,113 +468,201 @@ class AirtableStorage(BaseStorage):
 #             )
 
 
-class PostGresStorage(BaseStorage):
-    TRANSACTION = 'begin {sql} commit'
+# class PostGresStorage(BaseStorage):
+#     TRANSACTION = 'begin; {sql} commit'
 
-    CREATE_TABLE = 'create table if not exists {table} ({columns})'
+#     CREATE_TABLE = 'create table if not exists {table} ({columns})'
 
-    SELECT = 'select {columns} from {table}'
-    WHERE_CONDITION = 'where {condition}'
+#     SELECT = 'select {columns} from {table}'
+#     WHERE_CONDITION = 'where {condition}'
 
-    INSERT = 'insert into {table} ({columns}) values({values})'
+#     INSERT = 'insert into {table} ({columns}) values ({values})'
 
-    @staticmethod
-    def comma_join(fields):
-        return ', '.join(fields)
+#     def __init__(self, **kwargs):
+#         super().__init__(**kwargs)
+#         self.initialize()
+#         self.schema = 'spider'
 
-    @staticmethod
-    def quote_value(value):
-        if isinstance(value, (int, float)):
-            return value
+#     def __quit__(self):
+#         if self.is_connected:
+#             self.storage_connection.close()
 
-        if isinstance(value, bool):
-            return 1 if value else 0
+#     @staticmethod
+#     def comma_join(fields):
+#         return ', '.join(fields)
 
-        if value.startswith("'"):
-            return value
-        return f"'{value}'"
+#     @staticmethod
+#     def quote_value(value):
+#         if isinstance(value, (int, float)):
+#             return value
 
-    @staticmethod
-    def finalize(value):
-        if value.endswith(';'):
-            return value
-        return f"{value};"
+#         if isinstance(value, bool):
+#             return 1 if value else 0
 
-    def quote_values(self, *values):
-        for value in values:
-            yield self.quote_value(value)
+#         value = str(value)
 
-    def build_condition(self, **params):
-        column = params.get('column')
-        condition_value = params.get('condition', '=')
-        quoted_value = self.quote_value(params.get('value'))
-        return f"{column}{condition_value}{quoted_value}"
+#         if value.startswith("'"):
+#             return value
+#         return f"'{value}'"
 
-    def join_tokens(self, *tokens, finalize_each=False):
-        if finalize_each:
-            return ' '.join(self.finalize(x) for x in tokens)
-        return ' '.join(tokens)
+#     @staticmethod
+#     def finalize(value):
+#         if value.endswith(';'):
+#             return value
+#         return f"{value};"
 
-    def initialize(self):
-        import psycopg
-        self.storage_connection = connection = psycopg.connect()
-        self.is_connected = True
+#     def quote_values(self, *values):
+#         for value in values:
+#             yield self.quote_value(value)
 
-        # Tables
-        table1 = self.CREATE_TABLE.format_map(**{
-            'table': 'spider.seen_urls',
-            'columns': self.comma_join(
-                [
-                    'id integer primary key',
-                    "url varchar(500) unique not null check(url <> '')",
-                    'created_on timestamp'
-                ]
+#     def build_condition(self, **params):
+#         column = params.get('column')
+#         condition_value = params.get('condition', '=')
+#         quoted_value = self.quote_value(params.get('value'))
+#         return f"{column}{condition_value}{quoted_value}"
+
+#     def join_tokens(self, *tokens, separator=' ', finalize_each=False):
+#         if finalize_each:
+#             return separator.join(self.finalize(x) for x in tokens)
+#         return separator.join(tokens)
+
+#     def get_cursor(self):
+#         if self.is_connected:
+#             return self.storage_connection.cursor()
+#         return None
+
+#     def run_cursor(self, sql):
+#         """Get a cursor and execute an initial
+#         sql statement returns both the result and
+#         the cursor for more operations"""
+#         cursor = self.get_cursor()
+#         if cursor is not None:
+#             try:
+#                 sql = self.finalize(sql)
+#                 result = cursor.execute(sql)
+#             except Exception as e:
+#                 print(e)
+#             else:
+#                 return result, cursor
+
+#     def initialize(self):
+#         import psycopg
+
+#         try:
+#             template = 'dbname={db} user={user} password={password} host={host} port={port}'
+#             conn_information = template.format(**{
+#                 'db': settings.STORAGE_POSTGRESQL_DB_NAME,
+#                 'user': settings.STORAGE_POSTGRESQL_USER,
+#                 'password': settings.STORAGE_POSTGRESQL_PASSWORD,
+#                 'host': settings.STORAGE_POSTGRESQL_HOST,
+#                 'port': settings.STORAGE_POSTGRESQL_PORT,
+#             })
+#             self.storage_connection = connection = psycopg.connect(
+#                 conninfo=conn_information
+#             )
+#         except Exception as e:
+#             message = self.connection_error.format(
+#                 storage_name=self.__class__.__name__)
+#             logger.critical(color_text('red', message))
+#             logger.critical(str(e))
+#             return
+#         else:
+#             self.is_connected = True
+
+#         sql = 'create schema if not exists spider'
+#         result, cursor = self.run_cursor(sql)
+
+#         # Tables
+#         table1 = self.CREATE_TABLE.format(**{
+#             'table': 'spider.seen_urls',
+#             'columns': self.comma_join(
+#                 [
+#                     'id bigserial primary key',
+#                     "url varchar(1500) unique not null check(url <> '')",
+#                     'created_on timestamp'
+#                 ]
+#             )
+#         })
+
+#         table2 = self.CREATE_TABLE.format(**{
+#             'table': 'spider.url_cache',
+#             'columns': self.comma_join(
+#                 [
+#                     'id bigserial primary key',
+#                     "url varchar(1500) unique not null check(url <> '')",
+#                     'visited boolean default false',
+#                     'created_on timestamp'
+#                 ]
+#             )
+#         })
+
+#         transaction = self.TRANSACTION.format(**{
+#             'sql': self.join_tokens(table1, table2, finalize_each=True)
+#         })
+
+#         cursor.execute(transaction)
+#         connection.commit()
+#         cursor.close()
+
+#     def select_sql(self, table: str):
+#         return self.SELECT.format_map(**{'table': table})
+
+#     def insert_sql(self, table: str, *values: str | URL):
+#         d = str(datetime.datetime.now().date())
+#         data = [(str(value), False, d) for value in values]
+
+#         with self.get_cursor() as c:
+#             sql = self.INSERT.format(**{
+#                 'table': f'{self.schema}.{table}',
+#                 'columns': self.join_tokens('url', 'visited', 'created_on', separator=', '),
+#                 'values': '%s, %s, %s'
+#             })
+#             on_conlict_sql = f'{sql} on conflict (url) do nothing'
+#             c.executemany(on_conlict_sql, data)
+#             self.storage_connection.commit()
+
+#     async def save(self, key, data, adapt_list=False, **kwargs):
+#         if key == f'{settings.CACHE_FILE_NAME}.json':
+#             urls_to_visit = data['urls_to_visit']
+#             visited_urls = data['visited_urls']
+#             self.insert_sql('url_cache', urls_to_visit)
+#         elif key == 'seen_urls.csv':
+#             self.insert_sql('url_cache', data)
+
+    # def create_sql(self, table, column, value):
+    #     return
+
+    # def insert_sql(self, table, columns=[], values=[]):
+    #     columns = self.comma_join(columns)
+    #     values = self.comma_join(self.quote_values(*values))
+    #     return self.INSERT.format(table=table, columns=columns, values=values)
+
+    # def run_sql_statements(self, *tokens):
+    #     sql = self.join_tokens(*tokens)
+    #     cursor = self.storage_connection.cursor()
+    #     return cursor.execute(self.finalize(sql))
+
+    # def save(self, key, data, adapt_list=False, **kwargs):
+    #     return
+
+    # def visited_urls(self, state=True):
+    #     select_sql = self.select_sql('url_cache')
+    #     condition = self.build_condition(visited=state)
+    #     where_condition = self.WHERE_CONDITION.format(condition=condition)
+    #     return self.run_sql_statements(select_sql, where_condition)
+
+
+class GoogleSheetStorage(BaseStorage):
+    storage_class = None
+
+    def __init__(self, spider=None):
+        super().__init__(spider=spider)
+
+        path = pathlib.Path(settings.STORAGE_GOOGLE_SHEET_CREDENTIALS)
+        with open(path, mode='r', encoding='utf-8') as f:
+            credentials = json.load(f)
+            self.storage_connection = gspread.service_account_from_dict(
+                credentials)
+            self.spreadsheet = self.storage_connection.open_by_key(
+                settings.STORAGE_GOOGLE_SHEET_ID
             )
-        })
-
-        table2 = self.CREATE_TABLE.format_map(**{
-            'table': 'spider.url_cache',
-            'columns': self.comma_join(
-                [
-                    'id integer primary key',
-                    "url varchar(500) unique not null check(url <> '')",
-                    'visited boolean default 0'
-                    'created_on timestamp'
-                ]
-            )
-        })
-
-        transaction = self.TRANSACTION.format(**{
-            'sql': self.join_tokens(table1, finalize_each=True)
-        })
-
-        cursor = connection.cursor()
-        cursor.execute(self.finalize(transaction))
-
-        cursor.close()
-        return True
-
-    def select_sql(self, table):
-        return self.SELECT.format_map(**{'table': table})
-
-    def create_sql(self, table, column, value):
-        return
-
-    def insert_sql(self, table, columns=[], values=[]):
-        columns = self.comma_join(columns)
-        values = self.comma_join(self.quote_values(*values))
-        return self.INSERT.format(table=table, columns=columns, values=values)
-
-    def run_sql_statements(self, *tokens):
-        sql = self.join_tokens(*tokens)
-        cursor = self.storage_connection.cursor()
-        return cursor.execute(self.finalize(sql))
-
-    def save(self, key, data, adapt_list=False, **kwargs):
-        return
-
-    def visited_urls(self, state=True):
-        select_sql = self.select_sql('url_cache')
-        condition = self.build_condition(visited=state)
-        where_condition = self.WHERE_CONDITION.format(condition=condition)
-        return self.run_sql_statements(select_sql, where_condition)

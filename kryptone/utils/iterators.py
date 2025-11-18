@@ -1,15 +1,10 @@
-import datetime
 import itertools
-import re
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from functools import cached_property
-from string import Template
-from urllib.parse import urlencode, urlparse
-
-import pytz
+from typing import Any, Callable
 
 
-def drop_null(items, remove_empty_strings=True):
+def drop_null(items: list[str | None], remove_empty_strings: bool = True):
     for item in items:
         if remove_empty_strings and item == '':
             continue
@@ -18,21 +13,21 @@ def drop_null(items, remove_empty_strings=True):
             yield item
 
 
-def keep_while(predicate, items):
+def keep_while(predicate: Callable[[str], bool], items: list[str]):
     for item in items:
         if not predicate(item):
             continue
         yield item
 
 
-def drop_while(predicate, items):
+def drop_while(predicate: Callable[[str], bool], items: list[str]):
     for item in items:
         if predicate(item):
             continue
         yield item
 
 
-def group_by(predicate, items):
+def group_by(predicate: Callable[[str], bool], items: list[str]):
     lhvs = []
     rhvs = []
     for item in items:
@@ -43,7 +38,7 @@ def group_by(predicate, items):
     return lhvs, rhvs
 
 
-def iterate_chunks(items, n):
+def iterate_chunks(items: list[Any], n: int):
     """Function that creates and iterates over
     chunks of data
 
