@@ -702,8 +702,8 @@ class BaseCrawler(metaclass=Crawler):
         self.urls_to_visit.update(filtered_urls)
 
     def calculate_performance(self):
-        """Calculate the overall spider performance"""
-        async def calculate_urls_performance():
+        """Calculate and/log the overall spider performance"""
+        async def log_urls_performance():
             total_count = sum(
                 [
                     len(self.visited_urls),
@@ -1034,7 +1034,10 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 logger.critical('Body element of page was not located')
                 continue
             else:
-                self.post_navigation_actions(current_url)
+                if inspect.iscoroutinefunction(self.post_navigation_actions):
+                    async_to_sync(self.post_navigation_actions)(current_url)
+                else:
+                    self.post_navigation_actions(current_url)
 
             self.visited_urls.add(current_url)
 
@@ -1045,10 +1048,16 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             current_page_actions_params = {}
 
             try:
-                self.current_page_actions(
-                    current_url,
-                    **current_page_actions_params
-                )
+                if inspect.iscoroutinefunction(self.current_page_actions):
+                    async_to_sync(self.current_page_actions)(
+                        current_url,
+                        **current_page_actions_params
+                    )
+                else:
+                    self.current_page_actions(
+                        current_url,
+                        **current_page_actions_params
+                    )
             except TypeError as e:
                 logger.error(e)
                 raise TypeError(
@@ -1080,7 +1089,13 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             except:
                 pass
             else:
-                self.before_next_page_actions(current_url, next_url)
+                if inspect.iscoroutinefunction(self.before_next_page_actions):
+                    async_to_sync(self.before_next_page_actions)(
+                        current_url,
+                        next_url
+                    )
+                else:
+                    self.before_next_page_actions(current_url, next_url)
 
             if self._meta.router is not None:
                 pass
