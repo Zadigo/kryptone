@@ -3,7 +3,8 @@ import os
 import pathlib
 import unittest
 from importlib import import_module
-from unittest.mock import patch
+from unittest import mock
+from unittest.mock import MagicMock, patch
 
 from kryptone.registry import (ENVIRONMENT_VARIABLE, MasterRegistry,
                                SpiderConfig)
@@ -53,13 +54,27 @@ class TestMasterRegistry(unittest.TestCase):
         self.assertIsInstance(spider, SpiderConfig)
 
 
-@patch('tests.testproject.spiders')
 class TestSpiderConfig(unittest.TestCase):
-    def test_structure(self, mocked_module):
-        print(mocked_module)
+    @classmethod
+    def setUpClass(cls):
         spider_name = 'ExampleSpider'
-        module = import_module('tests.testproject')
+        module = import_module('tests.testproject.spiders')
 
-        config = SpiderConfig(spider_name, module)
-        self.assertIsNotNone(config.spider_class)
-        config.run()
+        cls.config = SpiderConfig(spider_name, module)
+
+    def test_structure(self):
+        self.assertIsNotNone(self.config.spider_class)
+        self.assertIsNotNone(self.config.path)
+
+        mocked_spider = MagicMock()
+        mocked_spider.boost_start.return_value = mock.Mock()
+        mocked_spider.start.return_value = mock.Mock()
+
+        with patch.object(SpiderConfig, 'get_spider_instance') as mock_method:
+            mock_method.return_value = mocked_spider
+
+            self.config.run(windows=10)
+            mocked_spider.boost_start.assert_called()
+
+            self.config.run()
+            mocked_spider.start.assert_called()
