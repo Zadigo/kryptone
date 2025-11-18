@@ -1,6 +1,9 @@
 ## v6.1.0 - (2024-08-08)
 
-- Allow `async` functions on 
+- Allow `async` functions on `post_navigation_actions`, `current_page_actions` and `before_next_page_actions`
+- Add type hints to several methods
+- Improve documentation and tests
+- Remove kryptone-stubs folder from package distribution
 
 ## v6.0.0 - (2024-08-08)
 
