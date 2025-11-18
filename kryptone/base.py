@@ -722,7 +722,7 @@ class BaseCrawler(metaclass=Crawler):
 
         asyncio.run(main())
 
-    def current_page_actions(self, current_url, **kwargs):
+    def current_page_actions(self, current_url: URL, **kwargs):
         """Custom actions to execute on the current page. 
 
         >>> class MyCrawler(SiteCrawler):
@@ -731,13 +731,13 @@ class BaseCrawler(metaclass=Crawler):
         """
         return NotImplemented
 
-    def post_navigation_actions(self, current_url, **kwargs):
+    def post_navigation_actions(self, current_url: URL, **kwargs):
         """Actions to run on the page immediately after
         the crawler has visited a page e.g. clicking
         on cookie button banner"""
         return NotImplemented
 
-    def before_next_page_actions(self, current_url, next_url, **kwargs):
+    def before_next_page_actions(self, current_url: URL, next_url: URL, **kwargs):
         """Actions to run once the page was visited and that
         all user actions were performed. This method runs just 
         after the `wait_time` has expired"""
