@@ -715,9 +715,9 @@ class BaseCrawler(metaclass=Crawler):
             logger.info(f'{percentage}% of total urls visited')
 
         async def main():
-            await asyncio.create_task(calculate_urls_performance())
-
             data = self.performance_audit.json()
+
+            await asyncio.create_task(log_urls_performance())
             await self.storage.save_or_create('performance.json', data)
 
         asyncio.run(main())
