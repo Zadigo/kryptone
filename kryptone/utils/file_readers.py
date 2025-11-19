@@ -111,11 +111,3 @@ def write_text_document(filename: str, data: str, encoding: str = 'utf-8'):
     path = get_media_folder(filename)
     with open(path, mode='w', encoding=encoding) as f:
         f.write(data)
-
-
-@deprecated
-def something(x):
-    pass
-
-
-something('access.log')
