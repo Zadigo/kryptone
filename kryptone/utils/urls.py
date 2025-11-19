@@ -433,12 +433,12 @@ class URL:
             return True
         return False
 
-    def multi_test_path(self, regexes, operator='and'):
+    def multi_test_path(self, regexes: list[str], operator: str = 'and'):
         """Test if the url's path passes test. Only the
         path is used to perform the test
 
         >>> instance = URL('http://example.com/a')
-        ... instance.multi_test_path([r'\/a', r'\/b'])
+        ... instance.multi_test_path([r'\\a', r'\\b'])
         ... True
         """
         truth_array = []
