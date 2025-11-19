@@ -704,11 +704,11 @@ class BaseCrawler(metaclass=Crawler):
             # If the user provided rule testing
             # check that the url validates
             # the regex tests
-            # if self._meta.url_rule_tests:
-            #     truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
-            #     if not all(truth_array):
-            #         invalid_urls.add(url)
-            #         continue
+            if self._meta.url_rule_tests:
+                truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
+                if not all(truth_array):
+                    invalid_urls.add(url)
+                    continue
 
             valid_urls.add(url)
 
