@@ -271,7 +271,7 @@ class MasterRegistry:
 
         self.pre_configure_project(dotted_path, settings)
 
-    def get_spider(self, spider_name):
+    def get_spider(self, spider_name: str) -> SpiderConfig:
         self.check_spiders_ready()
         try:
             return self.spiders[spider_name]

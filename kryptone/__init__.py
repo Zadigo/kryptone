@@ -1,10 +1,12 @@
 import logging
 import re
+
 from kryptone.signals import Signal
 
 __all__ = [
     'Signal'
 ]
+
 
 class Logger:
     instance = None
@@ -27,7 +29,7 @@ class Logger:
         # Since there might be colors in use for logging
         # messages, ensure that ANSI string a removed from
         # log files since they are not correctly parsed
-        
+
         def remove_ansi(text):
             # FIXME: Text could be an exception and that
             # case we have to return the object directly
@@ -40,7 +42,7 @@ class Logger:
             def filter(self, record):
                 record.msg = remove_ansi(record.msg)
                 return True
-        
+
         file_handler.addFilter(NoAnsiFilter())
 
         logger.addHandler(file_handler)

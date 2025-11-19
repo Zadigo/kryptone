@@ -2,6 +2,10 @@ import os
 from collections import OrderedDict
 from importlib import import_module
 from os.path import basename
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from kryptone.management.base import BaseCommand
 
 # NOTE: In order for certain commands to work when
 # testing ex. startproject myproject, in order for
@@ -38,7 +42,7 @@ class Utility:
     This is the main class that encapsulates the logic
     for creating and using the command parser
     """
-    commands_registry = OrderedDict()
+    commands_registry: OrderedDict[str, 'BaseCommand'] = OrderedDict()
 
     def __init__(self):
         modules_paths = collect_commands()
@@ -56,7 +60,7 @@ class Utility:
                 )
             self.commands_registry[true_name] = module_obj.Command()
 
-    def _parse_incoming_commands(self, args):
+    def _parse_incoming_commands(self, args: list[str]):
         if len(args) <= 1:
             from kryptone import logger
             logger.info('No command specified. Exiting...')
@@ -71,11 +75,15 @@ class Utility:
         commands = list(filter(lambda x: name in x, command_names))
         return ' or '.join(commands)
 
-    def call_command(self, name: list):
+    def call_command(self, name: list[str]):
         """
         Call a specific command from the registry
         """
         module_or_file, tokens = self._parse_incoming_commands(name)
+
+        if not tokens:
+            return
+
         command_name = tokens.pop(0)
         command_instance = self.commands_registry.get(command_name, None)
         if command_instance is None:
@@ -91,7 +99,7 @@ class Utility:
         return command_instance
 
 
-def execute_command_inline(argv=None):
+def execute_command_inline(argv: Optional[list[str]] = None):
     """
     Execute a command using `python manage.py`
     """

@@ -1,5 +1,6 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from collections import OrderedDict
+from typing import Optional
 
 
 class BaseCommand:
@@ -27,7 +28,7 @@ class BaseCommand:
         self.add_arguments(parser)
         return parser
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser: ArgumentParser):
         """
         Adds additional arguments in addition with
         the ones that were already implemented above. Each
@@ -35,7 +36,7 @@ class BaseCommand:
         """
         return NotImplemented
 
-    def execute(self, namespace = None):
+    def execute(self, namespace: Optional[Namespace] = None):
         """
         Represents the main logic behind an argument passed
         using the command line. Each Command should override
