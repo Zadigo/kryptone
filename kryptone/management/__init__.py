@@ -58,11 +58,10 @@ class Utility:
 
     def _parse_incoming_commands(self, args):
         if len(args) <= 1:
-            message = (
-                'You called manage.py or python -m kryptone '
-                'without specifying a commands to run.'
-            )
-            raise ValueError(message)
+            from kryptone import logger
+            logger.info('No command specified. Exiting...')
+            return None, []
+
         name = args[0]
         remaining_tokens = args[1:]
         return name, remaining_tokens
