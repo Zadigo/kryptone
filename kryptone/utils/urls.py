@@ -7,9 +7,9 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property, lru_cache
 from string import Template
-from typing import Union
-from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus, urlencode, urljoin,
-                          urlparse, urlunparse)
+from typing import Callable, Optional, Union
+from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus,
+                          urlencode, urljoin, urlparse, urlunparse)
 
 import pandas
 import pytz
@@ -24,9 +24,11 @@ from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
+_StringOrURL = Union[str, 'URL']
+
 
 @lru_cache(maxsize=100)
-def load_image_extensions():
+def load_image_extensions() -> list[str]:
     try:
         from PIL import Image
     except ImportError:
@@ -44,7 +46,7 @@ class URL:
     >>> url = URL('http://example.com')
     """
 
-    def __init__(self, url: Union[str, 'URL'], *, domain=None):
+    def __init__(self, url: Union[str, 'URL', Callable[[], str], None], *, domain: Optional[Union['URL', str]] = None):
         self.invalid_initial_check = False
 
         if isinstance(url, URL):
@@ -65,22 +67,23 @@ class URL:
 
         if url is None:
             self.invalid_initial_check = True
+            url = ''
         elif isinstance(url, (int, float)):
             self.invalid_initial_check = True
             url = str(url)
-        else:
-            if url.startswith('/') and domain is not None:
-                domain = URL(domain)
-                logic = [
-                    domain.is_path,
-                    domain.has_path,
-                    domain.has_queries,
-                    domain.has_fragment
-                ]
-                if any(logic):
-                    raise ValueError(f'Domain is not valid: {domain}')
 
-                url = urljoin(str(domain), url)
+        if url.startswith('/') and domain is not None:
+            domain = URL(url=domain)
+            logic = [
+                domain.is_path,
+                domain.has_path,
+                domain.has_query,
+                domain.has_fragment
+            ]
+            if any(logic):
+                raise ValueError(f'Domain is not valid: {domain}')
+
+            url = urljoin(str(domain), url)
 
         self.raw_url = url
         self.domain = domain
@@ -155,7 +158,7 @@ class URL:
     def is_social_link(self):
         if self.is_empty:
             return False
-        
+
         return any([
             'facebook.com' in self.raw_url,
             'twitter.com' in self.raw_url,
@@ -179,16 +182,16 @@ class URL:
             return False
         return self.raw_url.startswith('/')
 
-    @property
-    def is_image(self):
-        if self.is_empty:
-            return False
-        
-        if self.as_path.suffix != '':
-            suffix = self.as_path.suffix.removeprefix('.')
-            if suffix in constants.IMAGE_EXTENSIONS:
-                return True
-        return False
+    # @property
+    # def is_image(self):
+    #     if self.is_empty:
+    #         return False
+
+    #     if self.as_path.suffix != '':
+    #         suffix = self.as_path.suffix.removeprefix('.')
+    #         if suffix in constants.IMAGE_EXTENSIONS:
+    #             return True
+    #     return False
 
     @property
     def is_valid(self):
@@ -205,7 +208,7 @@ class URL:
     def has_fragment(self):
         if self.is_empty:
             return False
-        
+
         return any([
             self.url_object.fragment != '',
             self.raw_url.endswith('#')
@@ -215,7 +218,7 @@ class URL:
     def as_dict(self):
         if self.is_empty:
             return {}
-        
+
         return {
             'url': self.raw_url,
             'is_valid': self.is_valid
@@ -225,28 +228,28 @@ class URL:
     def has_path(self):
         if self.is_empty:
             return False
-        
+
         return self.url_object.path != ''
 
     @property
     def has_query(self):
         if self.is_empty:
             return False
-        
+
         return self.url_object.query != ''
 
     @property
     def is_image(self):
-        if self.is_empty:
+        if self.is_empty or self.as_path is None:
             return False
-        
+
         return self.as_path.suffix in load_image_extensions()
 
     @property
     def is_file(self):
-        if self.is_empty:
+        if self.is_empty or self.as_path is None:
             return False
-        
+
         extension = self.as_path.suffix
 
         if extension == '':
@@ -260,12 +263,12 @@ class URL:
     def as_path(self):
         if self.is_empty:
             return None
-        
+
         # Rebuild the url without the query
         # part since it's not important for
         # the path resolution
         if self.has_query:
-            return pathlib.Path(unquote_plus(self.url_object.path))
+            return pathlib.Path(unquote_plus(str(self.url_object.path)))
 
         clean_path = unquote_plus(self.raw_url)
         return pathlib.Path(clean_path)
@@ -274,57 +277,60 @@ class URL:
     def url_path(self):
         if self.is_empty:
             return None
-        
-        return unquote_plus(self.url_object.path)
+
+        return unquote_plus(str(self.url_object.path))
 
     @property
     def get_extension(self):
-        if self.is_empty:
+        if self.is_empty or self.as_path is None:
             return None
-        
+
         if self.is_file:
             return self.as_path.suffix
         return None
 
     @property
     def url_stem(self):
-        if self.is_empty:
+        if self.is_empty or self.as_path is None:
             return None
-        
+
         return self.as_path.stem
 
     @property
     def is_secured(self):
         if self.is_empty:
             return False
-        
+
         return self.url_object.scheme == 'https'
 
     @property
     def query(self):
         if self.is_empty:
             return None
-        
-        return parse_qs(self.url_object.query)
+
+        return parse_qs(str(self.url_object.query))
 
     @property
     def get_filename(self):
         """If the url points to a file, try to
         return it's actual name """
+        if self.as_path is None:
+            return None
+
         if self.is_file:
             return self.as_path.name
         return None
 
     @classmethod
-    def create(cls, url):
+    def create(cls, url: str):
         return cls(url)
 
     @staticmethod
-    def structural_check(url, domain=None):
-        clean_url = unquote(url)
+    def structural_check(url: _StringOrURL, domain: Optional[_StringOrURL] = None):
+        clean_url = unquote(str(url))
         return clean_url, urlparse(clean_url)
 
-    def rebuild_query(self, **query):
+    def rebuild_query(self, **query: str):
         """Creates a new instance of the url
         with the existing query and and key/value
         parameters of the query parameter"""
@@ -351,7 +357,7 @@ class URL:
         ))
         return URL(url)
 
-    def is_same_domain(self, url: Union[str, 'URL']):
+    def is_same_domain(self, url: Union[str, 'URL', None]) -> bool:
         """Checks that an incoming url is the same
         domain as the current one
 
@@ -371,7 +377,7 @@ class URL:
         response = requests.get(self.raw_url, headers=headers)
         return response.ok, response.status_code
 
-    def compare(self, url_to_compare):
+    def compare(self, url_to_compare: _StringOrURL) -> bool:
         """Checks that the given url has the same path
         as the url to compare
 
@@ -438,7 +444,7 @@ class URL:
         truth_array = []
         for regex in regexes:
             truth_array.append(self.test_path(regex))
-        
+
         if operator == 'and':
             return all(truth_array)
         elif operator == 'or':
@@ -446,7 +452,7 @@ class URL:
         else:
             raise ValueError('Operator is not valid')
 
-    def decompose_path(self, exclude=[]):
+    def decompose_path(self, exclude: list[str] = []):
         """Decomposes an url's path
 
         >>> instance = URL('http://example.com/a/b')
@@ -455,13 +461,13 @@ class URL:
         """
         result = self.url_object.path.split('/')
 
-        def clean_values(value):
+        def clean_values(value: str):
             if value == '':
                 return True
-            
+
             if exclude and value in exclude:
                 return True
-            
+
             return False
         return list(drop_while(clean_values, result))
 
@@ -552,7 +558,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
     the URL will be ignored.
 
     For example, `example.com/1` will be 
-    ignored with `\/\d+`
+    ignored with `\\d+`
     """
 
     def __init__(self, name, regex):
@@ -711,7 +717,7 @@ class URLPaginationGenerator(BaseURLGenerator):
     ... ['http:////example.com?page=1', 'http:////example.com?page=2']
     """
 
-    def __init__(self, url, param_name='page', k=10):
+    def __init__(self, url: _StringOrURL, param_name: str = 'page', k: int = 10):
         self.urls = []
         self.final_urls = []
 
@@ -763,14 +769,14 @@ class MultipleURLManager:
     list_of_seen_urls = set()
     custom_url_filters = []
 
-    def __init__(self, ignore_images=True, sort_urls=False):
+    def __init__(self, ignore_images: bool = True, sort_urls: bool = False):
         self.start_url = None
         self.ignore_images = ignore_images
         self.sort_urls = sort_urls
         # This attribute is updated every time
         # "get" is called on the class
         self.current_iteration = 0
-        self.dataframe: pandas.DataFrame = None
+        self.dataframe: Optional[pandas.DataFrame] = None
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -1028,7 +1034,8 @@ class MultipleURLManager:
             found_urls = self.dataframe[self.dataframe.urls == url]
             for item in found_urls.itertuples():
                 self.dataframe.loc[item.Index, 'visited'] = True
-                self.dataframe.loc[item.Index, 'visited_on'] = get_current_date()
+                self.dataframe.loc[item.Index,
+                                   'visited_on'] = get_current_date()
             self.current_iteration += 1
             return url
         return None

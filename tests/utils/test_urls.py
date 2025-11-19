@@ -1,4 +1,5 @@
 import unittest
+from urllib.parse import urlunparse
 
 from kryptone.utils.urls import URL
 
@@ -182,3 +183,24 @@ class TestUrl(unittest.TestCase):
         instance = URL('http://example.com?b=2')
         result = instance.rebuild_query(c=4)
         self.assertEqual(str(result), 'http://example.com?c=4&b=2')
+
+    def test_pass_anything(self):
+        values = [
+            'http://example.com',
+            URL('http://example.com'),
+            None,
+            12345,
+            lambda: 'http://example.com',
+            '/some/path',
+            urlunparse(('http', 'example.com', '/path', '', '', ''))
+        ]
+
+        for value in values:
+            with self.subTest(value=value):
+                instance = URL(value)
+                print(instance.is_valid)
+
+    def test_query(self):
+        instance = URL('http://example.com?a=1&b=2&c=3')
+        self.assertEqual(instance.query, {'a': ['1'], 'b': ['2'], 'c': ['3']})
+        self.assertTrue(instance.has_query)

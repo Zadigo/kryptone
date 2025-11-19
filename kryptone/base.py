@@ -11,7 +11,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Optional, Union
+from typing import Any, Final, Optional, Union
 from urllib.parse import ParseResult, unquote, urljoin, urlunparse
 from uuid import uuid4
 
@@ -37,7 +37,7 @@ from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL
 
-DEFAULT_META_OPTIONS = {
+DEFAULT_META_OPTIONS: Final[set[str]] = {
     'domains', 'url_ignore_tests', 'url_rule_tests',
     'debug_mode', 'default_scroll_step',
     'router', 'crawl', 'start_urls',
@@ -100,23 +100,23 @@ def get_selenium_browser_instance(browser_name=None, headless=False, load_images
 class CrawlerOptions:
     """Stores the main options for the crawler"""
 
-    def __init__(self, spider, name):
+    def __init__(self, spider: 'SiteCrawler', name: str):
         self.spider = spider
         self.spider_name = name.lower()
         self.verbose_name = name.title()
         self.initial_spider_meta = None
 
-        self.domains = []
-        self.url_ignore_tests = []
-        self.debug_mode = False
-        self.default_scroll_step = 80
+        self.domains: list[str] = []
+        self.url_ignore_tests: list[Any] = []
+        self.debug_mode: bool = False
+        self.default_scroll_step: int = 80
         self.router = None
-        self.crawl = True
-        self.start_urls = []
+        self.crawl: bool = True
+        self.start_urls: list[str] = []
         # Restrict url retrieval only to
         # to specific sections of the page
         # e.g. body, div[class="example"]
-        self.restrict_search_to = []
+        self.restrict_search_to: list[str] = []
         # Ignore urls with query strings
         self.ignore_queries = False
         self.ignore_images = False
@@ -168,7 +168,7 @@ class Performance:
     end_date: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(tz=pytz.UTC)
     )
-    timezone: str = 'UTC'
+    timezone = 'UTC'
     error_count: int = 0
     duration: int = 0
     count_urls_to_visit: int = 0
@@ -256,8 +256,8 @@ class BaseCrawler(metaclass=Crawler):
     timezone = 'UTC'
     default_scroll_step = 80
 
-    storage = None
-    additional_storages: list[dict[str, str]] = []
+    storage: Union[BaseStorage, None] = None
+    additional_storages: list[tuple[str, BaseStorage]] = []
 
     def __init__(self, browser_name: Optional[str] = None):
         # The start url which corresponds
@@ -418,7 +418,9 @@ class BaseCrawler(metaclass=Crawler):
                 await asyncio.gather(*tasks)
 
         asyncio.run(main())
-        self.storage.initialize()
+
+        if self.storage is not None:
+            self.storage.initialize()
 
     def collect_page_urls(self):
         """Returns all the links present on the
@@ -1137,7 +1139,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break
 
-    def resume(self, windows: Optional[int] = 1, **kwargs):
+    def resume(self, windows: int = 1, **kwargs):
         """Resume a previous crawling sessiong by reloading
         data from the urls to visit and visited urls json files
         if present. The presence of previous data is checked 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Kryptone"
 description = "Kryptone is a hight level web scapper dedicated to marketers and wrapped around the Selenium library in order to automate and simplify website auditing and scraping."
-version="7.2.0"
+version="7.3.0"
 requires-python = ">=3.13"
 readme = "README.md"
 keywords = [
@@ -103,6 +103,6 @@ Repository = "https://github.com/Zadigo/kryptone.git"
 Changelog = "https://github.com/Zadigo/kryptone/blob/main/CHANGELOG.md"
 
 [tool.pyright]
-typeCheckingMode = "off"
+typeCheckingMode = "basic"
 extraPaths = ["./kryptone"]
 reportMissingImports = true

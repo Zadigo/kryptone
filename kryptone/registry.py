@@ -6,14 +6,18 @@ from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional, Type, Final
 
 from kryptone import logger
 from kryptone.conf import settings
 from kryptone.exceptions import SpiderExistsError
 
-SPIDERS_MODULE = 'spiders'
+if TYPE_CHECKING:
+    from kryptone.base import SiteCrawler
 
-ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
+SPIDERS_MODULE: Final = 'spiders'
+
+ENVIRONMENT_VARIABLE: Final = 'KRYPTONE_SPIDER'
 
 
 class SpiderConfig:
@@ -22,11 +26,15 @@ class SpiderConfig:
     its overall different configurations
     """
 
-    def __init__(self, name, spiders_module):
+    def __init__(self, name: str, spiders_module: Any):
         self.name = name
-        self.dotted_path = None
-        self.registry = None
-        self.spider_class = getattr(spiders_module, name, None)
+        self.dotted_path: Optional[str] = None
+        self.registry: Optional[MasterRegistry] = None
+        self.spider_class: Optional[Type['SiteCrawler']] = getattr(
+            spiders_module, 
+            name, 
+            None
+        )
 
         self.MODULE = spiders_module
 
@@ -53,12 +61,12 @@ class SpiderConfig:
         return f"<{self.__class__.__name__} for {self.name}>"
 
     @classmethod
-    def create(cls, name, module, dotted_path=None):
+    def create(cls, name: str, module: Any, dotted_path: Optional[str] = None):
         instance = cls(name, module)
         instance.dotted_path = dotted_path
         return instance
 
-    def get_spider_instance(self):
+    def get_spider_instance(self) -> 'SiteCrawler':
         if self.spider_class is None:
             raise ValueError(
                 f"Could not start spider '{self.name}' in "
@@ -73,7 +81,7 @@ class SpiderConfig:
         if self.spider_class is not None and self.name is not None:
             self.is_ready = True
 
-    def run(self, windows=1, **params):
+    def run(self, windows: int = 1, **params: Any) -> None:
         """Runs the spider by calling the spider class
         which in return calls "start" method on the
         spider via the __init__ method"""
@@ -98,6 +106,8 @@ class SpiderConfig:
             spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
+        finally:
+            spider_instance.driver.quit()
 
     def resume(self, windows=1, **spider_params):
         """Interface function used to call `SpiderCrawler.resume`"""
@@ -113,6 +123,8 @@ class SpiderConfig:
             spider_instance.after_fail()
             logger.error(e)
             raise Exception(e)
+        finally:
+            spider_instance.driver.quit()
 
     # TODO: Add enrichment to spider process
     # def enrich(self,  windows=1, **spider_params):
@@ -131,13 +143,15 @@ class SpiderConfig:
     #         spider_instance.after_fail()
     #         logger.error(e)
     #         raise Exception(e)
+    #     finally:
+    #         spider_instance.driver.quit()
 
 
 class MasterRegistry:
     def __init__(self):
         self.is_ready = False
         self.spiders_ready = False
-        self.spiders = OrderedDict()
+        self.spiders: OrderedDict[str, SpiderConfig] = OrderedDict()
         self.project_name = None
         self.absolute_path = None
         self.middlewares = []
@@ -271,7 +285,7 @@ class MasterRegistry:
 
         self.pre_configure_project(dotted_path, settings)
 
-    def get_spider(self, spider_name: str) -> SpiderConfig:
+    def get_spider(self, spider_name: str):
         self.check_spiders_ready()
         try:
             return self.spiders[spider_name]

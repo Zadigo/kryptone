@@ -23,7 +23,7 @@ class TestUtility(unittest.TestCase):
         self.utility = Utility()
         self.utility.commands_registry['help'] = HelpCommand()
 
-    @unittest.expectedFailure('The namespace is the one of test itself and creates an error')
+    @unittest.skip('The namespace is the one of test itself and creates an error')
     def test_call_command(self):
         incoming_command = ['manage.py', 'help']
         command_instance = self.utility.call_command(incoming_command)

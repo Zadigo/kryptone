@@ -1,6 +1,9 @@
-ENVIRONMENT_VARIABLE = 'KRYPTONE_SPIDER'
+from typing import Final
 
-IMAGE_EXTENSIONS = {
+
+ENVIRONMENT_VARIABLE: Final[str] = 'KRYPTONE_SPIDER'
+
+IMAGE_EXTENSIONS: Final[set[str]] = {
     '3dm',
     '3ds',
     'max',
