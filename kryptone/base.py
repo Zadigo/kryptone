@@ -11,7 +11,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Final, Optional, Union
+from typing import Any, Final, Optional, Sequence, Union
 from urllib.parse import ParseResult, unquote, urljoin, urlunparse
 from uuid import uuid4
 
@@ -38,15 +38,49 @@ from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL
 
 DEFAULT_META_OPTIONS: Final[set[str]] = {
-    'domains', 'url_ignore_tests', 'url_rule_tests',
-    'debug_mode', 'default_scroll_step',
-    'router', 'crawl', 'start_urls',
-    'ignore_queries', 'ignore_images', 'restrict_search_to',
-    'url_gather_ignore_tests', 'database'
+    'domains',
+    # List of callables that will be used
+    # to filter out urls after they have been
+    # collected from the page: URLIgnoreTest, URLIgnoreRegexTest
+    'url_ignore_tests',
+    # List of regex patterns used on URL.test_path
+    # to validate urls before they are added to the
+    # urls to visit list
+    'url_rule_tests',
+    # Whether to run the spider in debug mode
+    'debug_mode',
+    # Default number of pixels to scroll
+    # when scrolling down the page
+    'default_scroll_step',
+    # Router instance used to manage
+    # url routing. Should be an instance of
+    # kryptone.routers.BaseRouter which will
+    # then route the urls to the appropriate
+    # function registered on the spider
+    'router',
+    # Whether to actually perform crawling
+    'crawl',
+    # List of urls or url generators used
+    # to start the crawling from
+    'start_urls',
+    # Ignore urls with query strings
+    'ignore_queries',
+    # Ignore images
+    'ignore_images',
+    # Restrict url retrieval only to
+    # to specific sections of the page
+    # e.g. body, div[class="example"]
+    'restrict_search_to',
+    # List of regex patters used to filter all urls before
+    # they are even considered valid to be added to
+    # the urls to visit list. The urls will not appear in
+    # the seen urls list either
+    'url_gather_ignore_tests',
+    'database'
 }
 
 
-def get_selenium_browser_instance(browser_name=None, headless=False, load_images=True, load_js=True):
+def get_selenium_browser_instance(browser_name: Optional[str] = None, headless: bool = False, load_images: bool = True, load_js: bool = True):
     """Creates a new selenium browser instance
 
     >>> browser = get_selenium_browser_instance()
@@ -120,8 +154,8 @@ class CrawlerOptions:
         # Ignore urls with query strings
         self.ignore_queries = False
         self.ignore_images = False
-        self.url_gather_ignore_tests = []
-        self.url_rule_tests = []
+        self.url_gather_ignore_tests: list[str] = []
+        self.url_rule_tests: list[str] = []
 
     def __repr__(self):
         return f'<{self.__class__.__name__} for {self.verbose_name}>'
@@ -295,7 +329,7 @@ class BaseCrawler(metaclass=Crawler):
         return datetime.datetime.now(tz=timezone)
 
     @property
-    def get_origin(self) -> ParseResult:
+    def get_origin(self) -> str | ParseResult:
         if self.start_url is None:
             return ''
 
@@ -497,7 +531,7 @@ class BaseCrawler(metaclass=Crawler):
                 storage_path=settings.MEDIA_FOLDER
             )
 
-        async def run_additional_storages(key: str, value: dict[str, Any]):
+        async def run_additional_storages(key: str, value: list[Any] | dict[str, Any]):
             for name, storage in self.additional_storages:
                 # Only use storages that are connected.
                 # This is a none block loop
@@ -523,7 +557,7 @@ class BaseCrawler(metaclass=Crawler):
             await run_additional_storages(key_or_filename, data)
 
         async def write_seen_urls():
-            sorted_urls = []
+            sorted_urls: list[str] = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
@@ -550,7 +584,7 @@ class BaseCrawler(metaclass=Crawler):
         """Returns the domain of the current
         website"""
         path = str(path).strip()
-        result = urljoin(self.get_origin, path)
+        result = urljoin(str(self.get_origin), path)
         return URL(unquote(result))
 
     def run_url_filters(self, valid_urls: set[URL]):
@@ -587,7 +621,7 @@ class BaseCrawler(metaclass=Crawler):
             return urls_kept
         return valid_urls
 
-    def check_urls(self, urls: list[str], refresh: bool = False):
+    def check_urls(self, urls: Sequence[str | URL], refresh: bool = False):
         raw_urls = set(urls)
 
         if self.performance_audit.iteration_count > 0:
@@ -662,7 +696,7 @@ class BaseCrawler(metaclass=Crawler):
                 continue
 
             # If the user provided rule testing
-            # check that the url is validates
+            # check that the url validates
             # the regex tests
             # if self._meta.url_rule_tests:
             #     truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
@@ -690,7 +724,7 @@ class BaseCrawler(metaclass=Crawler):
             )
         return valid_urls
 
-    def add_urls(self, urls: list[str], refresh: bool = False):
+    def add_urls(self, urls: Sequence[str | URL], refresh: bool = False):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
         nested in other elements than links cannot actually be 
@@ -809,9 +843,9 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         logger.info('Project stopped')
 
     @staticmethod
-    def transform_string_urls(urls: list[str]):
+    def transform_string_urls(urls: Sequence[str | URL]):
         for url in urls:
-            yield URL(url)
+            yield URL(url) if isinstance(url, str) else url
 
     # async def start_udp_server(self, host='localhost', port=65432):
     #     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -851,7 +885,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         )
 
         if len(candidates) == 0:
-            return False
+            return False, False
 
         return candidates[-1]
 
@@ -932,7 +966,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             logger.warning(
                 f'Created uuid file @ {color_text('blue', file.path)}')
 
-    def before_start(self, start_urls: list[str], *args, **kwargs):
+    def before_start(self, start_urls: Sequence[str | URL], *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
         # "setup_class" funcitons into one single function
         # "setup_class"
@@ -979,7 +1013,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         self.add_urls(start_urls)
 
-    def start(self, start_urls: list[str] = [], **kwargs):
+    def start(self, start_urls: Sequence[str | URL] = [], **kwargs: str | bool):
         skip_setup = kwargs.get('skip_setup', False)
         if not skip_setup:
             self.setup_class()
@@ -1139,7 +1173,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             if os.getenv('KYRPTONE_TEST_RUN') is not None:
                 break
 
-    def resume(self, windows: int = 1, **kwargs):
+    def resume(self, windows: int = 1, **kwargs: str | bool):
         """Resume a previous crawling sessiong by reloading
         data from the urls to visit and visited urls json files
         if present. The presence of previous data is checked 
@@ -1174,7 +1208,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         #             urls_to_visit = storage.get('urls_to_vist')
         #             visited_urls = storage.get('visited_urls')
         # else:
-        data = self.storage.get('cache.json')
+        data = async_to_sync(self.storage.get)('cache.json')
 
         self.start_url = URL(self._meta.start_urls[0])
 
@@ -1184,7 +1218,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         self.urls_to_visit = urls_to_visit
         self.visited_urls = visited_urls
 
-        state = self.storage.has('seen_urls.csv')
+        state = async_to_sync(self.storage.has)('seen_urls.csv')
         if not state:
             logger.warning(
                 "Could not find the file for urls that were "
@@ -1192,8 +1226,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 "revisit urls that were already visited"
             )
 
-        if self.storage.has('performance.json'):
-            data = self.storage.get('performance.json')
+        if async_to_sync(self.storage.has)('performance.json'):
+            data = async_to_sync(self.storage.get)('performance.json')
             self.performance_audit.load_statistics(data)
 
         if windows > 1:
