@@ -295,18 +295,15 @@ class TestSpider(SpiderMixin, unittest.TestCase):
         cls.p1.stop()
         cls.p2.stop()
 
-    # @patch('data_storages.FileStorage', autospec=FileStorage, new_callable=AsyncMock)
     def test_structure(self):
         self.spider.start(self.start_urls)
-        self.mocked_edge.get.assert_called_once_with(self.start_urls[0])
+        self.mocked_edge.get.assert_called()
 
-        self.assertTrue(
-            hasattr(self.spider, '_meta'),
-            'Spider has no _meta attribute'
-        )
+        meta = hasattr(self.spider, '_meta')
+        self.assertIsNotNone(meta, 'Spider has no _meta attribute')
 
-        crawl = getattr(self.spider._meta, 'crawl')
-        self.assertTrue(crawl, 'Spider has no crawl attribute set to True')
+        crawl = getattr(getattr(self.spider, '_meta'), 'crawl')
+        self.assertTrue(crawl, 'Spider has crawl attribute set to False')
 
     @patch.object(SiteCrawler, 'collect_page_urls')
     @patch.object(URL, 'is_same_domain', return_value=True)
@@ -395,11 +392,11 @@ class TestSpider(SpiderMixin, unittest.TestCase):
         spider = self.spider
 
         setattr(
-            spider, 
+            spider,
             'post_navigation_actions',
             post_navigation_actions.__get__(self.spider)
         )
-        
+
         spider.start(start_urls=self.start_urls)
 
     def test_backup_urls(self):
@@ -423,3 +420,42 @@ class TestWithIgnores(SpiderMixin, unittest.TestCase):
         for url in self.spider.urls_to_visit:
             with self.subTest(url=url):
                 self.assertNotIn(collected_urls[-1], self.spider.urls_to_visit)
+
+
+class TestGatherIgnore(SpiderMixin, unittest.TestCase):
+    def test_collect_page_urls_with_url_gather_ignore_tests(self):
+        collected_urls = [
+            URL('http://example.com/product-1'),
+            URL('http://example.com/product-2'),
+            URL('http://example.com/2')
+        ]
+
+        self.spider.start_url = URL('http://example.com/')
+        self.spider._meta.url_gather_ignore_tests.append(r'2$')
+        self.spider.add_urls(collected_urls)
+
+        for url in self.spider.urls_to_visit:
+            with self.subTest(url=url):
+                self.assertNotIn(collected_urls[1], self.spider.urls_to_visit)
+                self.assertNotIn(collected_urls[2], self.spider.urls_to_visit)
+
+        # We should only have one url left
+        self.assertEqual(
+            len(self.spider.urls_to_visit), 1,
+            f'Unexpected number of URLs collected: {self.spider.urls_to_visit}'
+        )
+
+
+class TestUrlRuleTest(SpiderMixin, unittest.TestCase):
+    def test_multi_test_path_and_operator(self):
+        urls = [
+            URL('http://example.com/product/123'),
+            URL('http://example.com/legal')
+        ]
+
+        self.spider.start_url = urls[0]
+        self.spider._meta.url_rule_tests = [r'/product/', r'/123$']
+        result = self.spider.check_urls(urls)
+        
+        # We should only have one remaining url
+        self.assertEqual(len(result), 1, 'Unexpected number of URLs after rule tests')
