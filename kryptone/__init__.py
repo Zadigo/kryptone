@@ -11,7 +11,7 @@ __all__ = [
 class Logger:
     instance = None
 
-    def __init__(self, name='KRYPTONE'):
+    def __init__(self, name: str = 'KRYPTONE'):
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
 
@@ -51,7 +51,7 @@ class Logger:
         self.instance = logger
 
     @classmethod
-    def create(cls, name):
+    def create(cls, name: str = 'KRYPTONE'):
         instance = cls(name=name)
         return instance
 
