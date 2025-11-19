@@ -33,24 +33,6 @@ def collect_commands():
     return complete_paths
 
 
-def load_command_class(name):
-    """
-    Loads each commands in the `management/commands` directory
-    and then returns the Command class instance of a specific
-    command specified the name in the parameter
-    """
-    paths = collect_commands()
-    for path in paths:
-        module_name = basename(path)
-        name, _ = module_name.split('.')
-        try:
-            module = import_module(f'kryptone.management.commands.{name}')
-        except:
-            raise ImportError(
-                f"Could not import module at {path} from the Kryptone commands directory.")
-        return module.Command()
-
-
 class Utility:
     """
     This is the main class that encapsulates the logic
