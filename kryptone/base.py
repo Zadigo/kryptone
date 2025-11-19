@@ -42,10 +42,11 @@ DEFAULT_META_OPTIONS: Final[set[str]] = {
     # List of callables that will be used
     # to filter out urls after they have been
     # collected from the page: URLIgnoreTest, URLIgnoreRegexTest
+    # (exclusion test)
     'url_ignore_tests',
     # List of regex patterns used on URL.test_path
     # to validate urls before they are added to the
-    # urls to visit list
+    # urls to visit list - (exclusion test)
     'url_rule_tests',
     # Whether to run the spider in debug mode
     'debug_mode',
@@ -74,7 +75,8 @@ DEFAULT_META_OPTIONS: Final[set[str]] = {
     # List of regex patters used to filter all urls before
     # they are even considered valid to be added to
     # the urls to visit list. The urls will not appear in
-    # the seen urls list either
+    # the seen urls list either - this is useful for not
+    # tracking certain types of urls at all (exclusion test)
     'url_gather_ignore_tests',
     'database'
 }
