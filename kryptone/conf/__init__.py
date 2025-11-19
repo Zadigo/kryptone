@@ -57,7 +57,7 @@ class Settings:
         self._user_settings = UserSettings(dotted_path)
 
         list_or_tuple_settings = [
-            'STORAGE_MEMCACHE_LOAD_BALANCER', 
+            # 'STORAGE_MEMCACHE_LOAD_BALANCER', 
             'STORAGE_GSHEET_SCOPE'
         ]
         

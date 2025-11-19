@@ -45,9 +45,9 @@ class ApplicationChecks(GlobalMixins):
                 )
 
         requires_list_or_tuple = [
-            'WAIT_TIME_RANGE', 
+            'WAIT_TIME_RANGE',
             'STORAGE_GSHEET_SCOPE',
-            'STORAGE_MEMCACHE_LOAD_BALANCER'
+            # 'STORAGE_MEMCACHE_LOAD_BALANCER'
         ]
         for item in requires_list_or_tuple:
             value = getattr(settings, item)
