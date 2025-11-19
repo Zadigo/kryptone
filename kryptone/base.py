@@ -644,6 +644,12 @@ class BaseCrawler(metaclass=Crawler):
         valid_urls: set[URL] = set()
         invalid_urls: set[URL] = set()
 
+        if self.start_url is None:
+            logger.warning(
+                "Start url is not defined. Will not be able to check "
+                "the domain of the collected urls"
+            )
+
         for url in raw_urls_objs:
             if url.is_path:
                 url = self.urljoin(url)
