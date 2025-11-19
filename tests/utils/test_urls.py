@@ -1,7 +1,9 @@
+import json
+import pathlib
 import unittest
 from urllib.parse import urlunparse
 
-from kryptone.utils.urls import URL
+from kryptone.utils.urls import URL, URLIgnoreRegexTest, URLIgnoreTest
 
 IGNORE_PATHS = [
     '/Customer/Wishlist',
@@ -204,3 +206,83 @@ class TestUrl(unittest.TestCase):
         instance = URL('http://example.com?a=1&b=2&c=3')
         self.assertEqual(instance.query, {'a': ['1'], 'b': ['2'], 'c': ['3']})
         self.assertTrue(instance.has_query)
+
+
+class TestURLIgnoreTest(unittest.TestCase):
+    def setUp(self):
+        path = pathlib.Path(__file__).parent.parent.absolute()
+        with open(path / 'data' / 'urls.json', mode='r') as f:
+            self.urls = json.load(f)
+
+    def test_ignore_paths(self):
+        instance = URLIgnoreTest('test-name', paths=['/femmes/vetements'])
+
+        url_count = len(
+            list(
+                filter(
+                    lambda u: '/femmes/vetements' in u,
+                    self.urls
+                )
+            )
+        )
+
+        self.assertGreater(
+            url_count, 0,
+            'Test URLs must contain at least one matching URL'
+        )
+
+        total_tests = 0
+        for url in self.urls:
+            with self.subTest(url=url):
+                result = instance(url)
+
+                if '/femmes/vetements' in url:
+                    # Was ignored
+                    self.assertTrue(result)
+                    total_tests += 1
+                else:
+                    self.assertFalse(result)
+
+        self.assertEqual(
+            total_tests,
+            url_count,
+            'All matching URLs should have been tested'
+        )
+
+    def test_ignore_paths_regex(self):
+        instance = URLIgnoreRegexTest(
+            'test-name',
+            regex=r'\/minijupe\-denim'
+        )
+
+        url_count = len(
+            list(
+                filter(
+                    lambda u: '/minijupe-denim' in u,
+                    self.urls
+                )
+            )
+        )
+
+        self.assertGreater(
+            url_count, 0,
+            'Test URLs must contain at least one matching URL'
+        )
+
+        total_tests = 0
+        for url in self.urls:
+            with self.subTest(url=url):
+                result = instance(url)
+
+                if '/minijupe-denim' in url:
+                    # Was ignored
+                    self.assertTrue(result)
+                    total_tests += 1
+                else:
+                    self.assertFalse(result)
+
+        self.assertEqual(
+            total_tests,
+            url_count,
+            'All matching URLs should have been tested'
+        )

@@ -4,7 +4,8 @@ import pathlib
 import re
 from dataclasses import field
 from functools import cached_property
-from urllib.parse import unquote, urlparse
+from typing import Optional
+from urllib.parse import ParseResult, unquote, urlparse
 
 from kryptone.utils.text import Text
 
@@ -50,41 +51,42 @@ class Products(BaseModel):
     name: str
     price: str
     url: str
-    image: str = None
-    colors: list = field(default=list)
-    other_information: str = None
+    image: Optional[str] = None
+    colors: list[str] = field(default_factory=list)
+    other_information: Optional[str] = None
 
 
 @dataclasses.dataclass
 class Product(BaseModel):
-    """A simple database for storing pieces
-    of information from an e-commerce 
-    product page"""
+    """A simple model to store product information
+    scraped from an e-commerce product page"""
 
     name: str
     description: str
     price: int
     url: str
-    material: str = None
-    discount_price: int = None
-    breadcrumb: str = None
-    collection_id: str = None
+    material: Optional[str] = None
+    discount_price: Optional[int] = None
+    breadcrumb: Optional[str] = None
+    collection_id: Optional[str] = None
     number_of_colors: int = 1
-    id_or_reference: str = None
-    images: list = dataclasses.field(default_factory=list)
-    composition: str = None
-    color: str = None
-    date: str = None
-    sizes: list = dataclasses.field(default_factory=list)
+    id_or_reference: Optional[str] = None
+    images: list[str] = dataclasses.field(default_factory=list)
+    composition: Optional[str] = None
+    color: Optional[str] = None
+    date: Optional[str] = None
+    sizes: list[str] = dataclasses.field(default_factory=list)
     out_of_stock: bool = False
-    inventory: str = None
+    inventory: Optional[str] = None
     is_404: bool = False
+    other_detail: Optional[dict[str, str | int | None]
+                           ] = dataclasses.field(default_factory=dict)
 
     def __hash__(self):
         return hash((self.name, self.url, self.id_or_reference))
 
     @cached_property
-    def get_images_url_objects(self):
+    def get_images_url_objects(self) -> list[ParseResult]:
         items = []
         for url in self.images:
             items.append(urlparse(url))
@@ -101,7 +103,7 @@ class Product(BaseModel):
         the result of the match will return this specific value otherwise
         it will be result of the first group
 
-        >>> set_collection_id(r'\/(?P<collection_id>\d+)')
+        >>> set_collection_id(r'\\(?P<collection_id>\\d+)')
         """
         result = re.search(regex, self.get_url_object.path)
         if result:
