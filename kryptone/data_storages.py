@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any, Optional
 import gspread
 import pyairtable
 import redis
-from internal_types import FileProtocol, _SiteCrawler
 
 from kryptone import logger
 from kryptone.conf import settings
+from kryptone.internal_types import FileProtocol, _SiteCrawler
 from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL, load_image_extensions
