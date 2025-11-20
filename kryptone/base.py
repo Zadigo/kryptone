@@ -582,8 +582,6 @@ class BaseCrawler(metaclass=Crawler):
                     self.normalize_urls(sorted_urls),
                     adapt_list=True
                 )
-                adapt_list=True
-            )
 
             await run_additional_storages(key_or_filename, self.normalize_urls(sorted_urls))
 
