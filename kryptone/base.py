@@ -27,10 +27,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from internal_types import PerformanceAuditProtocol
 from kryptone import exceptions, logger, signal_constants
 from kryptone.conf import settings
 from kryptone.data_storages import BaseStorage, FileStorage
+from kryptone.internal_types import PerformanceAuditProtocol
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module

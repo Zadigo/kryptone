@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "Kryptone"
 description = "Kryptone is a hight level web scapper dedicated to marketers and wrapped around the Selenium library in order to automate and simplify website auditing and scraping."
-version="7.6.0"
+version="7.7.0"
 requires-python = ">=3.13"
 readme = "README.md"
 keywords = [
