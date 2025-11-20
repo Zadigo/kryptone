@@ -347,6 +347,11 @@ class BaseCrawler(metaclass=Crawler):
     @cached_property
     def calculate_completion_percentage(self) -> float:
         return len(self.visited_urls) / len(self.urls_to_visit)
+    
+    @staticmethod
+    def normalize_urls(urls: list[URL] | set[URL]):
+        """Converts a list of URL objects to strings"""
+        return [str(url) for url in urls]
 
     def download_images(self, urls: list[str], page_url: Union[str, URL], directory: Optional[Union[str, pathlib.Path]] = None, exclude_paths=[], filename_attrs={}):
         """A method that can be called with a list of image urls to download. The
@@ -550,8 +555,8 @@ class BaseCrawler(metaclass=Crawler):
                 'spider': self.__class__.__name__,
                 'spider_uuid': self.spider_uuid,
                 'timestamp': self.get_current_date.strftime('%Y-%M-%d %H:%M:%S'),
-                'urls_to_visit': self.urls_to_visit,
-                'visited_urls': self.visited_urls
+                'urls_to_visit': self.normalize_urls(self.urls_to_visit),
+                'visited_urls': self.normalize_urls(self.visited_urls)
             }
 
             key_or_filename = f'{settings.CACHE_FILE_NAME}.json'
@@ -559,18 +564,18 @@ class BaseCrawler(metaclass=Crawler):
             await run_additional_storages(key_or_filename, data)
 
         async def write_seen_urls():
-            sorted_urls: list[str] = []
+            sorted_urls: list[URL] = []
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
             key_or_filename = 'seen_urls.csv'
             await self.storage.save_or_create(
                 key_or_filename,
-                sorted_urls,
+                self.normalize_urls(sorted_urls),
                 adapt_list=True
             )
 
-            await run_additional_storages(key_or_filename, sorted_urls)
+            await run_additional_storages(key_or_filename, self.normalize_urls(sorted_urls))
 
         async def main():
             t1 = asyncio.create_task(write_cache_file())
@@ -1338,8 +1343,11 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     )
                 except:
                     logger.error('Body element of page was not detected')
-
-                self.post_navigation_actions(current_url)
+                
+                if inspect.iscoroutinefunction(self.post_navigation_actions):
+                    async_to_sync(self.post_navigation_actions)(current_url)
+                else:
+                    self.post_navigation_actions(current_url)
 
                 self.visited_urls.add(current_url)
                 url_instances.append(current_url)
@@ -1362,9 +1370,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 self.backup_urls()
 
                 try:
-                    # Run custom user actions once
-                    # everything is completed
-                    self.current_page_actions(url_instance)
+                    if inspect.iscoroutinefunction(self.current_page_actions):
+                        async_to_sync(self.current_page_actions)(url_instance)
+                    else:
+                        # Run custom user actions once
+                        # everything is completed
+                        self.current_page_actions(url_instance)
                 except TypeError as e:
                     logger.info(e)
                     raise TypeError(

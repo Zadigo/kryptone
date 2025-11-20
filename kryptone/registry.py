@@ -6,7 +6,9 @@ from collections import OrderedDict
 from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Type, Final
+from typing import TYPE_CHECKING, Any, Final, Optional, Type
+
+from asgiref.sync import async_to_sync
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -65,6 +67,14 @@ class SpiderConfig:
         instance = cls(name, module)
         instance.dotted_path = dotted_path
         return instance
+    
+    def _run_fail(self, spider: 'SiteCrawler'):
+        """Runs the after_fail method on the spider instance and
+        any other cleanup operations on failure"""
+        if inspect.iscoroutinefunction(spider.after_fail):
+            async_to_sync(spider.after_fail)()
+        else:
+            spider.after_fail()
 
     def get_spider_instance(self) -> 'SiteCrawler':
         if self.spider_class is None:
@@ -99,11 +109,11 @@ class SpiderConfig:
             else:
                 spider_instance.start(**params)
         except KeyboardInterrupt:
-            spider_instance.after_fail()
+            self._run_fail(spider_instance)
             logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
-            spider_instance.after_fail()
+            self._run_fail(spider_instance)
             logger.error(e)
             raise Exception(e)
         finally:
@@ -117,10 +127,10 @@ class SpiderConfig:
             # create_celery_server()
             spider_instance.resume(windows=windows, **spider_params)
         except KeyboardInterrupt:
-            spider_instance.after_fail()
+            self._run_fail(spider_instance)
             sys.exit(0)
         except Exception as e:
-            spider_instance.after_fail()
+            self._run_fail(spider_instance)
             logger.error(e)
             raise Exception(e)
         finally:
