@@ -18,12 +18,29 @@
             }
         },
         {
-            "name": "Kryptone: Test Project",
+            "name": "Kryptone: Run Project",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/tests/testproject/manage.py",
             "args": [
                 "start",
+                "ExampleSpider"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "presentation": {
+                "hidden": false,
+                "group": "Kryptone",
+                "order": 2
+            }
+        },
+        {
+            "name": "Kryptone: Resume Project",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/testproject/manage.py",
+            "args": [
+                "resume",
                 "ExampleSpider"
             ],
             "console": "integratedTerminal",
