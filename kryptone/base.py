@@ -977,24 +977,25 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         else:
             storage = self.storage
 
-        file_exists = async_to_sync(storage.has)('uuid_map.json')
-        if file_exists:
-            file = async_to_sync(storage.get_file)('uuid_map.json')
-            existing_data = async_to_sync(file.read)()
+        if storage:
+            file_exists = async_to_sync(storage.has)('uuid_map.json')
+            if file_exists:
+                file = async_to_sync(storage.get_file)('uuid_map.json')
+                existing_data = async_to_sync(file.read)()
 
-            # Re-use an existing uuid so that other backends can
-            # track the state of the spider
-            exisiting_uuid = existing_data.get(self.__class__.__name__)
-            if exisiting_uuid is not None:
-                self.spider_uuid = exisiting_uuid
-            logger.warning(
-                f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
-        else:
-            data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
-            async_to_sync(storage.save_or_create)('uuid_map.json', data)
-            file = async_to_sync(storage.get_file)('uuid_map.json')
-            logger.warning(
-                f'Created uuid file @ {color_text('blue', file.path)}')
+                # Re-use an existing uuid so that other backends can
+                # track the state of the spider
+                exisiting_uuid = existing_data.get(self.__class__.__name__)
+                if exisiting_uuid is not None:
+                    self.spider_uuid = exisiting_uuid
+                logger.warning(
+                    f'Re-using known uuid: {color_text('yellow', self.spider_uuid)}')
+            else:
+                data = {f'{self.__class__.__name__}': str(self.spider_uuid)}
+                async_to_sync(storage.save_or_create)('uuid_map.json', data)
+                file = async_to_sync(storage.get_file)('uuid_map.json')
+                logger.warning(
+                    f'Created uuid file @ {color_text('blue', file.path)}')
 
     def before_start(self, start_urls: Sequence[str | URL], *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
