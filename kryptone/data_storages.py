@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional
 import gspread
 import pyairtable
 import redis
+from internal_types import FileProtocol, _SiteCrawler
 
 from kryptone import logger
 from kryptone.conf import settings
@@ -49,15 +50,15 @@ class BaseStorage:
         'keep running without a storage backend. Data might be lost!'
     )
 
-    def __init__(self, spider: Optional['SiteCrawler'] = None):
+    def __init__(self, spider: Optional[_SiteCrawler] = None):
         self.spider = spider
         self.is_connected = False
-        self.spider_uuid = None
-        
+        self.spider_uuid: Optional[str] = None
+
         if self.spider is not None:
             self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
 
-    def before_save(self, data):
+    def before_save(self, data: Any):
         """A hook that is execute before data
         is saved to the storage"""
         return data
@@ -125,15 +126,15 @@ class FileStorage(BaseStorage):
 
     file_based = True
 
-    def __init__(self, *, spider=None, storage_path=None, ignore_images=True):
+    def __init__(self, *, spider: Optional[_SiteCrawler] = None, storage_path: Optional[pathlib.Path | str] = None, ignore_images: bool = True):
         super().__init__(spider=spider)
         if storage_path is not None:
             if isinstance(storage_path, str):
                 storage_path = pathlib.Path(storage_path)
 
-        if not storage_path.is_dir():
-            raise ValueError(
-                f"Storage should be a folder. Got: {storage_path}")
+            if not storage_path.is_dir():
+                raise ValueError(
+                    f"Storage should be a folder. Got: {storage_path}")
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
@@ -165,15 +166,15 @@ class FileStorage(BaseStorage):
             self.storage[item.name] = instance
         return True
 
-    async def has(self, key):
+    async def has(self, key: str) -> bool:
         return key in self.storage
 
-    async def get(self, filename):
+    async def get(self, filename: str):
         """Reads the file and returns its content"""
         file = await self.get_file(filename)
         return await file.read()
 
-    async def get_file(self, filename):
+    async def get_file(self, filename: str) -> FileProtocol:
         """Return a file from the storage. The extension
         of the filename should be specified"""
         # TODO: Instead of raising a dry error if the
@@ -182,7 +183,7 @@ class FileStorage(BaseStorage):
         # we can also create the file in memory
         return self.storage[filename]
 
-    async def save_or_create(self, filename, data, **kwargs):
+    async def save_or_create(self, filename: str, data: Any, **kwargs):
         file_exists = await self.has(filename)
         if not file_exists:
             path = self.storage_path.joinpath(filename)
@@ -199,7 +200,7 @@ class FileStorage(BaseStorage):
             return True
         return await self.save(filename, data, **kwargs)
 
-    async def save(self, filename, data, adapt_list=False):
+    async def save(self, filename: str, data: Any, adapt_list: bool = False):
         data = self.before_save(data)
         file = await self.get_file(filename)
 
@@ -243,7 +244,7 @@ class RedisStorage(BaseStorage):
         else:
             self.is_connected = True
 
-    def before_save(self, data):
+    def before_save(self, data: Any) -> str:
         if isinstance(data, URL):
             data = str(data)
 
@@ -255,15 +256,19 @@ class RedisStorage(BaseStorage):
 
         return str(data)
 
-    async def has(self, key):
+    async def has(self, key: str) -> bool:
         value = self.storage_connection.get(key)
         return False if value is None else True
 
-    async def update_iteration(self, by=1):
+    async def update_iteration(self, by: int = 1):
         self.storage_connection.incrby('iteration', by)
 
-    async def save(self, key, data):
+    async def save(self, key: str, data: Any):
         data = self.before_save(data)
+
+        if self.spider_uuid is None:
+            return None
+
         return self.storage_connection.hset(self.spider_uuid, key, data)
 
     async def save_or_create(self, key, data, **kwargs):
@@ -278,25 +283,28 @@ class RedisStorage(BaseStorage):
         else:
             await self.save(key, data)
 
-    async def get(self, key):
-        result = self.storage_connection.hget(self.spider_uuid, key)
+    async def get(self, key: str):
+        if self.spider_uuid is not None:
+            result = self.storage_connection.hget(self.spider_uuid, key)
 
-        if result is not None:
-            data = result.decode()
+            if result is not None and isinstance(result, bytes):
+                data = result.decode()
 
-            try:
-                # If the item is a list or dict,
-                # this will attempt to return it
-                return json.loads(data)
-            except:
-                pass
+                try:
+                    # If the item is a list or dict,
+                    # this will attempt to return it
+                    return json.loads(data)
+                except:
+                    pass
 
-            try:
-                return int(data)
-            except:
-                pass
+                try:
+                    # If the item is an integer,
+                    # return it as such
+                    return int(data)
+                except:
+                    pass
 
-            return data
+                return data
         return None
 
 

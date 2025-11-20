@@ -27,6 +27,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
+from internal_types import PerformanceAuditProtocol
 from kryptone import exceptions, logger, signal_constants
 from kryptone.conf import settings
 from kryptone.data_storages import BaseStorage, FileStorage
@@ -296,7 +297,7 @@ class BaseCrawler(metaclass=Crawler):
     timezone = 'UTC'
     default_scroll_step = 80
 
-    storage: Union[BaseStorage, None] = None
+    storage: Union[BaseStorage | FileStorage, None] = None
     additional_storages: list[tuple[str, BaseStorage]] = []
 
     def __init__(self, browser_name: Optional[str] = None):
@@ -306,6 +307,8 @@ class BaseCrawler(metaclass=Crawler):
         # crawling needs to be limited to
         self.start_url: Optional[URL] = None
 
+        # A dictionary that allows us to track the
+        # distribution of urls per domain or page visited
         self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
 
@@ -351,7 +354,7 @@ class BaseCrawler(metaclass=Crawler):
     @cached_property
     def calculate_completion_percentage(self) -> float:
         return len(self.visited_urls) / len(self.urls_to_visit)
-    
+
     @staticmethod
     def normalize_urls(urls: list[URL] | set[URL]):
         """Converts a list of URL objects to strings"""
@@ -576,6 +579,8 @@ class BaseCrawler(metaclass=Crawler):
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
+            key_or_filename = 'seen_urls.csv'
+
             if self.storage is not None:
                 await self.storage.save_or_create(
                     key_or_filename,
@@ -728,7 +733,8 @@ class BaseCrawler(metaclass=Crawler):
             # check that the url validates
             # the regex tests
             if self._meta.url_rule_tests:
-                truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
+                truth_array = map(lambda x: url.test_path(x),
+                                  self._meta.url_rule_tests)
                 if not all(truth_array):
                     invalid_urls.add(url)
                     continue
@@ -862,7 +868,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         self.start_date = get_current_date(timezone=self.timezone)
         self.end_date = None
-        self.performance_audit = Performance()
+        self.performance_audit: PerformanceAuditProtocol = Performance()
         self.performance_audit.timezone = self.timezone
 
     def __del__(self):
@@ -1262,23 +1268,27 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.performance_audit.load_statistics(data)
 
         if windows > 1:
-            self.boost_start(windows=windows, **kwargs)
+            self.boost_start(windows=windows, skip_setup=True, **kwargs)
         else:
             self.start(skip_setup=True, **kwargs)
 
-    def start_from_sitemap_xml(self, url: Union[str, URL], windows: Optional[int] = 1, **kwargs):
+    def start_from_sitemap_xml(self, url: Union[str, URL], windows: Optional[int] = 1, **kwargs: str | bool):
         return NotImplemented
 
-    def start_from_json(self, windows: Optional[int] = 1, **kwargs):
+    def start_from_json(self, windows: Optional[int] = 1, **kwargs: str | bool):
         return NotImplemented
 
-    def boost_start(self, start_urls: Optional[list[Union[str, URL]]] = [], *, windows: Optional[int] = 1, **kwargs):
+    def boost_start(self, start_urls: Sequence[Union[str, URL]] = [], *, windows: int = 1, **kwargs: str | bool):
         """Calling this method will make selenium open either
         multiple windows or multiple tabs for the project.$
         Selenium will open an url in each window or tab and
         sequentically call `current_page_actions` on the
         given page"""
-        self.setup_class()
+
+        skip_setup = kwargs.get('skip_setup', False)
+        if not skip_setup:
+            self.setup_class()
+
         self.before_start(start_urls, **kwargs)
 
         wait_time = settings.WAIT_TIME
@@ -1361,7 +1371,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     )
                 except:
                     logger.error('Body element of page was not detected')
-                
+
                 if inspect.iscoroutinefunction(self.post_navigation_actions):
                     async_to_sync(self.post_navigation_actions)(current_url)
                 else:
