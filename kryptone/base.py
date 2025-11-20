@@ -228,7 +228,7 @@ class Performance:
     def load_statistics(self, data):
         self.iteration_count = data['iteration_count']
 
-        date_format = '%Y-%m-%dT%H:%M:%S.%f'
+        date_format = '%Y-%m-%dT%H:%M:%S.%fZ'
         self.start_date = datetime.datetime.strptime(
             data['start_date'],
             date_format
