@@ -566,7 +566,9 @@ class BaseCrawler(metaclass=Crawler):
             }
 
             key_or_filename = f'{settings.CACHE_FILE_NAME}.json'
-            await self.storage.save_or_create(key_or_filename, data)
+
+            if self.storage is not None:
+                await self.storage.save_or_create(key_or_filename, data)
             await run_additional_storages(key_or_filename, data)
 
         async def write_seen_urls():
@@ -574,10 +576,12 @@ class BaseCrawler(metaclass=Crawler):
             for url in self.list_of_seen_urls:
                 bisect.insort(sorted_urls, url)
 
-            key_or_filename = 'seen_urls.csv'
-            await self.storage.save_or_create(
-                key_or_filename,
-                self.normalize_urls(sorted_urls),
+            if self.storage is not None:
+                await self.storage.save_or_create(
+                    key_or_filename,
+                    self.normalize_urls(sorted_urls),
+                    adapt_list=True
+                )
                 adapt_list=True
             )
 
