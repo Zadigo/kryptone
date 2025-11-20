@@ -495,6 +495,8 @@ class BaseCrawler(metaclass=Crawler):
                 return urls.map(x => x.href)
                 """
             )
+
+        self.url_distribution[self.driver.current_url].extend(found_urls)
         return found_urls
 
     def save_object(self, data: Union[dict[str, Any], list[dict[str, Any]]], check_fields_null: list[str] = []):
