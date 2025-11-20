@@ -233,7 +233,11 @@ class Performance:
             data['start_date'],
             date_format
         )
-        self.start_date.replace(tzinfo=pytz.timezone(data['timezone']))
+        self.start_date.replace(
+            tzinfo=pytz.timezone(
+                data.get('timezone', 'UTC')
+            )
+        )
 
         self.count_urls_to_visit = data.get('count_urls_to_visit', 0)
         self.count_visited_urls = data.get('count_visited_urls', 0)
