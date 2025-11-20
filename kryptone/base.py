@@ -585,11 +585,19 @@ class BaseCrawler(metaclass=Crawler):
 
             await run_additional_storages(key_or_filename, self.normalize_urls(sorted_urls))
 
+        async def write_url_distribution():
+            key_or_filename = 'url_distribution.json'
+
+            if self.storage is not None:
+                await self.storage.save_or_create(key_or_filename, self.url_distribution)
+            await run_additional_storages(key_or_filename, self.url_distribution)
+
         async def main():
             t1 = asyncio.create_task(write_cache_file())
             t2 = asyncio.create_task(write_seen_urls())
+            t3 = asyncio.create_task(write_url_distribution())
 
-            aws = [t1, t2]
+            aws = [t1, t2, t3]
             for aw in asyncio.as_completed(aws):
                 await aw
 
