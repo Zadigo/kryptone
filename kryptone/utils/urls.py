@@ -8,9 +8,17 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property, lru_cache
 from string import Template
-from typing import Callable, Optional, Union, override
-from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus,
-                          urlencode, urljoin, urlparse, urlunparse)
+from typing import Callable, Optional, Sequence, Union, override
+from urllib.parse import (
+    ParseResult,
+    parse_qs,
+    unquote,
+    unquote_plus,
+    urlencode,
+    urljoin,
+    urlparse,
+    urlunparse,
+)
 
 import pandas
 import pytz
@@ -26,7 +34,7 @@ from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
-_StringOrURL = Union[str, 'URL']
+_StringOrURL = Union[str, "URL"]
 
 
 @lru_cache(maxsize=100)
@@ -41,49 +49,53 @@ def load_image_extensions() -> list[str]:
 
 
 class URL:
-    """Transforms a URL string into a Python object, 
-    allowing various operations to be performed 
-    on the URL
+    """Transforms a URL string into a Python object,
+    allowing various operations to be performed
+    on the URL::
 
-    >>> url = URL('http://example.com')
+        url = URL('http://example.com')
+
+    Args:
+        url (Union[str, URL, ParseResult]): The URL to be transformed into a URL object.
+        domain (Optional[Union[URL, str]]): An optional domain to be used for relative URLs.
     """
 
-    def __init__(self, url: Union[TypeUrl, Callable[[], str], None], *, domain: Optional[Union['URL', str]] = None):
+    def __init__(
+        self,
+        url: Union[TypeUrl, Callable[[], str], None],
+        *,
+        domain: Optional[Union["URL", str]] = None,
+    ):
         self.invalid_initial_check = False
 
         if isinstance(url, URL):
             url = str(url)
 
         if isinstance(url, ParseResult):
-            url = urlunparse((
-                url.scheme,
-                url.netloc,
-                url.path,
-                url.query,
-                url.params,
-                url.fragment
-            ))
+            url = urlunparse(
+                (url.scheme, url.netloc, url.path, url.query, url.params, url.fragment)
+            )
 
         if callable(url):
             url = url()
 
         if url is None:
             self.invalid_initial_check = True
-            url = ''
+            url = ""
         elif isinstance(url, (int, float)):
             self.invalid_initial_check = True
             url = str(url)
 
-        if url.startswith('/') and domain is not None:
+        if url.startswith("/") and domain is not None:
             domain = URL(url=domain)
             logic = [
                 domain.is_path,
                 domain.has_path,
                 domain.has_query,
-                domain.has_fragment
+                domain.has_fragment,
             ]
             if any(logic):
-                raise ValueError(f'Domain is not valid: {domain}')
+                raise ValueError(f"Domain is not valid: {domain}")
 
             url = urljoin(str(domain), url)
 
@@ -99,10 +111,10 @@ class URL:
             self.invalid_initial_check = True
 
     def __repr__(self):
-        return f'<URL: {self.raw_url}>'
+        return f"<URL: {self.raw_url}>"
 
     def __str__(self):
-        return self.raw_url or ''
+        return self.raw_url or ""
 
     def __eq__(self, obj):
         if not isinstance(obj, URL):
@@ -135,10 +147,7 @@ class URL:
         return URL(urljoin(self.raw_url, obj))
 
     def __invert__(self):
-        return all([
-            not self.is_valid,
-            not self.raw_url == ''
-        ])
+        return all([not self.is_valid, not self.raw_url == ""])
 
     def __contains__(self, obj):
         if isinstance(obj, URL):
@@ -153,7 +162,7 @@ class URL:
 
     @cached_property
     def _file_extensions(self):
-        path = settings.GLOBAL_KRYPTONE_PATH / 'data/file_extensions.txt'
+        path = settings.GLOBAL_KRYPTONE_PATH / "data/file_extensions.txt"
         return read_document(path, as_list=True)
 
     @property
@@ -161,28 +170,27 @@ class URL:
         if self.is_empty:
             return False
 
-        return any([
-            'facebook.com' in self.raw_url,
-            'twitter.com' in self.raw_url,
-            'tiktok.com' in self.raw_url,
-            'snapchat.com' in self.raw_url,
-            'youtube.com' in self.raw_url,
-            'pinterest.com' in self.raw_url,
-            'spotify.com' in self.raw_url
-        ])
+        return any(
+            [
+                "facebook.com" in self.raw_url,
+                "twitter.com" in self.raw_url,
+                "tiktok.com" in self.raw_url,
+                "snapchat.com" in self.raw_url,
+                "youtube.com" in self.raw_url,
+                "pinterest.com" in self.raw_url,
+                "spotify.com" in self.raw_url,
+            ]
+        )
 
     @property
     def is_empty(self):
-        return any([
-            self.raw_url == '',
-            self.raw_url is None
-        ])
+        return any([self.raw_url == "", self.raw_url is None])
 
     @property
     def is_path(self):
         if self.is_empty:
             return False
-        return self.raw_url.startswith('/')
+        return self.raw_url.startswith("/")
 
     # @property
     # def is_image(self):
@@ -200,45 +208,41 @@ class URL:
         if self.is_empty:
             return False
 
-        return any([
-            self.raw_url.startswith('http://'),
-            self.raw_url.startswith('https://'),
-            self.invalid_initial_check
-        ])
+        return any(
+            [
+                self.raw_url.startswith("http://"),
+                self.raw_url.startswith("https://"),
+                self.invalid_initial_check,
+            ]
+        )
 
     @property
     def has_fragment(self):
         if self.is_empty:
             return False
 
-        return any([
-            self.url_object.fragment != '',
-            self.raw_url.endswith('#')
-        ])
+        return any([self.url_object.fragment != "", self.raw_url.endswith("#")])
 
     @property
     def as_dict(self):
         if self.is_empty:
             return {}
 
-        return {
-            'url': self.raw_url,
-            'is_valid': self.is_valid
-        }
+        return {"url": self.raw_url, "is_valid": self.is_valid}
 
     @property
     def has_path(self):
         if self.is_empty:
             return False
 
-        return self.url_object.path != ''
+        return self.url_object.path != ""
 
     @property
     def has_query(self):
         if self.is_empty:
             return False
 
-        return self.url_object.query != ''
+        return self.url_object.query != ""
 
     @property
     def is_image(self):
@@ -254,7 +258,7 @@ class URL:
 
         extension = self.as_path.suffix
 
-        if extension == '':
+        if extension == "":
             return False
 
         if self.as_path.suffix in self._file_extensions:
@@ -303,7 +307,7 @@ class URL:
         if self.is_empty:
             return False
 
-        return self.url_object.scheme == 'https'
+        return self.url_object.scheme == "https"
 
     @property
     def query(self):
@@ -315,7 +319,7 @@ class URL:
     @property
     def get_filename(self):
         """If the url points to a file, try to
-        return it's actual name """
+        return it's actual name"""
         if self.as_path is None:
             return None
 
@@ -341,7 +345,7 @@ class URL:
 
             for key, value in self.query.items():
                 if isinstance(value, list):
-                    clean_values[key] = ','.join(value)
+                    clean_values[key] = ",".join(value)
                     continue
 
                 clean_values[key] = value
@@ -349,17 +353,19 @@ class URL:
             query = query | clean_values
 
         string_query = urlencode(query)
-        url = urlunparse((
-            self.url_object.scheme,
-            self.url_object.netloc,
-            self.url_object.path,
-            None,
-            string_query,
-            None
-        ))
+        url = urlunparse(
+            (
+                self.url_object.scheme,
+                self.url_object.netloc,
+                self.url_object.path,
+                None,
+                string_query,
+                None,
+            )
+        )
         return URL(url)
 
-    def is_same_domain(self, url: Union[str, 'URL', None]) -> bool:
+    def is_same_domain(self, url: Union[str, "URL", None]) -> bool:
         """Checks that an incoming url is the same
         domain as the current one
 
@@ -375,7 +381,7 @@ class URL:
         return url.url_object.netloc == self.url_object.netloc
 
     def get_status(self):
-        headers = {'User-Agent': RANDOM_USER_AGENT()}
+        headers = {"User-Agent": RANDOM_USER_AGENT()}
         response = requests.get(self.raw_url, headers=headers)
         return response.ok, response.status_code
 
@@ -391,8 +397,8 @@ class URL:
 
         logic = [
             self.url_object.path == url_to_compare.url_object.path,
-            url_to_compare.url_object.path == '/' and self.url_object.path == '',
-            self.url_object.path == '/' and url_to_compare.url_object.path == ''
+            url_to_compare.url_object.path == "/" and self.url_object.path == "",
+            self.url_object.path == "/" and url_to_compare.url_object.path == "",
         ]
         return any(logic)
 
@@ -435,7 +441,7 @@ class URL:
             return True
         return False
 
-    def multi_test_path(self, regexes: list[str], operator: str = 'and'):
+    def multi_test_path(self, regexes: list[str], operator: str = "and"):
         """Test if the url's path passes test. Only the
         path is used to perform the test
 
@@ -447,12 +453,12 @@ class URL:
         for regex in regexes:
             truth_array.append(self.test_path(regex))
 
-        if operator == 'and':
+        if operator == "and":
             return all(truth_array)
-        elif operator == 'or':
+        elif operator == "or":
             return any(truth_array)
         else:
-            raise ValueError('Operator is not valid')
+            raise ValueError("Operator is not valid")
 
     def decompose_path(self, exclude: list[str] = []):
         """Decomposes an url's path
@@ -461,16 +467,17 @@ class URL:
         ... instance.decompose_path(exclude=[])
         ... ["a", "b"]
         """
-        result = self.url_object.path.split('/')
+        result = self.url_object.path.split("/")
 
         def clean_values(value: str):
-            if value == '':
+            if value == "":
                 return True
 
             if exclude and value in exclude:
                 return True
 
             return False
+
         return list(drop_while(clean_values, result))
 
     def remove_fragment(self):
@@ -481,14 +488,16 @@ class URL:
         ... url.reconstruct()
         ... 'http://example.com'
         """
-        clean_url = urlunparse((
-            self.url_object.scheme,
-            self.url_object.netloc,
-            self.url_object.path,
-            None,
-            None,
-            None
-        ))
+        clean_url = urlunparse(
+            (
+                self.url_object.scheme,
+                self.url_object.netloc,
+                self.url_object.path,
+                None,
+                None,
+                None,
+            )
+        )
         if self.has_fragment:
             return self.create(clean_url)
         return self
@@ -509,13 +518,17 @@ class BaseURLTestsMixin[U: URL]:
 
 
 class URLIgnoreTest(BaseURLTestsMixin[URL]):
-    """The `URLIgnoreTest` class is designed to filter 
-    out URLs based on specified paths that should be ignored. 
-    If any part of the URL's path matches one or more 
+    """The `URLIgnoreTest` class is designed to filter
+    out URLs based on specified paths that should be ignored.
+    If any part of the URL's path matches one or more
     of the provided paths, the URL will be ignored.
 
-    For example, `example.com/1` will be 
+    For example, `example.com/1` will be
     ignored with `/1`
+
+    Args:
+        name (str): The name of the filter for logging purposes.
+        paths (list[str] | tuple[str]): A list or tuple of paths to be ignored.
     """
 
     def __init__(self, name: str, *, paths: list[str] | tuple[str] = []):
@@ -525,7 +538,7 @@ class URLIgnoreTest(BaseURLTestsMixin[URL]):
         self.paths = set(paths)
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} {self.paths}>'
+        return f"<{self.__class__.__name__} {self.paths}>"
 
     def __call__(self, url: str | URL):
         exclusion_truth_array = []
@@ -543,23 +556,18 @@ class URLIgnoreTest(BaseURLTestsMixin[URL]):
                 exclusion_truth_array.append(False)
 
         if any(exclusion_truth_array):
-            logger.warning(
-                self.error_message.format(
-                    url=url,
-                    filter_name=self.name
-                )
-            )
+            logger.warning(self.error_message.format(url=url, filter_name=self.name))
             return True
         return False
 
 
 class URLIgnoreRegexTest(BaseURLTestsMixin):
-    """The URLIgnoreRegexTest class is designed to filter 
-    out URLs based on a specified regular expression pattern. 
-    If any part of the URL matches the provided regex pattern, 
+    """The URLIgnoreRegexTest class is designed to filter
+    out URLs based on a specified regular expression pattern.
+    If any part of the URL matches the provided regex pattern,
     the URL will be ignored.
 
-    For example, `example.com/1` will be 
+    For example, `example.com/1` will be
     ignored with `\\d+`
     """
 
@@ -568,17 +576,12 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         self.regex = re.compile(regex)
 
     def __repr__(self):
-        return f'<{self.__class__.__name__} [{self.regex}]>'
+        return f"<{self.__class__.__name__} [{self.regex}]>"
 
     def __call__(self, url: TypeUrl):
         result = self.regex.search(str(url))
         if result:
-            logger.warning(
-                self.error_message.format(
-                    url=url,
-                    filter_name=self.name
-                )
-            )
+            logger.warning(self.error_message.format(url=url, filter_name=self.name))
             return True
         return False
 
@@ -599,13 +602,13 @@ class BaseURLGenerator[U: URL](abc.ABC):
 
 
 class URLQueryGenerator(BaseURLGenerator[URL]):
-    """This class allows you to generate a set of URLs by substituting 
-    the value of a specified query parameter with different values. This is 
-    useful for creating multiple URLs with varying query parameters based 
+    """This class allows you to generate a set of URLs by substituting
+    the value of a specified query parameter with different values. This is
+    useful for creating multiple URLs with varying query parameters based
     on a base URL.
 
-    It takes a base URL, a query parameter to be substituted, and a list of values 
-    for substitution. It generates new URLs by replacing the specified query 
+    It takes a base URL, a query parameter to be substituted, and a list of values
+    for substitution. It generates new URLs by replacing the specified query
     parameter's value with each value from the provided list.
 
     >>> instance = URLQueryGenerator('http://example.com?year=2001', param='year', initial_value=2001, end_value=2003)
@@ -613,11 +616,21 @@ class URLQueryGenerator(BaseURLGenerator[URL]):
     ... ['http://example.com?year=2001', 'http://example.com?year=2002', 'http://example.com?year=2003']
     """
 
-    def __init__(self, url: URL, *, param: Optional[str] = None, initial_value: int = 0, end_value: int = 0, step: int = 1, param_type: str = 'number', query: dict[str, str | int] = {}):
-        acceptable_types = ['number', 'letter']
+    def __init__(
+        self,
+        url: URL,
+        *,
+        param: Optional[str] = None,
+        initial_value: int = 0,
+        end_value: int = 0,
+        step: int = 1,
+        param_type: str = "number",
+        query: dict[str, str | int] = {},
+    ):
+        acceptable_types = ["number", "letter"]
 
         if param_type not in acceptable_types:
-            raise ValueError('Valid parameter types are: number, letter')
+            raise ValueError("Valid parameter types are: number, letter")
 
         self.url_instance = URL(url)
         self.parameter_type = param_type
@@ -639,17 +652,17 @@ class URLQueryGenerator(BaseURLGenerator[URL]):
         clean_query: dict[str, str | int] = {}
         for key, value in query.items():
             if value is None:
-                clean_query[key] = ''
+                clean_query[key] = ""
                 continue
             clean_query[key] = value
         return clean_query
 
     @override
     def resolve_generator(self):
-        if self.parameter_type == 'number':
+        if self.parameter_type == "number":
             calculated_range = 0
             if self.initial_value < 0 or self.end_value < 0:
-                raise ValueError('End value cannot be below initial value')
+                raise ValueError("End value cannot be below initial value")
 
             calculated_range = self.end_value - self.initial_value
             for i in range(calculated_range):
@@ -659,20 +672,20 @@ class URLQueryGenerator(BaseURLGenerator[URL]):
                     full_query = self.query | {self.param: value}
                     query = urlencode(full_query)
 
-                    yield URL(str(self.url_instance) + f'?{query}')
+                    yield URL(str(self.url_instance) + f"?{query}")
 
-        if self.parameter_type == 'letter':
+        if self.parameter_type == "letter":
             pass
 
 
 class URLPathGenerator(BaseURLGenerator):
-    """This class generates a set of URLs by substituting values 
-    into a URL path template. This is useful for creating multiple URLs 
+    """This class generates a set of URLs by substituting values
+    into a URL path template. This is useful for creating multiple URLs
     with varying path parameters based on a template.
 
-    It takes an URL template, a dictionary of parameters, and generates a set of URLs 
-    by replacing template variables with sequential values. The primary use case is 
-    generating URLs where a part of the path changes according to a 
+    It takes an URL template, a dictionary of parameters, and generates a set of URLs
+    by replacing template variables with sequential values. The primary use case is
+    generating URLs where a part of the path changes according to a
     specified pattern, such as incrementing numbers.
 
     >>> generator = URLPathGenerator('http://example.com/$id', params={'id': 'number'}, k=2)
@@ -686,7 +699,7 @@ class URLPathGenerator(BaseURLGenerator):
         self.start = start
 
     def __repr__(self):
-        return f'<{self.__class__.__name__}: {self.__len__()}>'
+        return f"<{self.__class__.__name__}: {self.__len__()}>"
 
     def __len__(self):
         return len(list(self.resolve_generator()))
@@ -697,8 +710,8 @@ class URLPathGenerator(BaseURLGenerator):
         for i, param in enumerate(base_params, start=self.start):
             new_param = {}
             for key, value in param.items():
-                if value == 'number' or value == 'k':
-                    new_param[key.removeprefix('$')] = i
+                if value == "number" or value == "k":
+                    new_param[key.removeprefix("$")] = i
             new_params.append(new_param)
 
         for i in range(self.k):
@@ -709,19 +722,19 @@ class URLPathGenerator(BaseURLGenerator):
 
 
 class URLPaginationGenerator(BaseURLGenerator[URL]):
-    """This class generates a set of URLs by adding a pagination query parameter 
-    to a base URL. This is useful for creating URLs that correspond to different 
+    """This class generates a set of URLs by adding a pagination query parameter
+    to a base URL. This is useful for creating URLs that correspond to different
     pages of a paginated website.
 
-    It takes a base URL and a pagination query parameter name, and generates a 
-    set of URLs with the pagination parameter incremented sequentially. This allows for the 
+    It takes a base URL and a pagination query parameter name, and generates a
+    set of URLs with the pagination parameter incremented sequentially. This allows for the
     creation of multiple URLs to explore different pages of a paginated website.
 
     >>> PagePaginationGenerator('http:////example.com', k=2)
     ... ['http:////example.com?page=1', 'http:////example.com?page=2']
     """
 
-    def __init__(self, url: _StringOrURL, param_name: str = 'page', k: int = 10):
+    def __init__(self, url: _StringOrURL, param_name: str = "page", k: int = 10):
         self.urls = []
         self.final_urls = []
 
@@ -739,7 +752,7 @@ class URLPaginationGenerator(BaseURLGenerator[URL]):
         self.k = k
 
     def __repr__(self):
-        return f'<{self.__class__.__name__}: {len(self.final_urls)}>'
+        return f"<{self.__class__.__name__}: {len(self.final_urls)}>"
 
     def __len__(self):
         return len(self.final_urls)
@@ -752,26 +765,27 @@ class URLPaginationGenerator(BaseURLGenerator[URL]):
 
         counter = 1
         for url in self.urls:
-            final_query = urlencode(
-                {self.param_name: str(counter)},
-                encoding='utf-8'
-            )
-            yield url + f'?{final_query}'
+            final_query = urlencode({self.param_name: str(counter)}, encoding="utf-8")
+            yield url + f"?{final_query}"
             counter = counter + 1
 
 
 class MultipleURLManager:
-    """This class allows the management for multiple urls
-    by removing currently visited urls from urls to visit
-    and therefore making it easier for the robot to move
-    from an url to another with ease
+    """A class that manages a collection of URLs to visit and
+    keeps track of visited URLs. It provides methods to add, filter, and
+    retrieve URLs, as well as to maintain statistics about the crawling process.
+
+    Args:
+        ignore_images (bool): Whether to ignore image URLs when adding new URLs.
+        sort_urls (bool): Whether to sort the URLs to visit.
     """
-    _urls_to_visit = set()
-    _visited_urls = set()
-    _grouped_by_page = defaultdict(set)
-    _current_url = None
-    list_of_seen_urls = set()
-    custom_url_filters = []
+
+    _urls_to_visit: set[URL] = set()
+    _visited_urls: set[URL] = set()
+    _grouped_by_page: defaultdict = defaultdict(set)
+    _current_url: Optional[URL] = None
+    list_of_seen_urls: set[URL] = set()
+    custom_url_filters: list[Callable[[URL], bool]] = []
 
     def __init__(self, ignore_images: bool = True, sort_urls: bool = False):
         self.start_url = None
@@ -780,21 +794,20 @@ class MultipleURLManager:
         # This attribute is updated every time
         # "get" is called on the class
         self.current_iteration = 0
+        # A dataframe used to store the urls to visit and visited urls
+        # and can be used to export the data to a csv or json file
         self.dataframe: Optional[pandas.DataFrame] = None
 
     def __repr__(self):
         name = self.__class__.__name__
-        return f'<{name} urls_to_visit={self.urls_to_visit_count} visited_urls={self.visited_urls_count}>'
+        return f"<{name} urls_to_visit={self.urls_to_visit_count} visited_urls={self.visited_urls_count}>"
 
     def __iter__(self):
         for url in self._urls_to_visit:
             yield url
 
     def __contains__(self, url):
-        return any([
-            str(url) in self._urls_to_visit,
-            str(url) in self._visited_urls
-        ])
+        return any([str(url) in self._urls_to_visit, str(url) in self._visited_urls])
 
     def __len__(self):
         return len(self._urls_to_visit)
@@ -853,27 +866,24 @@ class MultipleURLManager:
 
     @lru_cache(maxsize=100)
     def all_urls(self):
-        return list(itertools.chain(
-            self._visited_urls,
-            self._urls_to_visit
-        ))
+        return list(itertools.chain(self._visited_urls, self._urls_to_visit))
 
     def urljoin(self, path):
         if self.start_url is None:
             raise Exception(
-                'You should call populate at least once '
-                'in order to join paths to their base domain'
+                "You should call populate at least once "
+                "in order to join paths to their base domain"
             )
         return URL(urljoin(str(self.start_url), str(path)))
 
-    def add_urls(self, urls, refresh=False):
+    def add_urls(self, urls: list[str, URL], refresh: bool = False):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
         nested in other elements than links and that
         cannot actually be retrieved by the spider
 
         * Runs `self.check_urls` on each url
-        * RUns user custom url filters `self.run_url_filters`
+        * Runs user custom url filters `self.run_url_filters`
         * Updates `self.urls_to_visit`"""
         checked_urls = self.check_urls(urls, refresh=refresh)
         filtered_urls = self.run_url_filters(checked_urls)
@@ -883,7 +893,7 @@ class MultipleURLManager:
             container = self._grouped_by_page[self.start_url]
             container.update(filtered_urls)
 
-    def run_url_filters(self, valid_urls):
+    def run_url_filters(self, valid_urls: set[URL]):
         """Excludes urls in the list of collected
         urls based on the value of the functions in
         `url_filters`. All conditions should be true
@@ -912,14 +922,11 @@ class MultipleURLManager:
                     continue
                 urls_kept.add(url)
 
-            logger.info(
-                f"Filters completed. {len(urls_removed)} "
-                "url(s) removed"
-            )
+            logger.info(f"Filters completed. {len(urls_removed)} url(s) removed")
             return urls_kept
         return valid_urls
 
-    def check_urls(self, urls, refresh=False):
+    def check_urls(self, urls: Sequence[URL], refresh=False):
         raw_urls = set(urls)
 
         if self.current_iteration > 0:
@@ -927,8 +934,8 @@ class MultipleURLManager:
 
         raw_urls_objs = list(map(lambda x: URL(x), raw_urls))
 
-        valid_urls = set()
-        invalid_urls = set()
+        valid_urls: set[URL] = set()
+        invalid_urls: set[URL] = set()
 
         for url in raw_urls_objs:
             if url.is_path:
@@ -956,12 +963,12 @@ class MultipleURLManager:
                 continue
 
             is_home_page = [
-                url.url_object.path == '/',
-                self.start_url.url_object.path == '/',
+                url.url_object.path == "/",
+                self.start_url.url_object.path == "/",
                 # To prevent returning an empty list when running
                 # the spider for the first time, require at least
                 # on rotation before running this check
-                self.current_iteration > 0
+                self.current_iteration > 0,
             ]
 
             if all(is_home_page):
@@ -987,7 +994,7 @@ class MultipleURLManager:
         self.list_of_seen_urls.update(invalid_urls)
 
         if valid_urls:
-            logger.info(f'Kept {len(valid_urls)} url(s) as valid to visit')
+            logger.info(f"Kept {len(valid_urls)} url(s) as valid to visit")
 
         newly_discovered_urls = []
         for url in valid_urls:
@@ -995,24 +1002,23 @@ class MultipleURLManager:
                 newly_discovered_urls.append(url)
 
         if newly_discovered_urls:
-            logger.info(
-                f"Discovered {len(newly_discovered_urls)} "
-                "unseen url(s)"
-            )
+            logger.info(f"Discovered {len(newly_discovered_urls)} unseen url(s)")
         return valid_urls
 
     def backup(self):
         return {
-            'date': str(datetime.datetime.now(tz=pytz.UTC)),
-            'urls_to_visit': list(self._urls_to_visit),
-            'visited_urls': list(self._visited_urls),
-            'statistics': {
-                'last_visited_url': str(self._current_url) if self._current_url is not None else None,
-                'urls_to_visit_count': self.urls_to_visit_count,
-                'visited_urls_count': self.visited_urls_count,
-                'total_urls': sum([self.urls_to_visit_count, self.visited_urls_count]),
-                'completion_rate': self.completion_rate
-            }
+            "date": str(datetime.datetime.now(tz=pytz.UTC)),
+            "urls_to_visit": list(self._urls_to_visit),
+            "visited_urls": list(self._visited_urls),
+            "statistics": {
+                "last_visited_url": str(self._current_url)
+                if self._current_url is not None
+                else None,
+                "urls_to_visit_count": self.urls_to_visit_count,
+                "visited_urls_count": self.visited_urls_count,
+                "total_urls": sum([self.urls_to_visit_count, self.visited_urls_count]),
+                "completion_rate": self.completion_rate,
+            },
         }
 
     def clear(self):
@@ -1023,10 +1029,8 @@ class MultipleURLManager:
         return list(reversed(self.urls_to_visit))
 
     def get(self):
-        """Gets an url from the list of urls to visit.
-        This is a destructive function, in other words,
-        when the function is called, it removed from the
-        list of urls to visit"""
+        """Destructively returns the next url to visit
+        and removes it from the list of urls to visit"""
         if not self._urls_to_visit:
             return None
 
@@ -1037,50 +1041,45 @@ class MultipleURLManager:
         if self.dataframe is not None:
             found_urls = self.dataframe[self.dataframe.urls == url]
             for item in found_urls.itertuples():
-                self.dataframe.loc[item.Index, 'visited'] = True
-                self.dataframe.loc[item.Index,
-                                   'visited_on'] = get_current_date()
+                self.dataframe.loc[item.Index, "visited"] = True
+                self.dataframe.loc[item.Index, "visited_on"] = get_current_date()
             self.current_iteration += 1
             return url
         return None
 
-    def populate(self, start_urls):
-        """Function that populates the `urls_to_visit` and
-        sets `start_url`. If called more than once, the other
-        calls will have no effect"""
+    def populate(self, start_urls: list[str]):
+        """Populates the list of urls to visit with a
+        list of starting urls. This method should be called at
+        least once before starting the crawling process."""
         if self.start_url is None:
             start_url = URL(start_urls[0])
             if start_url.is_path:
                 raise ValueError(
-                    "The first url in the list of startin urls is a path "
+                    "The first url in the list of starting urls is a path "
                     "you need to implement a valid url string as a "
-                    "fist value in the list"
+                    "first value in the list"
                 )
             self.start_url = start_url
             self.add_urls(start_urls)
 
-            self.dataframe = pandas.DataFrame(
-                {
-                    'urls': list(self.urls_to_visit)
-                }
-            )
-            self.dataframe['visited'] = False
-            self.dataframe['visited_on'] = None
+            self.dataframe = pandas.DataFrame({"urls": list(self.urls_to_visit)})
+            self.dataframe["visited"] = False
+            self.dataframe["visited_on"] = None
 
             if self.sort_urls:
-                self.dataframe = self.dataframe.sort_values('urls')
+                self.dataframe = self.dataframe.sort_values("urls")
 
             result = self.dataframe.urls.to_list()
             self._urls_to_visit.update(result)
 
 
 class LoadStartUrls(BaseURLGenerator):
-    """The class loads start URLs from a CSV or JSON file 
-    to be used by a web crawler. This allows for automated operations on 
+    """The class loads start URLs from a CSV or JSON file
+    to be used by a web crawler. This allows for automated operations on
     the pages specified by these URLs
 
-    The class takes a filename (without the extension) and a flag indicating 
-    whether the file is in JSON format. It then loads the URLs from the 
+    The class takes a filename (without the extension) and a flag indicating
+    whether the file is in JSON format. It then loads the URLs from the
     specified file and makes them available for the crawler.
 
     >>> class MyCrawler(SiteCrawler):
@@ -1093,18 +1092,18 @@ class LoadStartUrls(BaseURLGenerator):
 
     def __init__(self, *, filename=None, is_json=False):
         self.is_json = is_json
-        extension = 'json' if self.is_json else 'csv'
+        extension = "json" if self.is_json else "csv"
         self.filename = f"{filename or 'start_urls'}.{extension}"
 
     def resolve_generator(self):
         try:
             path = settings.PROJECT_PATH / self.filename
-            with open(path, mode='r', encoding='utf-8') as f:
+            with open(path, mode="r", encoding="utf-8") as f:
                 if self.is_json:
                     data = json.load(f)
                     for item in data:
                         if isinstance(item, dict):
-                            yield item['url']
+                            yield item["url"]
 
                         if isinstance(item, str):
                             yield item
