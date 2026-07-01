@@ -1,8 +1,9 @@
 import pathlib
 import random
 import string
-from typing import Optional, Union
+from typing import Optional
 
+from internal_types import TypeUrl
 from kryptone.utils.text import (normalize_spaces, remove_accents,
                                  remove_punctuation)
 from kryptone.utils.urls import URL
@@ -38,7 +39,7 @@ def directory_from_breadcrumbs(text: str, separator: Optional[str] = '>', remove
     return pathlib.Path('/'.join(tokens))
 
 
-def directory_from_url(url_or_path: Union[str, URL], exclude: Optional[list[str]] = []):
+def directory_from_url(url_or_path: TypeUrl, exclude: list[str] = []):
     """Build the logical local directory in the local project
     using the natural structure of the product url
 
@@ -47,7 +48,7 @@ def directory_from_url(url_or_path: Union[str, URL], exclude: Optional[list[str]
     ... "/woman/clothing/dresses/short-dresses"
     """
     if isinstance(url_or_path, URL):
-        url_or_path = url_or_path.url_object.path
+        url_or_path = str(url_or_path.url_object.path)
 
     tokens = url_or_path.split('/')
     tokens = filter(lambda x: x not in exclude and x != '', tokens)
@@ -61,7 +62,7 @@ def directory_from_url(url_or_path: Union[str, URL], exclude: Optional[list[str]
     return pathlib.Path('/'.join(tokens))
 
 
-def create_filename(length: Optional[int] = 5, extension: Optional[str] = None, suffix: Optional[str] = None, suffix_with_date: bool = False) -> str:
+def create_filename(length: int = 5, extension: Optional[str] = None, suffix: Optional[str] = None, suffix_with_date: bool = False) -> str:
     characters = string.ascii_lowercase + string.digits
     name = ''.join(random.choice(characters) for _ in range(length))
 

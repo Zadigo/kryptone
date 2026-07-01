@@ -11,7 +11,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Final, Optional, Sequence, Union
+from typing import Any, Final, Optional, Sequence
 from urllib.parse import ParseResult, unquote, urljoin, urlunparse
 from uuid import uuid4
 
@@ -27,16 +27,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-from kryptone import exceptions, logger, signal_constants
+from kryptone import exceptions, logger
 from kryptone.conf import settings
 from kryptone.data_storages import BaseStorage, FileStorage
-from kryptone.internal_types import PerformanceAuditProtocol
+from kryptone.internal_types import PerformanceAuditProtocol, TypeData, TypePath, TypeUrl
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL
+from kryptone.internal_types import TypeStorage
 
 DEFAULT_META_OPTIONS: Final[set[str]] = {
     'domains',
@@ -137,7 +138,7 @@ def get_selenium_browser_instance(browser_name: Optional[str] = None, headless: 
 class CrawlerOptions:
     """Stores the main options for the crawler"""
 
-    def __init__(self, spider: 'SiteCrawler', name: str):
+    def __init__(self, spider: 'SiteCrawler | Crawler', name: str):
         self.spider = spider
         self.spider_name = name.lower()
         self.verbose_name = name.title()
@@ -285,7 +286,7 @@ class Crawler(type):
         cls._meta.prepare()
 
 
-class BaseCrawler(metaclass=Crawler):
+class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
     DATA_CONTAINER: list = []
     model = None
 
@@ -294,11 +295,13 @@ class BaseCrawler(metaclass=Crawler):
     visited_pages_count: int = 0
     list_of_seen_urls: set[URL] = set()
     browser_name: Optional[str] = None
-    timezone = 'UTC'
-    default_scroll_step = 80
+    timezone: str = 'UTC'
+    default_scroll_step: int = 80
 
-    storage: Union[BaseStorage | FileStorage, None] = None
+    storage: Optional[TypeStorage] = None
     additional_storages: list[tuple[str, BaseStorage]] = []
+
+    _meta: Final[O] = None
 
     def __init__(self, browser_name: Optional[str] = None):
         # The start url which corresponds
@@ -345,7 +348,7 @@ class BaseCrawler(metaclass=Crawler):
         return urlunparse((
             self.start_url.url_object.scheme,
             self.start_url.url_object.netloc,
-            '',
+            None,
             None,
             None,
             None
@@ -356,11 +359,11 @@ class BaseCrawler(metaclass=Crawler):
         return len(self.visited_urls) / len(self.urls_to_visit)
 
     @staticmethod
-    def normalize_urls(urls: list[URL] | set[URL]):
+    def normalize_urls(urls: Sequence[URL]) -> list[str]:
         """Converts a list of URL objects to strings"""
         return [str(url) for url in urls]
 
-    def download_images(self, urls: list[str], page_url: Union[str, URL], directory: Optional[Union[str, pathlib.Path]] = None, exclude_paths=[], filename_attrs={}):
+    def download_images(self, urls: Sequence[str], page_url: TypeUrl, directory: Optional[TypePath] = None, exclude_paths: list[str] = [], filename_attrs={}):
         """A method that can be called with a list of image urls to download. The
         images will be stored the indicated media folder"""
         if not isinstance(urls, list):
@@ -502,7 +505,7 @@ class BaseCrawler(metaclass=Crawler):
         self.url_distribution[self.driver.current_url].extend(found_urls)
         return found_urls
 
-    def save_object(self, data: Union[dict[str, Any], list[dict[str, Any]]], check_fields_null: list[str] = []):
+    def save_object(self, data: TypeData, check_fields_null: list[str] = []):
         """Saves a new object in the container"""
         if self.model is None:
             raise ValueError(
@@ -608,7 +611,7 @@ class BaseCrawler(metaclass=Crawler):
 
         asyncio.run(main())
 
-    def urljoin(self, path):
+    def urljoin(self, path: TypeUrl):
         """Returns the domain of the current
         website"""
         path = str(path).strip()
@@ -649,7 +652,7 @@ class BaseCrawler(metaclass=Crawler):
             return urls_kept
         return valid_urls
 
-    def check_urls(self, urls: Sequence[str | URL], refresh: bool = False):
+    def check_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
         raw_urls = set(urls)
 
         if self.performance_audit.iteration_count > 0:
@@ -733,8 +736,10 @@ class BaseCrawler(metaclass=Crawler):
             # check that the url validates
             # the regex tests
             if self._meta.url_rule_tests:
-                truth_array = map(lambda x: url.test_path(x),
-                                  self._meta.url_rule_tests)
+                truth_array = map(
+                    lambda x: url.test_path(x),
+                    self._meta.url_rule_tests
+                )
                 if not all(truth_array):
                     invalid_urls.add(url)
                     continue
@@ -759,7 +764,7 @@ class BaseCrawler(metaclass=Crawler):
             )
         return valid_urls
 
-    def add_urls(self, urls: Sequence[str | URL], refresh: bool = False):
+    def add_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
         """Manually add urls to the current urls to
         visit list. This is useful for cases where urls are
         nested in other elements than links cannot actually be 
@@ -804,13 +809,13 @@ class BaseCrawler(metaclass=Crawler):
         """
         return NotImplemented
 
-    def post_navigation_actions(self, current_url: URL, **kwargs):
+    def post_navigation_actions(self, current_url: URL, **kwargs: Any):
         """Actions to run on the page immediately after
         the crawler has visited a page e.g. clicking
         on cookie button banner"""
         return NotImplemented
 
-    def before_next_page_actions(self, current_url: URL, next_url: URL, **kwargs):
+    def before_next_page_actions(self, current_url: URL, next_url: URL, **kwargs: Any):
         """Actions to run once the page was visited and that
         all user actions were performed. This method runs just 
         after the `wait_time` has expired"""
@@ -824,10 +829,10 @@ class BaseCrawler(metaclass=Crawler):
         """
         return NotImplemented
 
-    def after_data_save(self, data: Any):
+    def after_data_save(self, data: TypeData):
         return NotImplemented
 
-    def before_start(self, start_urls: list[Union[str, URL]], *args, **kwargs):
+    def before_start(self, start_urls: list[TypeUrl], *args, **kwargs):
         return NotImplemented
 
 
@@ -863,7 +868,7 @@ class OnPageActionsMixin:
 
 
 class SiteCrawler(OnPageActionsMixin, BaseCrawler):
-    def __init__(self, browser_name=None):
+    def __init__(self, browser_name: Optional[str] = None):
         super().__init__(browser_name=browser_name)
 
         self.start_date = get_current_date(timezone=self.timezone)
@@ -879,7 +884,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         logger.info('Project stopped')
 
     @staticmethod
-    def transform_string_urls(urls: Sequence[str | URL]):
+    def transform_string_urls(urls: Sequence[TypeUrl]):
         for url in urls:
             yield URL(url) if isinstance(url, str) else url
 
@@ -1003,7 +1008,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 logger.warning(
                     f'Created uuid file @ {color_text('blue', file.path)}')
 
-    def before_start(self, start_urls: Sequence[str | URL], *args, **kwargs):
+    def before_start(self, start_urls: Sequence[TypeUrl], *args, **kwargs):
         # TODO: Maybe reunite the "before_start" and the
         # "setup_class" funcitons into one single function
         # "setup_class"
@@ -1050,7 +1055,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
         self.add_urls(start_urls)
 
-    def start(self, start_urls: Sequence[str | URL] = [], **kwargs: str | bool):
+    def start(self, start_urls: Sequence[TypeUrl] = [], **kwargs: str | bool):
         skip_setup = kwargs.get('skip_setup', False)
         if not skip_setup:
             self.setup_class()
@@ -1272,13 +1277,13 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         else:
             self.start(skip_setup=True, **kwargs)
 
-    def start_from_sitemap_xml(self, url: Union[str, URL], windows: Optional[int] = 1, **kwargs: str | bool):
+    def start_from_sitemap_xml(self, url: TypeUrl, windows: Optional[int] = 1, **kwargs: str | bool):
         return NotImplemented
 
     def start_from_json(self, windows: Optional[int] = 1, **kwargs: str | bool):
         return NotImplemented
 
-    def boost_start(self, start_urls: Sequence[Union[str, URL]] = [], *, windows: int = 1, **kwargs: str | bool):
+    def boost_start(self, start_urls: Sequence[TypeUrl] = [], *, windows: int = 1, **kwargs: str | bool):
         """Calling this method will make selenium open either
         multiple windows or multiple tabs for the project.$
         Selenium will open an url in each window or tab and

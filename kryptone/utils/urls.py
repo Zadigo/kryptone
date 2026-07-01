@@ -1,3 +1,4 @@
+import abc
 import csv
 import datetime
 import itertools
@@ -7,7 +8,7 @@ import re
 from collections import OrderedDict, defaultdict
 from functools import cached_property, lru_cache
 from string import Template
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, override
 from urllib.parse import (ParseResult, parse_qs, unquote, unquote_plus,
                           urlencode, urljoin, urlparse, urlunparse)
 
@@ -16,7 +17,8 @@ import pytz
 import requests
 from asgiref.sync import sync_to_async
 
-from kryptone import constants, logger
+from internal_types import TypeUrl
+from kryptone import logger
 from kryptone.conf import settings
 from kryptone.exceptions import NoStartUrlsFile
 from kryptone.utils.date_functions import get_current_date
@@ -46,7 +48,7 @@ class URL:
     >>> url = URL('http://example.com')
     """
 
-    def __init__(self, url: Union[str, 'URL', Callable[[], str], None], *, domain: Optional[Union['URL', str]] = None):
+    def __init__(self, url: Union[TypeUrl, Callable[[], str], None], *, domain: Optional[Union['URL', str]] = None):
         self.invalid_initial_check = False
 
         if isinstance(url, URL):
@@ -428,7 +430,7 @@ class URL:
         ... instance.test_path(r'\/a')
         ... True
         """
-        path_search = re.search(regex, self.url_object.path)
+        path_search = re.search(regex, str(self.url_object.path))
         if path_search:
             return True
         return False
@@ -492,21 +494,21 @@ class URL:
         return self
 
 
-class BaseURLTestsMixin:
-    blacklist = set()
-    blacklist_distribution = defaultdict(list)
-    error_message = "{url} was blacklisted by filter '{filter_name}'"
+class BaseURLTestsMixin[U: URL]:
+    blacklist: set[U] = set()
+    blacklist_distribution: defaultdict[str, list[U]] = defaultdict(list)
+    error_message: str = "{url} was blacklisted by filter '{filter_name}'"
 
-    def __call__(self, url):
+    def __call__(self, url: U):
         return NotImplemented
 
-    def convert_url(self, url):
+    def convert_url(self, url: U) -> U:
         if isinstance(url, URL):
             return url
         return URL(url)
 
 
-class URLIgnoreTest(BaseURLTestsMixin):
+class URLIgnoreTest(BaseURLTestsMixin[URL]):
     """The `URLIgnoreTest` class is designed to filter 
     out URLs based on specified paths that should be ignored. 
     If any part of the URL's path matches one or more 
@@ -534,7 +536,7 @@ class URLIgnoreTest(BaseURLTestsMixin):
         # the path to exclude as True and the
         # others as False
         for path in self.paths:
-            if path in url.url_object.path:
+            if path in str(url.url_object.path):
                 self.blacklist.add(path)
                 exclusion_truth_array.append(True)
             else:
@@ -568,7 +570,7 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
     def __repr__(self):
         return f'<{self.__class__.__name__} [{self.regex}]>'
 
-    def __call__(self, url: str | URL):
+    def __call__(self, url: TypeUrl):
         result = self.regex.search(str(url))
         if result:
             logger.warning(
@@ -581,8 +583,8 @@ class URLIgnoreRegexTest(BaseURLTestsMixin):
         return False
 
 
-class BaseURLGenerator:
-    def __len__(self):
+class BaseURLGenerator[U: URL](abc.ABC):
+    def __len__(self) -> int:
         return NotImplemented
 
     def __iter__(self):
@@ -591,11 +593,12 @@ class BaseURLGenerator:
     def __aiter__(self):
         return sync_to_async(self.resolve_generator)()
 
-    def resolve_generator(self):
+    @abc.abstractmethod
+    def resolve_generator(self) -> U:
         return NotImplemented
 
 
-class URLQueryGenerator(BaseURLGenerator):
+class URLQueryGenerator(BaseURLGenerator[URL]):
     """This class allows you to generate a set of URLs by substituting 
     the value of a specified query parameter with different values. This is 
     useful for creating multiple URLs with varying query parameters based 
@@ -610,7 +613,7 @@ class URLQueryGenerator(BaseURLGenerator):
     ... ['http://example.com?year=2001', 'http://example.com?year=2002', 'http://example.com?year=2003']
     """
 
-    def __init__(self, url, *, param=None, initial_value=0, end_value=0, step=1, param_type='number', query={}):
+    def __init__(self, url: URL, *, param: Optional[str] = None, initial_value: int = 0, end_value: int = 0, step: int = 1, param_type: str = 'number', query: dict[str, str | int] = {}):
         acceptable_types = ['number', 'letter']
 
         if param_type not in acceptable_types:
@@ -625,15 +628,15 @@ class URLQueryGenerator(BaseURLGenerator):
         self.step = step
         self.param = param
 
-    def __len__(self):
-        return len(self.resolve_generator())
+    def __len__(self) -> int:
+        return len(list(self.resolve_generator()))
 
     @staticmethod
-    def check_initial_query(query):
+    def check_initial_query(query: dict[str, str | int]):
         """Function that checks if a value of the
         query dict is None and replaces it with an
         empty string"""
-        clean_query = {}
+        clean_query: dict[str, str | int] = {}
         for key, value in query.items():
             if value is None:
                 clean_query[key] = ''
@@ -641,6 +644,7 @@ class URLQueryGenerator(BaseURLGenerator):
             clean_query[key] = value
         return clean_query
 
+    @override
     def resolve_generator(self):
         if self.parameter_type == 'number':
             calculated_range = 0
@@ -704,7 +708,7 @@ class URLPathGenerator(BaseURLGenerator):
                 yield self.base_template_url
 
 
-class URLPaginationGenerator(BaseURLGenerator):
+class URLPaginationGenerator(BaseURLGenerator[URL]):
     """This class generates a set of URLs by adding a pagination query parameter 
     to a base URL. This is useful for creating URLs that correspond to different 
     pages of a paginated website.

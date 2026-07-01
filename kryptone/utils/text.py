@@ -1,4 +1,3 @@
-import sys
 import os
 import re
 import string
@@ -113,7 +112,7 @@ def remove_accents(text: str):
     return unidecode.unidecode(text)
 
 
-def clean_dictionnary(item, accents=False, punctation=False):
+def clean_dictionnary(item, accents: bool = False, punctation: bool = False):
     """Cleans each text values stored in a dictionnary
 
     >>> items = clean_dictionnary({'name': ' Kendall'})
@@ -132,7 +131,7 @@ def clean_dictionnary(item, accents=False, punctation=False):
     for key, value in item.items():
         if isinstance(value, str):
             if accents:
-                value = remove_accents(accents)
+                value = remove_accents(value)
 
             if punctation:
                 value = remove_punctuation(value)

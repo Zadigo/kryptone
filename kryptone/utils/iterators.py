@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import Any, Callable
 
 
-def drop_null(items: list[str | None], remove_empty_strings: bool = True):
+def drop_null(items: list[str], remove_empty_strings: bool = True):
     for item in items:
         if remove_empty_strings and item == '':
             continue

@@ -3,7 +3,7 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 import gspread
 import pyairtable
@@ -11,13 +11,10 @@ import redis
 
 from kryptone import logger
 from kryptone.conf import settings
-from kryptone.internal_types import FileProtocol, _SiteCrawler
+from kryptone.internal_types import FileProtocol, TypePath, TypeSiteCrawler
 from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.text import color_text
 from kryptone.utils.urls import URL, load_image_extensions
-
-if TYPE_CHECKING:
-    from kryptone.base import SiteCrawler
 
 
 def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
@@ -50,7 +47,7 @@ class BaseStorage:
         'keep running without a storage backend. Data might be lost!'
     )
 
-    def __init__(self, spider: Optional[_SiteCrawler] = None):
+    def __init__(self, spider: Optional[TypeSiteCrawler] = None):
         self.spider = spider
         self.is_connected = False
         self.spider_uuid: Optional[str] = None
@@ -70,13 +67,13 @@ class BaseStorage:
         return NotImplemented
 
     async def has(self, key: str) -> bool:
-        return NotImplemented
+        raise NotImplemented
 
     async def get(self, key: str) -> Any:
-        return NotImplemented
+        raise NotImplemented
 
     async def save(self, key: str, data: Any, adapt_list: bool = False, **kwargs) -> Any:
-        return NotImplemented
+        raise NotImplemented
 
     async def save_or_create(self, key: str, data: Any, **kwargs) -> Any:
         """Alternate save function that can be used to either
@@ -126,7 +123,7 @@ class FileStorage(BaseStorage):
 
     file_based = True
 
-    def __init__(self, *, spider: Optional[_SiteCrawler] = None, storage_path: Optional[pathlib.Path | str] = None, ignore_images: bool = True):
+    def __init__(self, *, spider: Optional[TypeSiteCrawler] = None, storage_path: Optional[TypePath] = None, ignore_images: bool = True):
         super().__init__(spider=spider)
         if storage_path is not None:
             if isinstance(storage_path, str):

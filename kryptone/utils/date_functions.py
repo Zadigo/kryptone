@@ -1,15 +1,19 @@
+from typing import TypeAlias
 import pytz
 import datetime
 import calendar
+from datetime import tzinfo
+
+TypeTimezone: TypeAlias = tzinfo
 
 
-def get_current_date(timezone='utc'):
+def get_current_date(timezone: TypeTimezone = 'utc') -> datetime.datetime:
     """Returns the current date"""
     timezone = pytz.timezone(timezone)
     return datetime.datetime.now(tz=timezone)
 
 
-def is_expired(d, timezone='utc'):
+def is_expired(d: datetime.datetime, timezone: TypeTimezone = 'utc') -> bool:
     """Checks if a date is expired by comparing it
     to the current date"""
     if not isinstance(d, datetime.datetime):

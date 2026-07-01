@@ -102,7 +102,7 @@ Documentation = "https://github.com/Zadigo/kryptone/wiki"
 Repository = "https://github.com/Zadigo/kryptone.git"
 Changelog = "https://github.com/Zadigo/kryptone/blob/main/CHANGELOG.md"
 
-[tool.pyright]
-typeCheckingMode = "basic"
-extraPaths = ["./kryptone"]
-reportMissingImports = true
+# [tool.pyright]
+# typeCheckingMode = "basic"
+# extraPaths = ["./kryptone"]
+# reportMissingImports = true

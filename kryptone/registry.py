@@ -110,6 +110,7 @@ class SpiderConfig:
                 spider_instance.start(**params)
         except KeyboardInterrupt:
             self._run_fail(spider_instance)
+            spider_instance.driver.quit()
             logger.info('Program stopped')
             sys.exit(0)
         except Exception as e:
@@ -128,6 +129,7 @@ class SpiderConfig:
             spider_instance.resume(windows=windows, **spider_params)
         except KeyboardInterrupt:
             self._run_fail(spider_instance)
+            spider_instance.driver.quit()
             sys.exit(0)
         except Exception as e:
             self._run_fail(spider_instance)

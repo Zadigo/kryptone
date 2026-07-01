@@ -5,6 +5,19 @@ from typing import TYPE_CHECKING, Any, Protocol, Optional, TypeVar, runtime_chec
 
 if TYPE_CHECKING:
     from kryptone.base import SiteCrawler
+    from kryptone.data_storages import BaseStorage
+    from kryptone.utils.urls import URL
+
+
+type TypeStorage = 'BaseStorage'
+
+type TypeUrl = str | 'URL'
+
+type TypePath = str | pathlib.Path
+
+type TypeData = dict[str, Any] | list[dict[str, Any]] | list[list[Any]]
+
+type TypeSiteCrawler = 'SiteCrawler'
 
 
 T = TypeVar('T')
