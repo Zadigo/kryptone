@@ -1,0 +1,9 @@
+{
+    "spider": "ExampleSpider",
+    "spider_uuid": "6f998485-a9f7-4f8a-98ae-258360bca491",
+    "timestamp": "2025-23-20 13:23:14",
+    "urls_to_visit": [],
+    "visited_urls": [
+        "http://example.com"
+    ]
+}
