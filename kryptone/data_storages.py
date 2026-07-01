@@ -4,7 +4,7 @@ import json
 import pathlib
 from collections import OrderedDict
 from typing import Any, Optional
-
+from abc import ABC, abstractmethod
 import gspread
 import pyairtable
 import redis
@@ -25,7 +25,7 @@ def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
     return list(map(lambda x: [x], data))
 
 
-class BaseStorage:
+class BaseStorage(ABC):
     """Storage backends are primarily used for storing the
     current state of the spider either to a local source
     (such as a file) or external sources such as a database
@@ -43,8 +43,8 @@ class BaseStorage:
     storage_connection = None
     file_based = False
     connection_error = (
-        'Failed connection to {storage_name}. The spider will '
-        'keep running without a storage backend. Data might be lost!'
+        "Failed connection to {storage_name}. The spider will "
+        "keep running without a storage backend. Data might be lost!"
     )
 
     def __init__(self, spider: Optional[TypeSiteCrawler] = None):
@@ -53,28 +53,35 @@ class BaseStorage:
         self.spider_uuid: Optional[str] = None
 
         if self.spider is not None:
-            self.spider_uuid = str(getattr(self.spider, 'spider_uuid'))
-
+            self.spider_uuid = str(getattr(self.spider, "spider_uuid"))
+    
     def before_save(self, data: Any):
         """A hook that is execute before data
         is saved to the storage"""
         return data
 
+    @abstractmethod
     def initialize(self):
         """A hook function that used to
         preload data (for example files) in the
         storage container"""
-        return NotImplemented
+        raise NotImplementedError
 
+    @abstractmethod
     async def has(self, key: str) -> bool:
-        raise NotImplemented
+        raise NotImplementedError
 
+    @abstractmethod
     async def get(self, key: str) -> Any:
-        raise NotImplemented
+        raise NotImplementedError
 
-    async def save(self, key: str, data: Any, adapt_list: bool = False, **kwargs) -> Any:
-        raise NotImplemented
+    @abstractmethod
+    async def save(
+        self, key: str, data: Any, adapt_list: bool = False, **kwargs
+    ) -> Any:
+        raise NotImplementedError
 
+    @abstractmethod
     async def save_or_create(self, key: str, data: Any, **kwargs) -> Any:
         """Alternate save function that can be used to either
         save existing data or create a new record if the element
@@ -90,26 +97,23 @@ class File:
     def __eq__(self, value):
         if dataclasses.is_dataclass(value):
             if isinstance(value, File):
-                return (
-                    value.path == self.path,
-                    value.path.name == self.path.name
-                )
+                return (value.path == self.path, value.path.name == self.path.name)
         return value == self.path.name
 
     @property
     def is_json(self):
-        return self.path.suffix == '.json'
+        return self.path.suffix == ".json"
 
     @property
     def is_csv(self):
-        return self.path.suffix == '.csv'
+        return self.path.suffix == ".csv"
 
     @property
     def is_image(self):
         return self.path.suffix in load_image_extensions()
 
     async def read(self):
-        with open(self.path, mode='r', encoding='utf-8') as f:
+        with open(self.path, mode="r", encoding="utf-8") as f:
             if self.is_json:
                 return json.load(f)
             elif self.is_csv:
@@ -123,15 +127,20 @@ class FileStorage(BaseStorage):
 
     file_based = True
 
-    def __init__(self, *, spider: Optional[TypeSiteCrawler] = None, storage_path: Optional[TypePath] = None, ignore_images: bool = True):
+    def __init__(
+        self,
+        *,
+        spider: Optional[TypeSiteCrawler] = None,
+        storage_path: Optional[TypePath] = None,
+        ignore_images: bool = True,
+    ):
         super().__init__(spider=spider)
         if storage_path is not None:
             if isinstance(storage_path, str):
                 storage_path = pathlib.Path(storage_path)
 
             if not storage_path.is_dir():
-                raise ValueError(
-                    f"Storage should be a folder. Got: {storage_path}")
+                raise ValueError(f"Storage should be a folder. Got: {storage_path}")
 
         self.storage = OrderedDict()
         self.storage_path = storage_path or settings.MEDIA_PATH
@@ -142,7 +151,7 @@ class FileStorage(BaseStorage):
         self.initialize()
 
     def __repr__(self):
-        return f'<{self.__class__.__name__}: {len(self.storage.keys())}>'
+        return f"<{self.__class__.__name__}: {len(self.storage.keys())}>"
 
     def initialize(self):
         """A hook function that used to
@@ -150,7 +159,7 @@ class FileStorage(BaseStorage):
         storage container. This hook should be
         called also when creating new files in
         the storage in order to keep track"""
-        items = self.storage_path.glob('**/*')
+        items = self.storage_path.glob("**/*")
         for item in items:
             if not item.is_file():
                 continue
@@ -187,10 +196,10 @@ class FileStorage(BaseStorage):
             instance = File(path)
 
             if instance.is_json:
-                with open(path, mode='w', encoding='utf-8') as f:
+                with open(path, mode="w", encoding="utf-8") as f:
                     json.dump(data, f, cls=DefaultJsonEncoder)
             elif instance.is_csv:
-                with open(path, mode='w', newline='\n', encoding='utf-8') as f:
+                with open(path, mode="w", newline="\n", encoding="utf-8") as f:
                     writer = csv.writer(f)
                     writer.writerows(data)
             self.initialize()
@@ -202,10 +211,10 @@ class FileStorage(BaseStorage):
         file = await self.get_file(filename)
 
         if file.is_json:
-            with open(file.path, mode='w', encoding='utf-8') as f:
+            with open(file.path, mode="w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, cls=DefaultJsonEncoder)
         elif file.is_csv:
-            with open(file.path, mode='w', newline='\n', encoding='utf-8') as f:
+            with open(file.path, mode="w", newline="\n", encoding="utf-8") as f:
                 writer = csv.writer(f)
 
                 if adapt_list:
@@ -226,8 +235,8 @@ class RedisStorage(BaseStorage):
         self.storage_connection = self.storage_class(
             host=settings.STORAGE_REDIS_HOST,
             port=settings.STORAGE_REDIS_PORT,
-            username=getattr(settings, 'STORAGE_REDIS_USERNAME'),
-            password=getattr(settings, 'STORAGE_REDIS_PASSWORD')
+            username=getattr(settings, "STORAGE_REDIS_USERNAME"),
+            password=getattr(settings, "STORAGE_REDIS_PASSWORD"),
         )
         self.initialize()
 
@@ -235,9 +244,8 @@ class RedisStorage(BaseStorage):
         try:
             self.storage_connection.ping()
         except:
-            message = self.connection_error.format(
-                storage_name=self.__class__.__name__)
-            logger.critical(color_text('red', message))
+            message = self.connection_error.format(storage_name=self.__class__.__name__)
+            logger.critical(color_text("red", message))
         else:
             self.is_connected = True
 
@@ -258,7 +266,7 @@ class RedisStorage(BaseStorage):
         return False if value is None else True
 
     async def update_iteration(self, by: int = 1):
-        self.storage_connection.incrby('iteration', by)
+        self.storage_connection.incrby("iteration", by)
 
     async def save(self, key: str, data: Any):
         data = self.before_save(data)
@@ -272,11 +280,11 @@ class RedisStorage(BaseStorage):
         # Based on the type of data that we get in the
         # backend, we should ensure that the saving function
         # matches the type of data that we are passing
-        if key == f'{settings.CACHE_FILE_NAME}.json':
+        if key == f"{settings.CACHE_FILE_NAME}.json":
             for key, value in data.items():
                 await self.save(key, value)
-        elif key == 'seen_urls.csv':
-            await self.save('seen_urls.csv', data)
+        elif key == "seen_urls.csv":
+            await self.save("seen_urls.csv", data)
         else:
             await self.save(key, data)
 
@@ -310,8 +318,7 @@ class AirtableStorage(BaseStorage):
 
     def __init__(self):
         super().__init__()
-        self.storage_connection = self.storage_class(
-            settings.STORAGE_AIRTABLE_API_KEY)
+        self.storage_connection = self.storage_class(settings.STORAGE_AIRTABLE_API_KEY)
 
 
 # class ApiStorage(BaseStorage):
@@ -629,27 +636,27 @@ class AirtableStorage(BaseStorage):
 #         elif key == 'seen_urls.csv':
 #             self.insert_sql('url_cache', data)
 
-    # def create_sql(self, table, column, value):
-    #     return
+# def create_sql(self, table, column, value):
+#     return
 
-    # def insert_sql(self, table, columns=[], values=[]):
-    #     columns = self.comma_join(columns)
-    #     values = self.comma_join(self.quote_values(*values))
-    #     return self.INSERT.format(table=table, columns=columns, values=values)
+# def insert_sql(self, table, columns=[], values=[]):
+#     columns = self.comma_join(columns)
+#     values = self.comma_join(self.quote_values(*values))
+#     return self.INSERT.format(table=table, columns=columns, values=values)
 
-    # def run_sql_statements(self, *tokens):
-    #     sql = self.join_tokens(*tokens)
-    #     cursor = self.storage_connection.cursor()
-    #     return cursor.execute(self.finalize(sql))
+# def run_sql_statements(self, *tokens):
+#     sql = self.join_tokens(*tokens)
+#     cursor = self.storage_connection.cursor()
+#     return cursor.execute(self.finalize(sql))
 
-    # def save(self, key, data, adapt_list=False, **kwargs):
-    #     return
+# def save(self, key, data, adapt_list=False, **kwargs):
+#     return
 
-    # def visited_urls(self, state=True):
-    #     select_sql = self.select_sql('url_cache')
-    #     condition = self.build_condition(visited=state)
-    #     where_condition = self.WHERE_CONDITION.format(condition=condition)
-    #     return self.run_sql_statements(select_sql, where_condition)
+# def visited_urls(self, state=True):
+#     select_sql = self.select_sql('url_cache')
+#     condition = self.build_condition(visited=state)
+#     where_condition = self.WHERE_CONDITION.format(condition=condition)
+#     return self.run_sql_statements(select_sql, where_condition)
 
 
 class GoogleSheetStorage(BaseStorage):
@@ -659,10 +666,9 @@ class GoogleSheetStorage(BaseStorage):
         super().__init__(spider=spider)
 
         path = pathlib.Path(settings.STORAGE_GOOGLE_SHEET_CREDENTIALS)
-        with open(path, mode='r', encoding='utf-8') as f:
+        with open(path, mode="r", encoding="utf-8") as f:
             credentials = json.load(f)
-            self.storage_connection = gspread.service_account_from_dict(
-                credentials)
+            self.storage_connection = gspread.service_account_from_dict(credentials)
             self.spreadsheet = self.storage_connection.open_by_key(
                 settings.STORAGE_GOOGLE_SHEET_ID
             )

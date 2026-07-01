@@ -1,6 +1,7 @@
 import json
 import pathlib
 import unittest
+from unittest.mock import MagicMock
 from urllib.parse import urlunparse
 
 from kryptone.utils.urls import (
@@ -267,10 +268,13 @@ class TestURLIgnoreTest(unittest.TestCase):
 
 class TestMultipleURLManager(unittest.TestCase):
     def setUp(self):
-        self.manager = MultipleURLManager()
+        mock_driver = MagicMock()
+        type(mock_driver).current_url = "http://example.com"
+
+        self.manager = MultipleURLManager(mock_driver)
         self.manager.start_url = URL("http://example.com")
 
-    def test_add_url(self):
+    def test_add_urls(self):
         url1 = URL("http://example.com")
         url2 = URL("http://example.com/1")
 

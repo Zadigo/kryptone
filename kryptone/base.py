@@ -10,9 +10,8 @@ import random
 import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import Any, Final, Optional, Sequence
-from urllib.parse import ParseResult, unquote, urljoin, urlunparse
+from urllib.parse import unquote, urljoin
 from uuid import uuid4
 
 import pytz
@@ -41,7 +40,7 @@ from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import color_text
-from kryptone.utils.urls import URL
+from kryptone.utils.urls import URL, MultipleURLManager
 from kryptone.internal_types import TypeStorage
 
 DEFAULT_META_OPTIONS: Final[set[str]] = {
@@ -293,9 +292,9 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
     DATA_CONTAINER: list = []
     model = None
 
-    urls_to_visit: set[URL] = set()
-    visited_urls: set[URL] = set()
-    visited_pages_count: int = 0
+    # urls_to_visit: set[URL] = set()
+    # visited_urls: set[URL] = set()
+    # visited_pages_count: int = 0
     list_of_seen_urls: set[URL] = set()
     browser_name: Optional[str] = None
     timezone: str = "UTC"
@@ -304,6 +303,7 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
     storage: Optional[TypeStorage] = None
     additional_storages: list[tuple[str, BaseStorage]] = []
 
+    url_manager_class: Final[type[MultipleURLManager]] = MultipleURLManager
     _meta: Final[O] = None
 
     def __init__(self, browser_name: Optional[str] = None):
@@ -311,20 +311,16 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
         # to the first url of "Meta.start_urls"
         # allows us to track the domain to which
         # crawling needs to be limited to
-        self.start_url: Optional[URL] = None
+        # self.start_url: Optional[URL] = None
+
+        self.url_manager: Optional[MultipleURLManager] = self.url_manager_class()
 
         # A dictionary that allows us to track the
         # distribution of urls per domain or page visited
-        self.url_distribution = defaultdict(list)
+        # self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
 
         if not self._meta.debug_mode:
-            # self.driver = get_selenium_browser_instance(
-            #     browser_name=browser_name or self.browser_name,
-            #     headless=settings.HEADLESS,
-            #     load_images=settings.LOAD_IMAGES,
-            #     load_js=settings.LOAD_JS
-            # )
             launcher = SeleniumLauncher(
                 SeleniumBrowser(
                     browser_name=browser_name or self.browser_name,
@@ -353,24 +349,25 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
         return datetime.datetime.now(tz=timezone)
 
     @property
-    def get_origin(self) -> str | ParseResult:
-        if self.start_url is None:
-            return ""
+    def get_origin(self):
+        return self.url_manager.start_url.domain
+        # if self.start_url is None:
+        #     return ""
 
-        return urlunparse(
-            (
-                self.start_url.url_object.scheme,
-                self.start_url.url_object.netloc,
-                None,
-                None,
-                None,
-                None,
-            )
-        )
+        # return urlunparse(
+        #     (
+        #         self.start_url.url_object.scheme,
+        #         self.start_url.url_object.netloc,
+        #         None,
+        #         None,
+        #         None,
+        #         None,
+        #     )
+        # )
 
-    @cached_property
-    def calculate_completion_percentage(self) -> float:
-        return len(self.visited_urls) / len(self.urls_to_visit)
+    # @cached_property
+    # def calculate_completion_percentage(self) -> float:
+    #     return len(self.visited_urls) / len(self.urls_to_visit)
 
     @staticmethod
     def normalize_urls(urls: Sequence[URL]) -> list[str]:
@@ -520,7 +517,7 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
                 """
             )
 
-        self.url_distribution[self.driver.current_url].extend(found_urls)
+        # self.url_distribution[self.driver.current_url].extend(found_urls)
         return found_urls
 
     def save_object(self, data: TypeData, check_fields_null: list[str] = []):
@@ -765,19 +762,19 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
             logger.info(f"Discovered {len(newly_discovered_urls)} unseen url(s)")
         return valid_urls
 
-    def add_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
-        """Manually add urls to the current urls to
-        visit list. This is useful for cases where urls are
-        nested in other elements than links cannot actually be
-        retrieved by the spider
+    # def add_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
+    #     """Manually add urls to the current urls to
+    #     visit list. This is useful for cases where urls are
+    #     nested in other elements than links cannot actually be
+    #     retrieved by the spider
 
-        * Checks that the url was not already seen and therefore invalid be navigated to
-        * Checks that the url belongs to the same domain as the start url
-        * Runs filtering tests on the url before adding it to the list of urls to visit
-        """
-        checked_urls = self.check_urls(urls, refresh=refresh)
-        filtered_urls = self.run_url_filters(checked_urls)
-        self.urls_to_visit.update(filtered_urls)
+    #     * Checks that the url was not already seen and therefore invalid be navigated to
+    #     * Checks that the url belongs to the same domain as the start url
+    #     * Runs filtering tests on the url before adding it to the list of urls to visit
+    #     """
+    #     checked_urls = self.check_urls(urls, refresh=refresh)
+    #     filtered_urls = self.run_url_filters(checked_urls)
+    #     self.urls_to_visit.update(filtered_urls)
 
     def calculate_performance(self):
         """Calculate and/log the overall spider performance"""
@@ -879,7 +876,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     def __del__(self):
         try:
             self.driver.quit()
-        except:
+        except Exception:
             pass
         logger.info("Project stopped")
 
@@ -1112,7 +1109,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.visited_urls.add(current_url)
 
             if self._meta.crawl:
-                self.add_urls(self.collect_page_urls())
+                self.url_manager.add_urls(self.collect_page_urls(), from_page=self.driver.current_url)
                 self.backup_urls()
 
             current_page_actions_params = {}
@@ -1145,7 +1142,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.add_urls(self.collect_page_urls(), refresh=True)
+                    self.url_manager.add_urls(self.collect_page_urls(), from_page=self.driver.current_url, refresh=True)
                     self.backup_urls()
 
             try:

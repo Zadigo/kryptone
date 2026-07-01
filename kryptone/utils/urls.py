@@ -33,6 +33,7 @@ from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
+from kryptone.internal_types import TypeSiteCrawler
 
 _StringOrURL = Union[str, "URL"]
 
@@ -778,22 +779,36 @@ class MultipleURLManager:
     Args:
         ignore_images (bool): Whether to ignore image URLs when adding new URLs.
         sort_urls (bool): Whether to sort the URLs to visit.
+
+    Attributes:
+        _urls_to_visit (set[URL]): A set of URLs that are yet to be visited.
+        _visited_urls (set[URL]): A set of URLs that have already been visited.
+        _grouped_by_page (defaultdict[URL, set[URL]]): A dictionary that groups URLs by the page they were found on.
+        _current_url (Optional[URL]): The current URL being processed.
+        list_of_seen_urls (set[URL]): A set of all URLs that have been seen, regardless of whether they are to be visited or have been visited.
+        custom_url_filters (list[Callable[[URL], bool]]): A list of custom filter functions that can be applied to URLs before adding them to the visit list.
     """
 
     _urls_to_visit: set[URL] = set()
     _visited_urls: set[URL] = set()
-    _grouped_by_page: defaultdict = defaultdict(set)
+    _grouped_by_page: defaultdict[URL, set[URL]] = defaultdict(set)
     _current_url: Optional[URL] = None
     list_of_seen_urls: set[URL] = set()
     custom_url_filters: list[Callable[[URL], bool]] = []
 
-    def __init__(self, ignore_images: bool = True, sort_urls: bool = False):
-        self.start_url = None
+    def __init__(
+        self,
+        driver: TypeSiteCrawler,
+        ignore_images: bool = True,
+        sort_urls: bool = False,
+    ):
+        self._driver = driver
+        self.start_url: Optional[URL] = None
         self.ignore_images = ignore_images
         self.sort_urls = sort_urls
         # This attribute is updated every time
         # "get" is called on the class
-        self.current_iteration = 0
+        self.current_iteration: int = 0
         # A dataframe used to store the urls to visit and visited urls
         # and can be used to export the data to a csv or json file
         self.dataframe: Optional[pandas.DataFrame] = None
@@ -806,13 +821,13 @@ class MultipleURLManager:
         for url in self._urls_to_visit:
             yield url
 
-    def __contains__(self, url):
+    def __contains__(self, url: URL):
         return any([str(url) in self._urls_to_visit, str(url) in self._visited_urls])
 
     def __len__(self):
         return len(self._urls_to_visit)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         url = list(self._urls_to_visit)[index]
         return URL(url)
 
@@ -859,7 +874,7 @@ class MultipleURLManager:
 
     @property
     def grouped_by_page(self):
-        container = OrderedDict()
+        container: OrderedDict[URL, list[URL]] = OrderedDict()
         for key, values in self._grouped_by_page.items():
             container[key] = list(values)
         return container
@@ -868,7 +883,7 @@ class MultipleURLManager:
     def all_urls(self):
         return list(itertools.chain(self._visited_urls, self._urls_to_visit))
 
-    def urljoin(self, path):
+    def urljoin(self, path: str):
         if self.start_url is None:
             raise Exception(
                 "You should call populate at least once "
@@ -892,6 +907,25 @@ class MultipleURLManager:
         if self.start_url is not None:
             container = self._grouped_by_page[self.start_url]
             container.update(filtered_urls)
+
+        container = self._grouped_by_page[URL(self._driver.current_url)]
+        container.update(checked_urls)
+
+        if self.dataframe is None:
+            self.dataframe = pandas.DataFrame({"urls": list(self.urls_to_visit)})
+            self.dataframe["visited"] = False
+            self.dataframe["visited_on"] = None
+
+            if self.sort_urls:
+                self.dataframe = self.dataframe.sort_values("urls")
+
+            result = self.dataframe.urls.to_list()
+            self._urls_to_visit.update(result)
+        else:
+            newdf = pandas.DataFrame({"urls": list(filtered_urls)})
+            newdf["visited"] = False
+            newdf["visited_on"] = None
+            self.dataframe = pandas.concat([self.dataframe, newdf], ignore_index=True)
 
     def run_url_filters(self, valid_urls: set[URL]):
         """Excludes urls in the list of collected
@@ -1061,16 +1095,6 @@ class MultipleURLManager:
                 )
             self.start_url = start_url
             self.add_urls(start_urls)
-
-            self.dataframe = pandas.DataFrame({"urls": list(self.urls_to_visit)})
-            self.dataframe["visited"] = False
-            self.dataframe["visited_on"] = None
-
-            if self.sort_urls:
-                self.dataframe = self.dataframe.sort_values("urls")
-
-            result = self.dataframe.urls.to_list()
-            self._urls_to_visit.update(result)
 
 
 class LoadStartUrls(BaseURLGenerator):

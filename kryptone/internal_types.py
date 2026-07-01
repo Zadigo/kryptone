@@ -1,7 +1,6 @@
 import pathlib
-import time
 import datetime
-from typing import TYPE_CHECKING, Any, Protocol, Optional, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from kryptone.base import SiteCrawler
@@ -9,20 +8,15 @@ if TYPE_CHECKING:
     from kryptone.utils.urls import URL
 
 
-type TypeStorage = 'BaseStorage'
+type TypeStorage = "BaseStorage"
 
-type TypeUrl = str | 'URL'
+type TypeUrl = str | "URL"
 
 type TypePath = str | pathlib.Path
 
 type TypeData = dict[str, Any] | list[dict[str, Any]] | list[list[Any]]
 
-type TypeSiteCrawler = 'SiteCrawler'
-
-
-T = TypeVar('T')
-
-_SiteCrawler = TypeVar('_SiteCrawler', bound='SiteCrawler')
+type TypeSiteCrawler = "SiteCrawler"
 
 
 @runtime_checkable
@@ -35,6 +29,7 @@ class PerformanceAuditProtocol(Protocol):
     duration: int
     count_urls_to_visit: int
     count_visited_urls: int
+
     def calculate_duration(self) -> None: ...
     def add_error_count(self) -> None: ...
     def add_iteration_count(self) -> None: ...
@@ -45,6 +40,7 @@ class PerformanceAuditProtocol(Protocol):
 @runtime_checkable
 class FileProtocol(Protocol):
     path: pathlib.Path
+
     def __eq__(self, value: Any) -> bool: ...
     @property
     def is_json(self) -> bool: ...
@@ -53,5 +49,4 @@ class FileProtocol(Protocol):
     @property
     def is_image(self) -> bool: ...
 
-    async def read(self) -> dict[str,
-                                 Any] | list[dict[str, Any]] | list[list[Any]]: ...
+    async def read(self) -> dict[str, Any] | list[dict[str, Any]] | list[list[Any]]: ...
