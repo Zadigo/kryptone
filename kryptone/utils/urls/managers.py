@@ -8,8 +8,10 @@ from urllib.parse import (
 )
 import asyncio
 import bisect
+import asgiref.sync
 import pandas
 import pytz
+import asgiref
 
 from kryptone import logger
 from kryptone.utils.date_functions import get_current_date
@@ -17,6 +19,21 @@ from kryptone.internal_types import TypeSiteCrawler, TypeUrl
 from kryptone.utils.urls.base import URL
 from kryptone.data_storages import FileStorage
 from kryptone.conf import settings
+from kryptone.internal_types import TypeStorage
+
+
+JSON_BACKUP_TEMPLATE = {
+    "date": None,
+    "urls_to_visit": [],
+    "visited_urls": [],
+    "statistics": {
+        "last_visited_url": None,
+        "urls_to_visit_count": 0,
+        "visited_urls_count": 0,
+        "total_urls": 0,
+        "completion_rate": 0.0,
+    },
+}
 
 
 class MultipleURLManager:
@@ -288,21 +305,29 @@ class MultipleURLManager:
             logger.info(f"Discovered {len(newly_discovered_urls)} unseen url(s)")
         return valid_urls
 
-    def backup(self):
-        return {
-            "date": str(datetime.datetime.now(tz=pytz.UTC)),
-            "urls_to_visit": list(self._urls_to_visit),
-            "visited_urls": list(self._visited_urls),
-            "statistics": {
-                "last_visited_url": str(self._current_url)
-                if self._current_url is not None
-                else None,
-                "urls_to_visit_count": self.urls_to_visit_count,
-                "visited_urls_count": self.visited_urls_count,
-                "total_urls": sum([self.urls_to_visit_count, self.visited_urls_count]),
-                "completion_rate": self.completion_rate,
-            },
-        }
+    def backup(self, using: Optional[TypeStorage] = None):
+        template = JSON_BACKUP_TEMPLATE.copy()
+        template.update(
+            {
+                "date": str(datetime.datetime.now(tz=pytz.UTC)),
+                "urls_to_visit": list(self._urls_to_visit),
+                "visited_urls": list(self._visited_urls),
+                "statistics": {
+                    "last_visited_url": str(self._current_url)
+                    if self._current_url is not None
+                    else None,
+                    "urls_to_visit_count": self.urls_to_visit_count,
+                    "visited_urls_count": self.visited_urls_count,
+                    "total_urls": self.total_urls_count,
+                    "completion_rate": self.completion_rate,
+                },
+            }
+        )
+
+        if using is not None:
+            asgiref.sync.async_to_sync(using.save)("performance.json", template)
+
+        return template
 
     def clear(self):
         self._urls_to_visit.clear()

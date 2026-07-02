@@ -481,11 +481,13 @@ class BaseCrawler(metaclass=Crawler):
         instances = map(lambda x: self.model(**x), data)
 
         for instance in instances:
-            for field in instance_fields:
-                func_name = f"clean_{field.name}"
+            for _field in instance_fields:
+                func_name = f"clean_{_field.name}"
                 if hasattr(instance, func_name):
-                    result = getattr(instance, func_name)(getattr(instance, field.name))
-                    setattr(instance, field.name, result)
+                    result = getattr(instance, func_name)(
+                        getattr(instance, _field.name)
+                    )
+                    setattr(instance, _field.name, result)
 
             for check_field in check_fields_null:
                 if getattr(instance, check_field) is None:
@@ -980,14 +982,6 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.boost_start(windows=windows, skip_setup=True, **kwargs)
         else:
             self.start(skip_setup=True, **kwargs)
-
-    def start_from_sitemap_xml(
-        self, url: TypeUrl, windows: Optional[int] = 1, **kwargs: str | bool
-    ):
-        return NotImplemented
-
-    def start_from_json(self, windows: Optional[int] = 1, **kwargs: str | bool):
-        return NotImplemented
 
     def boost_start(
         self,

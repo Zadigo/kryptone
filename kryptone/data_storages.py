@@ -3,7 +3,7 @@ import dataclasses
 import json
 import pathlib
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any, Optional, Type
 from abc import ABC, abstractmethod
 import gspread
 import pyairtable
@@ -17,6 +17,9 @@ from kryptone.utils.text import color_text
 from kryptone.utils.urls.base import URL, load_image_extensions
 
 
+STORAGE_KEY: str = "kryptone:{spider_uuid}"
+
+
 def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
     """This is useful in cases where we send
     a simple list [1, 2] which needs to be
@@ -25,7 +28,7 @@ def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
     return list(map(lambda x: [x], data))
 
 
-class BaseStorage(ABC):
+class BaseStorage[S = Any](ABC):
     """Storage backends are primarily used for storing the
     current state of the spider either to a local source
     (such as a file) or external sources such as a database
@@ -39,10 +42,11 @@ class BaseStorage(ABC):
     `has` and `get`. They must return a coroutine.
     """
 
-    storage_class = None
-    storage_connection = None
+    storage_class: Optional[Type[S]] = None
+    storage_connection: Optional[S] = None
+    storage_key: Optional[str] = None
     file_based = False
-    connection_error = (
+    connection_error: str = (
         "Failed connection to {storage_name}. The spider will "
         "keep running without a storage backend. Data might be lost!"
     )
@@ -54,7 +58,12 @@ class BaseStorage(ABC):
 
         if self.spider is not None:
             self.spider_uuid = str(getattr(self.spider, "spider_uuid"))
-    
+
+        if self.storage_class is None:
+            raise ValueError(
+                f"Storage class is not defined for {self.__class__.__name__}"
+            )
+
     def before_save(self, data: Any):
         """A hook that is execute before data
         is saved to the storage"""
@@ -77,17 +86,20 @@ class BaseStorage(ABC):
 
     @abstractmethod
     async def save(
-        self, key: str, data: Any, adapt_list: bool = False, **kwargs
+        self, key: str, data: Any, adapt_list: bool = False, **kwargs: Any
     ) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    async def save_or_create(self, key: str, data: Any, **kwargs) -> Any:
+    async def save_or_create(self, key: str, data: Any, **kwargs: Any) -> Any:
         """Alternate save function that can be used to either
         save existing data or create a new record if the element
         does not exist. The logic needs to be implemented by the
         subclasses since the default behaviour is to call `save`"""
         return self.save(key, data, **kwargs)
+
+    async def get_file(self, filename: str) -> FileProtocol:
+        raise NotImplementedError("This storage does not support file retrieval")
 
 
 @dataclasses.dataclass
@@ -223,31 +235,37 @@ class FileStorage(BaseStorage):
         return True
 
 
-class RedisStorage(BaseStorage):
+class RedisStorage(BaseStorage[redis.Redis]):
     """A storage backend that implements basic storage
     functionnalities in addition of more advanced features
     in order to run complexe spider operations on Redis"""
 
     storage_class = redis.Redis
+    storage_key = None
 
-    def __init__(self, *, spider=None):
+    def __init__(self, *, spider: Optional[TypeSiteCrawler] = None):
         super().__init__(spider=spider)
+
         self.storage_connection = self.storage_class(
             host=settings.STORAGE_REDIS_HOST,
             port=settings.STORAGE_REDIS_PORT,
-            username=getattr(settings, "STORAGE_REDIS_USERNAME"),
-            password=getattr(settings, "STORAGE_REDIS_PASSWORD"),
+            username=getattr(settings, "STORAGE_REDIS_USERNAME", None),
+            password=getattr(settings, "STORAGE_REDIS_PASSWORD", None),
         )
+
         self.initialize()
 
     def initialize(self):
         try:
             self.storage_connection.ping()
-        except:
+        except Exception:
             message = self.connection_error.format(storage_name=self.__class__.__name__)
             logger.critical(color_text("red", message))
         else:
             self.is_connected = True
+
+        if self.storage_key is None:
+            self.storage_key = STORAGE_KEY.format(spider_uuid=self.spider_uuid)
 
     def before_save(self, data: Any) -> str:
         if isinstance(data, URL):
@@ -274,7 +292,7 @@ class RedisStorage(BaseStorage):
         if self.spider_uuid is None:
             return None
 
-        return self.storage_connection.hset(self.spider_uuid, key, data)
+        return self.storage_connection.hset(self.storage_key, key, data)
 
     async def save_or_create(self, key, data, **kwargs):
         # Based on the type of data that we get in the
@@ -288,36 +306,38 @@ class RedisStorage(BaseStorage):
         else:
             await self.save(key, data)
 
-    async def get(self, key: str):
-        if self.spider_uuid is not None:
-            result = self.storage_connection.hget(self.spider_uuid, key)
+    async def get(self, key):
+        result = self.storage_connection.hget(self.storage_key, key)
 
-            if result is not None and isinstance(result, bytes):
-                data = result.decode()
+        if result is not None and isinstance(result, bytes):
+            data = result.decode()
 
-                try:
-                    # If the item is a list or dict,
-                    # this will attempt to return it
-                    return json.loads(data)
-                except:
-                    pass
+            try:
+                # If the item is a list or dict,
+                # this will attempt to return it
+                return json.loads(data)
+            except Exception:
+                pass
 
-                try:
-                    # If the item is an integer,
-                    # return it as such
-                    return int(data)
-                except:
-                    pass
+            try:
+                # If the item is an integer,
+                # return it as such
+                return int(data)
+            except Exception:
+                pass
 
-                return data
+            return data
         return None
 
+    async def get_file(self, filename: str) -> FileProtocol:
+        return await self.get(filename)
 
-class AirtableStorage(BaseStorage):
+
+class AirtableStorage(BaseStorage[pyairtable.Api]):
     storage_class = pyairtable.Api
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *, spider: Optional[TypeSiteCrawler] = None):
+        super().__init__(spider=spider)
         self.storage_connection = self.storage_class(settings.STORAGE_AIRTABLE_API_KEY)
 
 
@@ -659,16 +679,39 @@ class AirtableStorage(BaseStorage):
 #     return self.run_sql_statements(select_sql, where_condition)
 
 
-class GoogleSheetStorage(BaseStorage):
-    storage_class = None
+class GoogleSheetStorage(BaseStorage[gspread.Client]):
+    storage_key = 'sheet-{spider_uuid}'
 
-    def __init__(self, spider=None):
+    def __init__(self, *, spider: Optional[TypeSiteCrawler] = None):
         super().__init__(spider=spider)
 
         path = pathlib.Path(settings.STORAGE_GOOGLE_SHEET_CREDENTIALS)
-        with open(path, mode="r", encoding="utf-8") as f:
+        with path.open(mode="r", encoding="utf-8") as f:
             credentials = json.load(f)
             self.storage_connection = gspread.service_account_from_dict(credentials)
+            # Open the worksheet
             self.spreadsheet = self.storage_connection.open_by_key(
                 settings.STORAGE_GOOGLE_SHEET_ID
             )
+
+    def save(self, key, data, adapt_list = False, **kwargs):
+        try:
+            sheet = self.spreadsheet.worksheet(key)
+        except gspread.WorksheetNotFound:
+            sheet = self.spreadsheet.add_worksheet(title=key, rows=100, cols=20)
+
+        sheet.acell("A1").value = json.dumps(data, cls=DefaultJsonEncoder)
+
+    def get(self, key):
+        try:
+            sheet = self.spreadsheet.worksheet(key)
+        except gspread.WorksheetNotFound:
+            return None
+
+        value = sheet.acell("A1").value
+        if value is not None:
+            return json.loads(value)
+        return None
+
+    def get_file(self, filename: str) -> FileProtocol:
+        raise NotImplementedError("GoogleSheetStorage does not support file retrieval")
