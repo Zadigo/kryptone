@@ -1,6 +1,7 @@
 import os
 import re
 import string
+from typing import Callable
 import unicodedata
 from functools import cached_property
 
@@ -11,9 +12,9 @@ from kryptone.utils.iterators import drop_null
 os.system("")
 
 # ^(\d+[,.]?\d+)
-PRICE = re.compile(r'(\d+\,?\d+)')
+PRICE = re.compile(r"(\d+\,?\d+)")
 
-PRICE_EURO = re.compile(r'\d+\€\d+')
+PRICE_EURO = re.compile(r"\d+\€\d+")
 
 
 def parse_price(text: str | int | float | None):
@@ -35,22 +36,22 @@ def parse_price(text: str | int | float | None):
     format_two = PRICE.search(text)
 
     if format_one:
-        price = text.replace('€', '.')
+        price = text.replace("€", ".")
     elif format_two:
         price = format_two.group(0)
     else:
         price = text
-    price = price.replace(',', '.')
+    price = price.replace(",", ".")
     return float(price)
 
 
-def clean_text(text: str, encoding: str = 'utf-8'):
+def clean_text(text: str, encoding: str = "utf-8"):
     if not isinstance(text, str):
         return text
 
-    text = text.replace('\n', ' ')
-    text = text.replace('\t', ' ')
-    text = unicodedata.normalize('NFKD', text)
+    text = text.replace("\n", " ")
+    text = text.replace("\t", " ")
+    text = unicodedata.normalize("NFKD", text)
     text = text.encode(encoding).decode()
     return normalize_spaces(text)
 
@@ -63,7 +64,7 @@ class Text:
         self.tokens = []
         self.punctation = punctation
         self.accents = accents
-        self.encoding = 'utf-8'
+        self.encoding = "utf-8"
 
     def __str__(self):
         cleaned_text = clean_text(self.raw_text, encoding=self.encoding)
@@ -78,7 +79,7 @@ class Text:
         return cleaned_text
 
     def __add__(self, obj):
-        return ' '.join([self.__str__(), str(obj)])
+        return " ".join([self.__str__(), str(obj)])
 
     def __len__(self):
         return len(self.__str__())
@@ -89,7 +90,7 @@ class Text:
 
     @cached_property
     def tokens(self):
-        return self.__str__().split(' ')
+        return self.__str__().split(" ")
 
 
 def remove_punctuation(text: str, keep: list[str] = [], email_exception: bool = False):
@@ -100,11 +101,11 @@ def remove_punctuation(text: str, keep: list[str] = [], email_exception: bool = 
 
     if keep:
         for value in keep:
-            punctuation = punctuation.replace(value, '')
+            punctuation = punctuation.replace(value, "")
 
     if email_exception:
-        punctuation = punctuation.replace('@', '')
-    return text.translate(str.maketrans('', '', punctuation))
+        punctuation = punctuation.replace("@", "")
+    return text.translate(str.maketrans("", "", punctuation))
 
 
 def remove_accents(text: str):
@@ -125,7 +126,7 @@ def clean_dictionnary(item, accents: bool = False, punctation: bool = False):
         return [clean_dictionnary(data) for data in item]
 
     if not isinstance(item, dict):
-        raise ValueError('Object to clean should a dictionnary')
+        raise ValueError("Object to clean should a dictionnary")
 
     new_item = {}
     for key, value in item.items():
@@ -144,10 +145,10 @@ def clean_dictionnary(item, accents: bool = False, punctation: bool = False):
 def normalize_spaces(text_or_tokens: str | list[str]):
     """Remove excess spaces from a given text"""
     if isinstance(text_or_tokens, str):
-        tokens = text_or_tokens.split(' ')
+        tokens = text_or_tokens.split(" ")
     else:
         tokens = text_or_tokens
-    return ' '.join(drop_null(tokens))
+    return " ".join(drop_null(tokens))
 
 
 def slugify(text: str):
@@ -157,18 +158,18 @@ def slugify(text: str):
     ... 'my-text'
     """
     if not isinstance(text, str):
-        raise ValueError(f'Value should be a text. Got: {type(text)}')
-    text = text.replace(' ', '-').lower()
+        raise ValueError(f"Value should be a text. Got: {type(text)}")
+    text = text.replace(" ", "-").lower()
     return remove_accents(text)
 
 
-class LogStyle():
+class LogStyle:
     # See: https://stackoverflow.com/questions/287871/how-do-i-print-colored-text-to-the-terminal
 
-    CHECK_MARK = '[✓]'
-    CROSS_MARK = '[X]'
-    EXCLAMATION_MARK = '!'
-    PLUS = '+'
+    CHECK_MARK = "[✓]"
+    CROSS_MARK = "[X]"
+    EXCLAMATION_MARK = "!"
+    PLUS = "+"
 
     def __init__(self, text, background=False):
         self.foreground_color_code = 38
@@ -199,11 +200,11 @@ class LogStyle():
         return self.get_text(41, 128, 185)
 
 
-def color_text(color, text, background=False):
+def color_text(color: str, text: str, background: bool = False):
     """Shortcut method used to color a given text. If the
     color exists on LogStyle, the method will be inferred and used"""
     instance = LogStyle(text, background=background)
-    method = getattr(instance, f'{color}_text', None)
+    method: Callable[[], str] = getattr(instance, f"{color}_text", None)
     if method is not None:
         return method()
     return text

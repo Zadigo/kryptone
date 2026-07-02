@@ -8,7 +8,7 @@ from urllib.parse import (
 from asgiref.sync import sync_to_async
 
 from kryptone.utils.urls.base import URL
-from kryptone.internal_types import TypeStringOrUrl
+from kryptone.internal_types import TypeUrl
 
 
 class BaseURLGenerator[U: URL](abc.ABC):
@@ -159,7 +159,7 @@ class URLPaginationGenerator(BaseURLGenerator[URL]):
     ... ['http:////example.com?page=1', 'http:////example.com?page=2']
     """
 
-    def __init__(self, url: TypeStringOrUrl, param_name: str = "page", k: int = 10):
+    def __init__(self, url: TypeUrl, param_name: str = "page", k: int = 10):
         self.urls = []
         self.final_urls = []
 

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     from kryptone.base import SiteCrawler
     from kryptone.data_storages import BaseStorage
-    from kryptone.utils.urls import URL
+    from kryptone.utils.urls.base import URL
 
 
 type TypeStorage = "BaseStorage"

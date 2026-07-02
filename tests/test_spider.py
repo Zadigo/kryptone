@@ -259,9 +259,7 @@ class SpiderMixin(unittest.TestCase):
         mocked_selenium_instance.return_value.launch.return_value = mocked_edge
 
         # Current url
-        type(mocked_edge).current_url = PropertyMock(
-            return_value="http://example.com"
-        )
+        type(mocked_edge).current_url = PropertyMock(return_value="http://example.com")
 
         # Mock url retrieval on a given page
         mocked_selenium_instance.return_value.execute_script.return_value = [

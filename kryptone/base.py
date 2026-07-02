@@ -537,7 +537,9 @@ class BaseCrawler(metaclass=Crawler):
         on cookie button banner"""
         return NotImplemented
 
-    def before_next_page_actions(self, current_url: URL, next_url: URL, **kwargs: Any):
+    def before_next_page_actions(
+        self, current_url: URL, next_url: URL | None, **kwargs: Any
+    ):
         """Actions to run once the page was visited and that
         all user actions were performed. This method runs just
         after the `wait_time` has expired"""
@@ -762,14 +764,14 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         self.url_manager.add_urls(start_urls)
 
     def start(self, start_urls: Sequence[TypeUrl] = [], **kwargs: str | bool):
-        """Main function that starts the crawling process. 
-        The crawling will start from the urls provided in the `start_urls` 
-        argument or from the urls provided in the `Meta` class of the spider. 
-        The crawling will continue until all the urls have been visited or until 
+        """Main function that starts the crawling process.
+        The crawling will start from the urls provided in the `start_urls`
+        argument or from the urls provided in the `Meta` class of the spider.
+        The crawling will continue until all the urls have been visited or until
         the `stop` method is called.
-        
+
         Args:
-            start_urls (Sequence[TypeUrl], optional): A list of urls to start crawling from. 
+            start_urls (Sequence[TypeUrl], optional): A list of urls to start crawling from.
                 If not provided, the urls in the `Meta` class will be used. Defaults to [].
             **kwargs (str | bool): Additional keyword arguments to customize the crawling behavior.
         """
@@ -798,10 +800,15 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 if self.get_current_date < next_execution_date:
                     continue
 
-            current_url = URL(self.url_manager.urls_to_visit.pop())
-            logger.info(
-                f"{color_text('green', len(self.url_manager.urls_to_visit))} urls left to visit"
-            )
+            # current_url = URL(self.url_manager.urls_to_visit.pop())
+            current_url = self.url_manager.get()
+
+            colored_text = color_text("green", self.url_manager.urls_to_visit_count)
+            logger.info(f"{colored_text} urls left to visit")
+
+            if current_url is None:
+                logger.info("No more urls to visit")
+                break
 
             if current_url.is_empty:
                 continue
@@ -838,8 +845,6 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     async_to_sync(self.post_navigation_actions)(current_url)
                 else:
                     self.post_navigation_actions(current_url)
-
-            self.url_manager._visited_urls.add(current_url)
 
             if self._meta.crawl:
                 self.url_manager.add_urls(self.collect_page_urls())
@@ -881,15 +886,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     )
                     self.url_manager.backup_urls()
 
-            try:
-                next_url = self.url_manager.urls_to_visit[-1]
-            except Exception:
-                pass
+            if inspect.iscoroutinefunction(self.before_next_page_actions):
+                async_to_sync(self.before_next_page_actions)(
+                    current_url, self.url_manager.next_url
+                )
             else:
-                if inspect.iscoroutinefunction(self.before_next_page_actions):
-                    async_to_sync(self.before_next_page_actions)(current_url, next_url)
-                else:
-                    self.before_next_page_actions(current_url, next_url)
+                self.before_next_page_actions(current_url, self.url_manager.next_url)
 
             if self._meta.router is not None:
                 pass
@@ -909,16 +911,15 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
             self.performance_audit.add_iteration_count()
 
-            if len(self.url_manager.urls_to_visit) == 0:
+            if self.url_manager.urls_to_visit_count == 0:
                 self.performance_audit.end_date = self.get_current_date
                 self.performance_audit.calculate_duration()
 
-            self.performance_audit.count_urls_to_visit = len(self.url_manager.urls_to_visit)
-            self.performance_audit.count_visited_urls = len(self.visited_urls)
+            self.performance_audit.count_urls_to_visit = self.url_manager.urls_to_visit_count
+            self.performance_audit.count_visited_urls = self.url_manager.visited_urls_count
 
-            logger.info(
-                f"Next execution time: {color_text('blue', next_execution_date)}"
-            )
+            text = color_text("blue", next_execution_date)
+            logger.info(f"Next execution time: {text}")
 
             if os.getenv("KYRPTONE_TEST_RUN") is not None:
                 break

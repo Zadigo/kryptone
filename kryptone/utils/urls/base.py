@@ -20,7 +20,7 @@ from kryptone.conf import settings
 from kryptone.utils.file_readers import read_document
 from kryptone.utils.iterators import drop_while
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
-from kryptone.internal_types import TypeStringOrUrl
+from kryptone.internal_types import TypeUrl
 
 
 @lru_cache(maxsize=100)
@@ -331,7 +331,7 @@ class URL:
 
     @staticmethod
     def structural_check(
-        url: TypeStringOrUrl, domain: Optional[TypeStringOrUrl] = None
+        url: TypeUrl, domain: Optional[TypeUrl] = None
     ):
         clean_url = unquote(str(url))
         return clean_url, urlparse(clean_url)
@@ -384,7 +384,7 @@ class URL:
         response = requests.get(self.raw_url, headers=headers)
         return response.ok, response.status_code
 
-    def compare(self, url_to_compare: TypeStringOrUrl) -> bool:
+    def compare(self, url_to_compare: TypeUrl) -> bool:
         """Checks that the given url has the same path
         as the url to compare::
 

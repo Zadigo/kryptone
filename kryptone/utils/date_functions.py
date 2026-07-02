@@ -4,7 +4,7 @@ import calendar
 from datetime import tzinfo
 
 
-def get_current_date(timezone: str = pytz.UTC) -> datetime.datetime:
+def get_current_date(timezone: str = "UTC") -> datetime.datetime:
     """Returns the current date"""
 
     timezone = pytz.timezone(timezone)
