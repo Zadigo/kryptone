@@ -226,10 +226,26 @@ class Crawler(type):
 
 
 class BaseCrawler(metaclass=Crawler):
+    """
+    Args:
+        browser_name (str): The name of the browser to be used by the crawler.
+
+    Attributes:
+        DATA_CONTAINER (list): A list that stores the data collected by the crawler.
+        model (dataclass): dataclass model used to validate the data collected by the crawler.
+        browser_name (str): The name of the browser to be used by the crawler.
+        timezone (str): The timezone to be used by the crawler.
+        default_scroll_step (int): The default number of pixels to scroll when scrolling down the page.
+        storage (TypeStorage): The storage backend to be used by the crawler.
+        additional_storages (list): A list of additional storage backends to be used by the crawler.
+        url_manager_class (type): The class to be used for managing URLs.
+        _meta (CrawlerOptions): The options for the crawler.
+    """
+
     DATA_CONTAINER: list = []
     model = None
 
-    list_of_seen_urls: set[URL] = set()
+    # list_of_seen_urls: set[URL] = set()
     browser_name: Optional[str] = None
     timezone: str = "UTC"
     default_scroll_step: int = 80
@@ -241,17 +257,7 @@ class BaseCrawler(metaclass=Crawler):
     _meta: Final[CrawlerOptions] = None
 
     def __init__(self, browser_name: Optional[str] = None):
-        # A dictionary that allows us to track the
-        # distribution of urls per domain or page visited
-        # self.url_distribution = defaultdict(list)
         self.spider_uuid = uuid4()
-
-        # The start url which corresponds
-        # to the first url of "Meta.start_urls"
-        # allows us to track the domain to which
-        # crawling needs to be limited to
-        # self.start_url: Optional[URL] = None
-
         self.url_manager: Optional[MultipleURLManager] = self.url_manager_class(self)
 
         if not self._meta.debug_mode:
@@ -750,12 +756,23 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             f"{color_text('blue', self.__class__.__name__)} ready to crawl website"
         )
 
-        if self.start_url is None:
-            self.start_url = URL(start_urls[-1])
+        if self.url_manager.start_url is None:
+            self.url_manager.start_url = URL(start_urls[-1])
 
         self.url_manager.add_urls(start_urls)
 
     def start(self, start_urls: Sequence[TypeUrl] = [], **kwargs: str | bool):
+        """Main function that starts the crawling process. 
+        The crawling will start from the urls provided in the `start_urls` 
+        argument or from the urls provided in the `Meta` class of the spider. 
+        The crawling will continue until all the urls have been visited or until 
+        the `stop` method is called.
+        
+        Args:
+            start_urls (Sequence[TypeUrl], optional): A list of urls to start crawling from. 
+                If not provided, the urls in the `Meta` class will be used. Defaults to [].
+            **kwargs (str | bool): Additional keyword arguments to customize the crawling behavior.
+        """
         skip_setup = kwargs.get("skip_setup", False)
         if not skip_setup:
             self.setup_class()
@@ -776,20 +793,20 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         wait_time = settings.WAIT_TIME
         next_execution_date = None
 
-        while self.urls_to_visit:
+        while self.url_manager.urls_to_visit:
             if next_execution_date is not None:
                 if self.get_current_date < next_execution_date:
                     continue
 
-            current_url = URL(self.urls_to_visit.pop())
+            current_url = URL(self.url_manager.urls_to_visit.pop())
             logger.info(
-                f"{color_text('green', len(self.urls_to_visit))} urls left to visit"
+                f"{color_text('green', len(self.url_manager.urls_to_visit))} urls left to visit"
             )
 
             if current_url.is_empty:
                 continue
 
-            if not current_url.is_same_domain(self.start_url):
+            if not current_url.is_same_domain(self.url_manager.start_url):
                 continue
 
             # TODO: Factorize this section into one single function
@@ -865,7 +882,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     self.url_manager.backup_urls()
 
             try:
-                next_url = self.urls_to_visit[-1]
+                next_url = self.url_manager.urls_to_visit[-1]
             except Exception:
                 pass
             else:
@@ -892,11 +909,11 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
             self.performance_audit.add_iteration_count()
 
-            if len(self.urls_to_visit) == 0:
+            if len(self.url_manager.urls_to_visit) == 0:
                 self.performance_audit.end_date = self.get_current_date
                 self.performance_audit.calculate_duration()
 
-            self.performance_audit.count_urls_to_visit = len(self.urls_to_visit)
+            self.performance_audit.count_urls_to_visit = len(self.url_manager.urls_to_visit)
             self.performance_audit.count_visited_urls = len(self.visited_urls)
 
             logger.info(

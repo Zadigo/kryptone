@@ -255,7 +255,13 @@ class SpiderMixin(unittest.TestCase):
         mocked_edge.maximize_window.return_value = True
 
         # Return a mock of the Selenium Webdriver
-        mocked_selenium_instance.return_value = mocked_edge
+        # mocked_selenium_instance.return_value = mocked_edge
+        mocked_selenium_instance.return_value.launch.return_value = mocked_edge
+
+        # Current url
+        type(mocked_edge).current_url = PropertyMock(
+            return_value="http://example.com"
+        )
 
         # Mock url retrieval on a given page
         mocked_selenium_instance.return_value.execute_script.return_value = [
@@ -273,9 +279,9 @@ class SpiderMixin(unittest.TestCase):
         cls.start_urls = ["https://example.com"]
 
         # mocked_selenium_instance.assert_called_once_with(
-        #     browser_name=None, 
-        #     headless=False, 
-        #     load_images=True, 
+        #     browser_name=None,
+        #     headless=False,
+        #     load_images=True,
         #     load_js=True
         # )
 
@@ -293,7 +299,7 @@ class TestSpider(SpiderMixin):
         cls.p1.stop()
         cls.p2.stop()
 
-    def test_structure(self):
+    def test_structure_with_start_urls(self):
         self.spider.start(self.start_urls)
         self.mocked_edge.get.assert_called()
 
