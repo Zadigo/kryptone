@@ -18,6 +18,8 @@ type TypeData = dict[str, Any] | list[dict[str, Any]] | list[list[Any]]
 
 type TypeSiteCrawler = "SiteCrawler"
 
+type TypeStringOrUrl = str | "URL"
+
 
 @runtime_checkable
 class PerformanceAuditProtocol(Protocol):

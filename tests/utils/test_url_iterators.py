@@ -1,40 +1,41 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from kryptone.utils.urls import (URL, MultipleURLManager,
-                                 URLPaginationGenerator, URLPathGenerator,
-                                 URLQueryGenerator)
+from kryptone.utils.urls.base import (
+    URL,
+)
 
-START_URLS = [
-    'http://example.com',
-    'http://example.com/1'
-]
+from kryptone.utils.urls.generators import (
+    URLPaginationGenerator,
+    URLPathGenerator,
+    URLQueryGenerator,
+)
+
+from kryptone.utils.urls.managers import (
+    MultipleURLManager,
+)
+
+START_URLS = ["http://example.com", "http://example.com/1"]
 
 
 class TestURLPaginationGenerator(unittest.TestCase):
     def test_generator(self):
-        instance = URLPaginationGenerator('http://example.com', k=1)
-        self.assertListEqual(list(instance), ['http://example.com?page=1'])
+        instance = URLPaginationGenerator("http://example.com", k=1)
+        self.assertListEqual(list(instance), ["http://example.com?page=1"])
 
 
 class TestURLPathGenerator(unittest.TestCase):
     def test_generator(self):
         instance = URLPathGenerator(
-            'http://example.com/$id',
-            params={'id': 'number'},
-            k=1,
-            start=1
+            "http://example.com/$id", params={"id": "number"}, k=1, start=1
         )
-        self.assertListEqual(list(instance), ['http://example.com/1'])
+        self.assertListEqual(list(instance), ["http://example.com/1"])
 
 
 class TestURLQueryGenerator(unittest.TestCase):
     def test_generator(self):
         instance = URLQueryGenerator(
-            'http://example.com/',
-            param='year',
-            initial_value=2001,
-            end_value=2002
+            "http://example.com/", param="year", initial_value=2001, end_value=2002
         )
 
         urls = list(instance)
@@ -82,19 +83,17 @@ class TestMultipleURLManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.start_urls = [
-            'https://example.com',
-            'https://example.com?page=1',
-            'https://example.com/2',
-            '/url-path'
+            "https://example.com",
+            "https://example.com?page=1",
+            "https://example.com/2",
+            "/url-path",
         ]
 
-        cls.other_urls = [
-            'https://example.com/bershka'
-        ]
+        cls.other_urls = ["https://example.com/bershka"]
 
     def populate(self, instance):
         instance.populate(self.start_urls)
-        self.assertFalse(instance.empty, msg='Array is empty')
+        self.assertFalse(instance.empty, msg="Array is empty")
 
         for item in instance.urls_to_visit:
             with self.subTest(item=item):
@@ -116,19 +115,19 @@ class TestMultipleURLManager(unittest.TestCase):
 
         # 5
         urls_count = len(self.start_urls) + len(self.other_urls)
-        message = f'Instance had: {instance.list_of_seen_urls}'
+        message = f"Instance had: {instance.list_of_seen_urls}"
         self.assertEqual(len(instance.list_of_seen_urls), urls_count, message)
         self.assertTrue(len(instance._urls_to_visit) > 0)
         self.assertTrue(
             len(instance._urls_to_visit) == urls_count,
-            msg=f'urls to visit: {len(instance._urls_to_visit)}'
+            msg=f"urls to visit: {len(instance._urls_to_visit)}",
         )
 
         for item in instance._urls_to_visit:
             with self.subTest(item=item):
                 self.assertIsInstance(item, URL)
 
-    @patch('kryptone.utils.urls.URLIgnoreTest')
+    @patch("kryptone.utils.urls.URLIgnoreTest")
     def test_with_custom_filter(self, mock_ignore_test: Mock):
         instance = MultipleURLManager()
         instance.populate(self.start_urls)
@@ -138,7 +137,7 @@ class TestMultipleURLManager(unittest.TestCase):
         urls = instance.run_url_filters(self.start_urls[:1])
 
         mock_ignore_test.assert_called_once()
-        mock_ignore_test.assert_called_once_with('https://example.com')
+        mock_ignore_test.assert_called_once_with("https://example.com")
         self.assertTrue(len(urls) > 0)
 
     def test_get(self):
@@ -157,13 +156,9 @@ class TestMultipleURLManager(unittest.TestCase):
 class TestInvalidMultipleURLManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.start_urls = [
-            'https://example.com'
-        ]
+        cls.start_urls = ["https://example.com"]
 
-        cls.other_urls = [
-            'https://example.com/bershka'
-        ]
+        cls.other_urls = ["https://example.com/bershka"]
 
     def setUp(self):
         self.instance = MultipleURLManager()
@@ -171,7 +166,7 @@ class TestInvalidMultipleURLManager(unittest.TestCase):
 
     def populate(self):
         self.instance.populate(self.start_urls)
-        self.assertFalse(self.instance.empty, msg='Array is empty')
+        self.assertFalse(self.instance.empty, msg="Array is empty")
 
         for item in self.instance.urls_to_visit:
             with self.subTest(item=item):
@@ -181,7 +176,7 @@ class TestInvalidMultipleURLManager(unittest.TestCase):
         self.assertEqual(self.instance.urls_to_visit_count, urls_count)
 
     def test_add_urls_not_in_domain(self):
-        none_valid_url = URL('http://bershka.com')
+        none_valid_url = URL("http://bershka.com")
         self.instance.add_urls([none_valid_url])
-        message = f'Instance has {self.instance._urls_to_visit}'
+        message = f"Instance has {self.instance._urls_to_visit}"
         self.assertNotIn(none_valid_url, self.instance._urls_to_visit, message)

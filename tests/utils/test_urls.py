@@ -4,12 +4,9 @@ import unittest
 from unittest.mock import MagicMock
 from urllib.parse import urlunparse
 
-from kryptone.utils.urls import (
-    URL,
-    URLIgnoreRegexTest,
-    URLIgnoreTest,
-    MultipleURLManager,
-)
+from kryptone.utils.urls.base import URL
+from kryptone.utils.urls.url_testing import URLIgnoreTest, URLIgnoreRegexTest
+from kryptone.utils.urls.managers import MultipleURLManager
 
 IGNORE_PATHS = [
     "/Customer/Wishlist",

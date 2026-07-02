@@ -4,12 +4,16 @@ import string
 from typing import Optional
 
 from internal_types import TypeUrl
-from kryptone.utils.text import (normalize_spaces, remove_accents,
-                                 remove_punctuation)
-from kryptone.utils.urls import URL
+from kryptone.utils.text import normalize_spaces, remove_accents, remove_punctuation
+from kryptone.utils.urls.base import URL
 
 
-def directory_from_breadcrumbs(text: str, separator: Optional[str] = '>', remove_last: bool = True, exclude: Optional[list[str]] = []) -> pathlib.Path:
+def directory_from_breadcrumbs(
+    text: str,
+    separator: Optional[str] = ">",
+    remove_last: bool = True,
+    exclude: Optional[list[str]] = [],
+) -> pathlib.Path:
     """Get the path the local directory for the breadcrumb
     provided on the current page
 
@@ -24,7 +28,7 @@ def directory_from_breadcrumbs(text: str, separator: Optional[str] = '>', remove
     # is the current page and first element
     # the home page
     if remove_last:
-        tokens = tokens[0:len(tokens) - 1]
+        tokens = tokens[0 : len(tokens) - 1]
 
     clean_tokens = map(lambda x: x.strip(), tokens)
 
@@ -32,11 +36,11 @@ def directory_from_breadcrumbs(text: str, separator: Optional[str] = '>', remove
         tokens = list(filter(lambda x: x not in exclude, clean_tokens))
 
     def build(token):
-        token = remove_punctuation(token.strip()).replace(' ', '_')
+        token = remove_punctuation(token.strip()).replace(" ", "_")
         return token.lower()
 
     tokens = map(build, tokens)
-    return pathlib.Path('/'.join(tokens))
+    return pathlib.Path("/".join(tokens))
 
 
 def directory_from_url(url_or_path: TypeUrl, exclude: list[str] = []):
@@ -50,31 +54,37 @@ def directory_from_url(url_or_path: TypeUrl, exclude: list[str] = []):
     if isinstance(url_or_path, URL):
         url_or_path = str(url_or_path.url_object.path)
 
-    tokens = url_or_path.split('/')
-    tokens = filter(lambda x: x not in exclude and x != '', tokens)
+    tokens = url_or_path.split("/")
+    tokens = filter(lambda x: x not in exclude and x != "", tokens)
 
     def clean_token(token: str) -> str:
-        result = token.replace('-', '_')
-        return remove_accents(remove_punctuation(result.lower(), keep=['_']))
+        result = token.replace("-", "_")
+        return remove_accents(remove_punctuation(result.lower(), keep=["_"]))
+
     tokens = list(map(clean_token, tokens))
 
     tokens.pop(-1)
-    return pathlib.Path('/'.join(tokens))
+    return pathlib.Path("/".join(tokens))
 
 
-def create_filename(length: int = 5, extension: Optional[str] = None, suffix: Optional[str] = None, suffix_with_date: bool = False) -> str:
+def create_filename(
+    length: int = 5,
+    extension: Optional[str] = None,
+    suffix: Optional[str] = None,
+    suffix_with_date: bool = False,
+) -> str:
     characters = string.ascii_lowercase + string.digits
-    name = ''.join(random.choice(characters) for _ in range(length))
+    name = "".join(random.choice(characters) for _ in range(length))
 
     if suffix is not None:
-        name = f'{name}_{suffix}'
+        name = f"{name}_{suffix}"
 
     if suffix is None and suffix_with_date:
         from kryptone.utils.date_functions import get_current_date
 
-        current_date = str(get_current_date().date()).replace('-', '_')
-        name = f'{name}_{current_date}'
+        current_date = str(get_current_date().date()).replace("-", "_")
+        name = f"{name}_{current_date}"
 
     if extension is not None:
-        return f'{name}.{extension}'
+        return f"{name}.{extension}"
     return name

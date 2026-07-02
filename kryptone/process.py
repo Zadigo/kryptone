@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Optional
-from typing import Optional
 
 from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
 from selenium.webdriver.chrome.service import Service
@@ -12,7 +11,7 @@ from kryptone.conf import settings
 from kryptone.utils.randomizers import RANDOM_USER_AGENT
 
 
-class SeleniumBrowser(ABC):
+class BaseSeleniumBrowser(ABC):
     """A base interface class for launching Selenium
     browsers with customizable options.
 
@@ -39,6 +38,11 @@ class SeleniumBrowser(ABC):
         self.load_js = load_js
 
     @abstractmethod
+    def initialize(self):
+        raise NotImplementedError("Subclasses must implement the 'initialize' method.")
+
+
+class SeleniumBrowser(BaseSeleniumBrowser):
     def initialize(self):
         browser_name = self.browser_name or settings.WEBDRIVER
 
@@ -88,14 +92,9 @@ class SeleniumBrowser(ABC):
 
 
 class SeleniumLauncher:
-    """A class for launching Selenium browsers using a specified SeleniumBrowser instance.
-
-    Args:
-        instance (SeleniumBrowser): An instance of a SeleniumBrowser subclass.
-    """
-
-    def __init__(self, instance: SeleniumBrowser):
+    def __init__(self, instance: BaseSeleniumBrowser):
         self.instance = instance
 
     def launch(self):
+        """Launches the Selenium browser instance."""
         return self.instance.initialize()

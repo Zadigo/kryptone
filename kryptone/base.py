@@ -1,5 +1,4 @@
 import asyncio
-import bisect
 import dataclasses
 import datetime
 import inspect
@@ -8,7 +7,7 @@ import os
 import pathlib
 import random
 import time
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Final, Optional, Sequence
 from urllib.parse import unquote, urljoin
@@ -17,18 +16,13 @@ from uuid import uuid4
 import pytz
 import requests
 from asgiref.sync import async_to_sync
-from selenium.webdriver import Chrome, ChromeOptions, Edge, EdgeOptions
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from kryptone.process import SeleniumBrowser, SeleniumLauncher
 from kryptone import exceptions, logger
 from kryptone.conf import settings
-from kryptone.data_storages import BaseStorage, FileStorage
+from kryptone.data_storages import BaseStorage
 from kryptone.internal_types import (
     PerformanceAuditProtocol,
     TypeData,
@@ -38,9 +32,8 @@ from kryptone.internal_types import (
 from kryptone.utils.date_functions import get_current_date
 from kryptone.utils.functions import create_filename, directory_from_url
 from kryptone.utils.module_loaders import import_from_module
-from kryptone.utils.randomizers import RANDOM_USER_AGENT
 from kryptone.utils.text import color_text
-from kryptone.utils.urls import URL, MultipleURLManager
+from kryptone.utils.urls.managers import URL, MultipleURLManager
 from kryptone.internal_types import TypeStorage
 
 DEFAULT_META_OPTIONS: Final[set[str]] = {
@@ -86,62 +79,6 @@ DEFAULT_META_OPTIONS: Final[set[str]] = {
     "url_gather_ignore_tests",
     "database",
 }
-
-
-def get_selenium_browser_instance(
-    browser_name: Optional[str] = None,
-    headless: bool = False,
-    load_images: bool = True,
-    load_js: bool = True,
-):
-    """Creates a new selenium browser instance
-
-    >>> browser = get_selenium_browser_instance()
-    ... browser.get('...')
-    ... browser.quit()
-    """
-    browser_name = browser_name or settings.WEBDRIVER
-    browser = Chrome if browser_name == "Chrome" else Edge
-    manager_instance = (
-        ChromeDriverManager if browser_name == "Chrome" else EdgeChromiumDriverManager
-    )
-
-    options_klass = ChromeOptions if browser_name == "Chrome" else EdgeOptions
-    options = options_klass()
-    options.add_argument("--remote-allow-origins=*")
-    options.add_argument(f"--user-agent={RANDOM_USER_AGENT()}")
-    options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
-
-    # Allow Selenium to be launched
-    # in headless mode
-    if headless:
-        options.headless = True
-
-    # 0 = Default, 1 = Allow, 2 = Block
-    preferences = {
-        "profile.default_content_setting_values": {
-            "images": 0 if load_images else 2,
-            "javascript": 0 if load_js else 2,
-            "popups": 2,
-            "geolocation": 2,
-            "notifications": 2,
-        }
-    }
-    options.add_experimental_option("prefs", preferences)
-
-    # Proxies
-    if settings.PROXY_IP_ADDRESS is not None:
-        proxy = Proxy()
-        proxy.proxy_type = ProxyType.MANUAL
-        proxy.http_proxy = settings.PROXY_IP_ADDRESS
-        options.add_argument(f"--proxy-server=http://{settings.PROXY_IP_ADDRESS}")
-        options.add_argument("--disable-gpu")
-
-    try:
-        service = Service(manager_instance().install())
-    except Exception:
-        raise ConnectionError("And error occured. Are you offline?")
-    return browser(service=service, options=options)
 
 
 class CrawlerOptions:
@@ -288,13 +225,10 @@ class Crawler(type):
         cls._meta.prepare()
 
 
-class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
+class BaseCrawler(metaclass=Crawler):
     DATA_CONTAINER: list = []
     model = None
 
-    # urls_to_visit: set[URL] = set()
-    # visited_urls: set[URL] = set()
-    # visited_pages_count: int = 0
     list_of_seen_urls: set[URL] = set()
     browser_name: Optional[str] = None
     timezone: str = "UTC"
@@ -304,21 +238,21 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
     additional_storages: list[tuple[str, BaseStorage]] = []
 
     url_manager_class: Final[type[MultipleURLManager]] = MultipleURLManager
-    _meta: Final[O] = None
+    _meta: Final[CrawlerOptions] = None
 
     def __init__(self, browser_name: Optional[str] = None):
+        # A dictionary that allows us to track the
+        # distribution of urls per domain or page visited
+        # self.url_distribution = defaultdict(list)
+        self.spider_uuid = uuid4()
+
         # The start url which corresponds
         # to the first url of "Meta.start_urls"
         # allows us to track the domain to which
         # crawling needs to be limited to
         # self.start_url: Optional[URL] = None
 
-        self.url_manager: Optional[MultipleURLManager] = self.url_manager_class()
-
-        # A dictionary that allows us to track the
-        # distribution of urls per domain or page visited
-        # self.url_distribution = defaultdict(list)
-        self.spider_uuid = uuid4()
+        self.url_manager: Optional[MultipleURLManager] = self.url_manager_class(self)
 
         if not self._meta.debug_mode:
             launcher = SeleniumLauncher(
@@ -350,7 +284,9 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
 
     @property
     def get_origin(self):
-        return self.url_manager.start_url.domain
+        if self.url_manager and self.url_manager.start_url:
+            return self.url_manager.start_url.domain
+
         # if self.start_url is None:
         #     return ""
 
@@ -466,7 +402,7 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
         async def downloader(task_group: asyncio.TaskGroup, url: str):
             try:
                 response = requests.get(url)
-            except:
+            except Exception:
                 logger.warning(f"Could not download image: {color_text('red', url)}")
                 return False
             else:
@@ -553,70 +489,6 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
             logger.info(f"Saving: {instance}")
             self.DATA_CONTAINER.append(instance)
 
-    def backup_urls(self):
-        if self.storage is None:
-            self.storage = FileStorage(spider=self, storage_path=settings.MEDIA_FOLDER)
-
-        async def run_additional_storages(key: str, value: list[Any] | dict[str, Any]):
-            for name, storage in self.additional_storages:
-                # Only use storages that are connected.
-                # This is a none block loop
-                if not storage.is_connected:
-                    logger.warning(f"Could not use {name}. Connection broken")
-                    continue
-                await storage.save_or_create(key, value)
-
-        async def write_cache_file():
-            data = {
-                "spider": self.__class__.__name__,
-                "spider_uuid": self.spider_uuid,
-                "timestamp": self.get_current_date.strftime("%Y-%M-%d %H:%M:%S"),
-                "urls_to_visit": self.normalize_urls(self.urls_to_visit),
-                "visited_urls": self.normalize_urls(self.visited_urls),
-            }
-
-            key_or_filename = f"{settings.CACHE_FILE_NAME}.json"
-
-            if self.storage is not None:
-                await self.storage.save_or_create(key_or_filename, data)
-            await run_additional_storages(key_or_filename, data)
-
-        async def write_seen_urls():
-            sorted_urls: list[URL] = []
-            for url in self.list_of_seen_urls:
-                bisect.insort(sorted_urls, url)
-
-            key_or_filename = "seen_urls.csv"
-
-            if self.storage is not None:
-                await self.storage.save_or_create(
-                    key_or_filename, self.normalize_urls(sorted_urls), adapt_list=True
-                )
-
-            await run_additional_storages(
-                key_or_filename, self.normalize_urls(sorted_urls)
-            )
-
-        async def write_url_distribution():
-            key_or_filename = "url_distribution.json"
-
-            if self.storage is not None:
-                await self.storage.save_or_create(
-                    key_or_filename, self.url_distribution
-                )
-            await run_additional_storages(key_or_filename, self.url_distribution)
-
-        async def main():
-            t1 = asyncio.create_task(write_cache_file())
-            t2 = asyncio.create_task(write_seen_urls())
-            t3 = asyncio.create_task(write_url_distribution())
-
-            aws = [t1, t2, t3]
-            for aw in asyncio.as_completed(aws):
-                await aw
-
-        asyncio.run(main())
-
     def urljoin(self, path: TypeUrl):
         """Returns the domain of the current
         website"""
@@ -624,166 +496,16 @@ class BaseCrawler[O: CrawlerOptions](metaclass=Crawler):
         result = urljoin(str(self.get_origin), path)
         return URL(unquote(result))
 
-    def run_url_filters(self, valid_urls: set[URL]):
-        """Excludes urls in the list of collected
-        urls based on the value of the functions in
-        `url_filters`. All conditions should be true
-        in order for the url be considered valid to
-        be visited"""
-        if self._meta.url_ignore_tests:
-            results: dict[URL, list[bool]] = defaultdict(list)
-            for url in valid_urls:
-                truth_array = results[url]
-                for instance in self._meta.url_ignore_tests:
-                    truth_array.append(instance(url))
-
-            urls_kept: set[URL] = set()
-            urls_removed: set[URL] = set()
-            final_urls_filtering_audit: dict[URL, bool] = OrderedDict()
-
-            for url, truth_array in results.items():
-                final_urls_filtering_audit[url] = any(truth_array)
-
-                # Expect all the test results to
-                # be true. Otherwise the url is invalid
-                if any(truth_array):
-                    urls_removed.add(url)
-                    continue
-                urls_kept.add(url)
-
-            logger.info(f"Filters completed. {len(urls_removed)} url(s) removed")
-            return urls_kept
-        return valid_urls
-
-    def check_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
-        raw_urls = set(urls)
-
-        if self.performance_audit.iteration_count > 0:
-            logger.info(f"Found {len(raw_urls)} url(s) in total on this page")
-
-        raw_urls_objs = list(map(lambda x: URL(x), raw_urls))
-
-        # rename to: ignore_page_tests
-        if self._meta.url_gather_ignore_tests:
-            raw_urls_objs = list(
-                filter(
-                    lambda x: (
-                        not x.multi_test_path(
-                            self._meta.url_gather_ignore_tests, operator="or"
-                        )
-                    ),
-                    raw_urls_objs,
-                )
-            )
-
-        valid_urls: set[URL] = set()
-        invalid_urls: set[URL] = set()
-
-        if self.start_url is None:
-            logger.warning(
-                "Start url is not defined. Will not be able to check "
-                "the domain of the collected urls"
-            )
-
-        for url in raw_urls_objs:
-            if url.is_path:
-                url = self.urljoin(url)
-
-            if refresh:
-                # If we are for example paginating a page,
-                # then we only need to keep the new urls
-                # that have appeared and that we have
-                # not yet seen
-                if url in self.list_of_seen_urls:
-                    invalid_urls.add(url)
-                    continue
-
-            if not url.is_same_domain(self.start_url):
-                invalid_urls.add(url)
-                continue
-
-            if url.is_empty:
-                invalid_urls.add(url)
-                continue
-
-            if url.has_fragment:
-                invalid_urls.add(url)
-                continue
-
-            is_home_page = [
-                url.url_object.path == "/",
-                self.start_url.url_object.path == "/",
-                # To prevent returning an empty list when running
-                # the spider for the first time, require at least
-                # on rotation before running this check
-                self.performance_audit.iteration_count > 0,
-            ]
-
-            if all(is_home_page):
-                invalid_urls.add(url)
-                continue
-
-            if self._meta.ignore_images:
-                if url.is_image:
-                    invalid_urls.add(url)
-                    continue
-
-            if url in self.visited_urls:
-                invalid_urls.add(url)
-                continue
-
-            if url in self.list_of_seen_urls:
-                invalid_urls.add(url)
-                continue
-
-            # If the user provided rule testing
-            # check that the url validates
-            # the regex tests
-            if self._meta.url_rule_tests:
-                truth_array = map(lambda x: url.test_path(x), self._meta.url_rule_tests)
-                if not all(truth_array):
-                    invalid_urls.add(url)
-                    continue
-
-            valid_urls.add(url)
-
-        self.list_of_seen_urls.update(valid_urls)
-        self.list_of_seen_urls.update(invalid_urls)
-
-        if valid_urls:
-            logger.info(f"Kept {len(valid_urls)} url(s) as valid to visit")
-
-        newly_discovered_urls = []
-        for url in valid_urls:
-            if url not in self.list_of_seen_urls:
-                newly_discovered_urls.append(url)
-
-        if newly_discovered_urls:
-            logger.info(f"Discovered {len(newly_discovered_urls)} unseen url(s)")
-        return valid_urls
-
-    # def add_urls(self, urls: Sequence[TypeUrl], refresh: bool = False):
-    #     """Manually add urls to the current urls to
-    #     visit list. This is useful for cases where urls are
-    #     nested in other elements than links cannot actually be
-    #     retrieved by the spider
-
-    #     * Checks that the url was not already seen and therefore invalid be navigated to
-    #     * Checks that the url belongs to the same domain as the start url
-    #     * Runs filtering tests on the url before adding it to the list of urls to visit
-    #     """
-    #     checked_urls = self.check_urls(urls, refresh=refresh)
-    #     filtered_urls = self.run_url_filters(checked_urls)
-    #     self.urls_to_visit.update(filtered_urls)
-
     def calculate_performance(self):
         """Calculate and/log the overall spider performance"""
+        if self.url_manager is None:
+            raise ValueError(
+                "Url manager is not initialized. "
+                "Make sure to call 'setup_class' before starting the spider"
+            )
 
         async def log_urls_performance():
-            total_count = sum([len(self.visited_urls), len(self.urls_to_visit)])
-            result = len(self.visited_urls) / total_count
-            percentage = round(result * 100, 3)
-            logger.info(f"{percentage}% of total urls visited")
+            logger.info(f"{self.url_manager.completion_rate}% of total urls visited")
 
         async def main():
             data = self.performance_audit.json()
@@ -852,7 +574,7 @@ class OnPageActionsMixin:
                 time.sleep(before_click_wait_time)
 
             element.click()
-        except:
+        except Exception:
             logger.info("Consent button not found")
         finally:
             # Some websites might create an issue when
@@ -869,7 +591,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         super().__init__(browser_name=browser_name)
 
         self.start_date = get_current_date(timezone=self.timezone)
-        self.end_date = None
+        self.end_date: Optional[datetime.datetime] = None
         self.performance_audit: PerformanceAuditProtocol = Performance()
         self.performance_audit.timezone = self.timezone
 
@@ -884,18 +606,6 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
     def transform_string_urls(urls: Sequence[TypeUrl]):
         for url in urls:
             yield URL(url) if isinstance(url, str) else url
-
-    # async def start_udp_server(self, host='localhost', port=65432):
-    #     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #     server.bind((host, port))
-
-    #     def handle_client(data, address, server):
-    #         server.sendto(data.encode(), address)
-
-    #     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    #         while True:
-    #             data, address = server.recvfrom(1024)
-    #             executor.submit(handle_client, data, address, server)
 
     def load_storage(self, python_path: str):
         """Use this function to load a storage on the class
@@ -993,6 +703,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 logger.warning(f"Created uuid file @ {color_text('blue', file.path)}")
 
     def before_start(self, start_urls: Sequence[TypeUrl], *args, **kwargs):
+        if self.url_manager is None:
+            raise ValueError(
+                "Url manager is not initialized. "
+                "Make sure to call 'setup_class' before starting the spider"
+            )
+
         # TODO: Maybe reunite the "before_start" and the
         # "setup_class" funcitons into one single function
         # "setup_class"
@@ -1037,7 +753,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         if self.start_url is None:
             self.start_url = URL(start_urls[-1])
 
-        self.add_urls(start_urls)
+        self.url_manager.add_urls(start_urls)
 
     def start(self, start_urls: Sequence[TypeUrl] = [], **kwargs: str | bool):
         skip_setup = kwargs.get("skip_setup", False)
@@ -1097,7 +813,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
                 condition = EC.presence_of_element_located((By.TAG_NAME, "body"))
                 wait.until(condition)
-            except:
+            except Exception:
                 logger.critical("Body element of page was not located")
                 continue
             else:
@@ -1106,11 +822,11 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 else:
                     self.post_navigation_actions(current_url)
 
-            self.visited_urls.add(current_url)
+            self.url_manager._visited_urls.add(current_url)
 
             if self._meta.crawl:
-                self.url_manager.add_urls(self.collect_page_urls(), from_page=self.driver.current_url)
-                self.backup_urls()
+                self.url_manager.add_urls(self.collect_page_urls())
+                self.url_manager.backup_urls()
 
             current_page_actions_params = {}
 
@@ -1142,12 +858,15 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 # that could generate new urls to
                 # disover or changing a filter
                 if self._meta.crawl:
-                    self.url_manager.add_urls(self.collect_page_urls(), from_page=self.driver.current_url, refresh=True)
-                    self.backup_urls()
+                    self.url_manager.add_urls(
+                        self.collect_page_urls(),
+                        refresh=True,
+                    )
+                    self.url_manager.backup_urls()
 
             try:
                 next_url = self.urls_to_visit[-1]
-            except:
+            except Exception:
                 pass
             else:
                 if inspect.iscoroutinefunction(self.before_next_page_actions):
@@ -1304,7 +1023,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     # case, just pass. We'll go to the pages
                     # when we get more urls to use in the tabs
                     current_url = URL(self.urls_to_visit.pop())
-                except:
+                except Exception:
                     continue
                 else:
                     if current_url.is_empty:
@@ -1347,7 +1066,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     # the page to be located  or visible
                     wait = WebDriverWait(self.driver, 5)
                     wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-                except:
+                except Exception:
                     logger.error("Body element of page was not detected")
 
                 if inspect.iscoroutinefunction(self.post_navigation_actions):

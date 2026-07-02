@@ -14,7 +14,7 @@ from kryptone.conf import settings
 from kryptone.internal_types import FileProtocol, TypePath, TypeSiteCrawler
 from kryptone.utils.encoders import DefaultJsonEncoder
 from kryptone.utils.text import color_text
-from kryptone.utils.urls import URL, load_image_extensions
+from kryptone.utils.urls.base import URL, load_image_extensions
 
 
 def simple_list_adapter(data: list[Any]) -> list[list[Any]]:
