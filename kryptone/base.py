@@ -459,7 +459,6 @@ class BaseCrawler(metaclass=Crawler):
                 """
             )
 
-        # self.url_distribution[self.driver.current_url].extend(found_urls)
         return found_urls
 
     def save_object(self, data: TypeData, check_fields_null: list[str] = []):
@@ -793,18 +792,17 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
             self.driver.maximize_window()
 
         wait_time = settings.WAIT_TIME
-        next_execution_date = None
+        next_execution_date: Optional[datetime.datetime] = None
 
         while self.url_manager.urls_to_visit:
             if next_execution_date is not None:
                 if self.get_current_date < next_execution_date:
                     continue
 
-            # current_url = URL(self.url_manager.urls_to_visit.pop())
             current_url = self.url_manager.get()
 
-            colored_text = color_text("green", self.url_manager.urls_to_visit_count)
-            logger.info(f"{colored_text} urls left to visit")
+            text = color_text("green", self.url_manager.urls_to_visit_count)
+            logger.info(f"{text} urls left to visit")
 
             if current_url is None:
                 logger.info("No more urls to visit")
@@ -915,8 +913,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 self.performance_audit.end_date = self.get_current_date
                 self.performance_audit.calculate_duration()
 
-            self.performance_audit.count_urls_to_visit = self.url_manager.urls_to_visit_count
-            self.performance_audit.count_visited_urls = self.url_manager.visited_urls_count
+            self.performance_audit.count_urls_to_visit = (
+                self.url_manager.urls_to_visit_count
+            )
+            self.performance_audit.count_visited_urls = (
+                self.url_manager.visited_urls_count
+            )
 
             text = color_text("blue", next_execution_date)
             logger.info(f"Next execution time: {text}")
@@ -960,14 +962,7 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         #             visited_urls = storage.get('visited_urls')
         # else:
         data = async_to_sync(self.storage.get)("cache.json")
-
-        self.start_url = URL(self._meta.start_urls[0])
-
-        urls_to_visit = self.check_urls(data["urls_to_visit"])
-        visited_urls = self.check_urls(data["visited_urls"])
-
-        self.urls_to_visit = urls_to_visit
-        self.visited_urls = visited_urls
+        self.url_manager.restore(data["urls_to_visit"], data["visited_urls"])
 
         state = async_to_sync(self.storage.has)("seen_urls.csv")
         if not state:
@@ -1025,40 +1020,39 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
         self.driver.switch_to.window(self.driver.window_handles[0])
         next_execution_date = None
 
-        while self.urls_to_visit:
+        while self.url_manager.urls_to_visit:
             if next_execution_date is not None:
                 if self.get_current_date < next_execution_date:
                     continue
 
-            current_urls = []
+            selected_urls: list[str] = []
 
-            # 1. Create a batch of urls to visit
-            # and navigate to
+            # 1. Create a batch of urls to visit and navigate to
             for _ in self.driver.window_handles:
-                try:
-                    # In the very start we could have just
-                    # one url available to visit. In which
-                    # case, just pass. We'll go to the pages
-                    # when we get more urls to use in the tabs
-                    current_url = URL(self.urls_to_visit.pop())
-                except Exception:
+                # In the very start we could have just
+                # one url available to visit. In which
+                # case, just pass. We'll go to the pages
+                # when we get more urls to use in the tabs
+                current_url = self.url_manager.get()
+                if current_url is None:
                     continue
-                else:
-                    if current_url.is_empty:
-                        continue
-                    current_urls.append(str(current_url))
 
-            logger.info(f"{len(self.urls_to_visit)} urls left to visit")
+                if current_url.is_empty:
+                    continue
+
+                selected_urls.append(str(current_url))
+
+            logger.info(f"{self.url_manager.urls_to_visit_count} urls left to visit")
 
             # 2. Load each urls into the tabs
-            url_instances = []
+            selected_url_instances = []
 
             for i, handle in enumerate(self.driver.window_handles):
                 try:
                     # Same. If we only had one url
                     # to start with, this will raise
                     # IndexError - so just skip
-                    current_url = URL(current_urls[i])
+                    current_url = URL(selected_urls[i])
                 except IndexError:
                     continue
 
@@ -1092,13 +1086,12 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 else:
                     self.post_navigation_actions(current_url)
 
-                self.visited_urls.add(current_url)
-                url_instances.append(current_url)
+                selected_url_instances.append(current_url)
 
             # 3. Run the custom actions on the page
             for i, handle in enumerate(self.driver.window_handles):
                 try:
-                    url_instance = url_instances[i]
+                    url_instance = selected_url_instances[i]
                 except IndexError:
                     continue
 
@@ -1106,11 +1099,8 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
 
                 if self._meta.crawl:
                     self.collect_page_urls()
-                else:
-                    self.visited_urls.add(current_url)
-                    self.list_of_seen_urls.add(current_url)
 
-                self.backup_urls()
+                self.url_manager.backup_urls()
 
                 try:
                     if inspect.iscoroutinefunction(self.current_page_actions):
@@ -1137,10 +1127,10 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                     # user actions have been completed
                     # for example scrolling down a page
                     # that could generate new urls to
-                    # disover or changing a filter
+                    # discover or changing a filter
                     if self._meta.crawl:
                         self.collect_page_urls()
-                        self.backup_urls()
+                        self.url_manager.backup_urls()
 
                 # Run routing actions aka, base on given
                 # url path, route to a function that
@@ -1162,17 +1152,21 @@ class SiteCrawler(OnPageActionsMixin, BaseCrawler):
                 seconds=wait_time
             )
 
-            if len(self.urls_to_visit) == 0:
+            if self.url_manager.urls_to_visit_count == 0:
                 self.performance_audit.end_date = self.get_current_date
                 self.performance_audit.calculate_duration()
 
-            self.performance_audit.count_urls_to_visit = len(self.urls_to_visit)
-            self.performance_audit.count_visited_urls = len(self.visited_urls)
+            self.performance_audit.count_urls_to_visit = len(
+                self.url_manager.urls_to_visit
+            )
+            self.performance_audit.count_visited_urls = len(
+                self.url_manager.visited_urls
+            )
 
             if os.getenv("KYRPTONE_TEST_RUN") is not None:
                 break
 
             logger.info(f"Next execution time: {next_execution_date}")
 
-            current_urls.clear()
-            url_instances.clear()
+            selected_urls.clear()
+            selected_url_instances.clear()

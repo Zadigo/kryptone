@@ -38,12 +38,12 @@ class BaseSeleniumBrowser(ABC):
         self.load_js = load_js
 
     @abstractmethod
-    def initialize(self):
+    def initialize(self) -> Chrome | Edge:
         raise NotImplementedError("Subclasses must implement the 'initialize' method.")
 
 
 class SeleniumBrowser(BaseSeleniumBrowser):
-    def initialize(self):
+    def initialize(self) -> Chrome | Edge:
         browser_name = self.browser_name or settings.WEBDRIVER
 
         browser = Chrome if browser_name == "Chrome" else Edge

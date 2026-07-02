@@ -13,7 +13,7 @@ import pytz
 
 from kryptone import logger
 from kryptone.utils.date_functions import get_current_date
-from kryptone.internal_types import TypeSiteCrawler
+from kryptone.internal_types import TypeSiteCrawler, TypeUrl
 from kryptone.utils.urls.base import URL
 from kryptone.data_storages import FileStorage
 from kryptone.conf import settings
@@ -60,6 +60,7 @@ class MultipleURLManager:
         # A dataframe used to store the urls to visit and visited urls
         # and can be used to export the data to a csv or json file
         self.dataframe: Optional[pandas.DataFrame] = None
+        self.visited_pages
 
     def __repr__(self):
         name = self.__class__.__name__
@@ -208,7 +209,7 @@ class MultipleURLManager:
             return urls_kept
         return valid_urls
 
-    def check_urls(self, urls: Sequence[URL], refresh=False):
+    def check_urls(self, urls: Sequence[TypeUrl], refresh=False):
         raw_urls = set(urls)
 
         if self.current_iteration > 0:
@@ -345,6 +346,9 @@ class MultipleURLManager:
             self.add_urls(start_urls)
 
     def backup_urls(self):
+        """Backs up the current state of the URL manager to a storage.
+        This method saves the list of URLs to visit and the list of visited URLs
+        to a storage, allowing for the crawling session to be resumed later."""
         if self._driver.storage is None:
             self._driver.storage = FileStorage(
                 spider=self._driver, storage_path=settings.MEDIA_FOLDER
@@ -415,3 +419,16 @@ class MultipleURLManager:
                 await aw
 
         asyncio.run(main())
+
+    def restore(self, urls_to_visit: Sequence[str], visited_urls: Sequence[str]):
+        """Restores the state of the URL manager from a backup.
+        This method is useful for resuming a crawling session after
+        an interruption.
+
+        Args:
+            urls_to_visit (Sequence[str]): A sequence of URLs that are yet to be visited.
+            visited_urls (Sequence[str]): A sequence of URLs that have already been visited.
+        """
+        self.add_urls(urls_to_visit)
+        self._visited_urls = set(map(lambda x: URL(x), visited_urls))
+        self.start_url = self._urls_to_visit.pop() if self._urls_to_visit else None
